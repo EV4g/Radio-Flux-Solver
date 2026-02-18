@@ -10,13 +10,11 @@ import glob
 basedir = "/home/floris/Documents/PhD/Galactic plane/"
 
 meerkat_files = np.sort(glob.glob(basedir+"LOFAR_and_MeerKAT/data/smgps_mfs_images/*.fits"))
-#lofar_files = np.sort(glob.glob(basedir+"P282+00/*.fits"))
-#lofar_files = np.sort(glob.glob(basedir+"P282+00/ddf/Multi/HogbomMulti/*.fits"))
-
-lofar_files = np.sort(glob.glob("/home/floris/Downloads/low-mosaic-blanked.fits")) # low-res
+lofar_files = np.sort(glob.glob(basedir+"P282+00/ddf/Multi/HogbomMulti/*.fits")) #1 restored; 3 dirty
+#lofar_files = np.sort(glob.glob(basedir+"LOFAR_and_MeerKAT/data/lofar_images/*.fits"))
 
 meerkat_file = meerkat_files[11]
-lofar_file = lofar_files[0] #3
+lofar_file = lofar_files[1]
 
 # load meerkat data
 mhdul = fits.open(meerkat_file)
@@ -31,8 +29,8 @@ lofar_header = lhdul[0].header
 wcs_L = WCS(lofar_header).celestial
 
 # cutout (galactic lat,lon)
-cutout_lat = [-0.8, 0]
-cutout_lon = [34.2, 35]
+cutout_lat = [-0.75, -0.05]
+cutout_lon = [34.25, 34.95]
 
 l0 = np.mean(cutout_lon) * u.deg
 b0 = np.mean(cutout_lat) * u.deg
@@ -74,13 +72,16 @@ lofar_cut,   lofar_fp   = reproject_interp((lofar_data,   wcs_L), wcs_out, shape
 def spectral_index(S1, S2, v1, v2):
     return (np.log(S1) - np.log(S2)) / (np.log(v1) - np.log(v2))
 
-plt.imshow(meerkat_cut, vmin=-0.005, vmax=0.02, origin='lower')
+plt.imshow(meerkat_cut, vmin=-np.nanstd(meerkat_cut), vmax=5*np.nanstd(meerkat_cut), origin='lower')
 plt.colorbar()
 plt.show()
 
-plt.imshow(lofar_cut, vmin=-0.005, vmax=0.02, origin='lower')
+plt.imshow(lofar_cut, vmin=-np.nanstd(lofar_cut), vmax=5*np.nanstd(lofar_cut), origin='lower')
 plt.colorbar()
 plt.show()
 
-plt.imshow(spectral_index(meerkat_cut, lofar_cut, 1359.7, 150), origin='lower', vmin=-2, vmax=2, cmap='bwr')
+# spectral index map
+spx = spectral_index(meerkat_cut, lofar_cut, 1359.7, 150)
+plt.imshow(spx, origin='lower', vmin=-2, vmax=2, cmap='bwr')
 plt.colorbar()
+plt.show()
