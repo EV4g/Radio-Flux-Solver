@@ -24,7 +24,7 @@ def get_meerkat_file(files, coord):
         c = coord.transform_to(w.wcs.radesys.lower() if w.wcs.radesys else "icrs")
         x, y = w.world_to_pixel(c)
 
-        if (0 <= x < nx) and (0 <= y < ny): return i
+        if (0 <= x < nx) and (0 <= y < ny): return files[i]
 
     return None
 
@@ -52,7 +52,7 @@ def get_pixscale(wcs_A, wcs_B, w, h):
 
     nx = int(np.ceil((w  / pixscale).decompose().value))
     ny = int(np.ceil((h / pixscale).decompose().value))
-    return nx, ny
+    return pixscale, nx, ny
     
 
 def generate_new_wcs(center, nx, ny, pixscale):
