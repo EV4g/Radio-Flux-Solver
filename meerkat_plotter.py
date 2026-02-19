@@ -1,3 +1,5 @@
+import warnings
+from astropy.wcs import FITSFixedWarning
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
@@ -7,71 +9,41 @@ from reproject import reproject_interp
 import matplotlib.pyplot as plt
 import glob
 
+from functions import spectral_index, get_meerkat_file, cutout_to_galactic_wh, get_pixscale, generate_new_wcs
+
+warnings.filterwarnings("ignore", category=FITSFixedWarning)
 basedir = "/home/floris/Documents/PhD/Galactic plane/"
 
 meerkat_files = np.sort(glob.glob(basedir+"LOFAR_and_MeerKAT/data/smgps_mfs_images/*.fits"))
 lofar_files = np.sort(glob.glob(basedir+"P282+00/ddf/Multi/HogbomMulti/*.fits")) #1 restored; 3 dirty
-#lofar_files = np.sort(glob.glob(basedir+"LOFAR_and_MeerKAT/data/lofar_images/*.fits"))
-
-meerkat_file = meerkat_files[11]
-lofar_file = lofar_files[1]
-
-# load meerkat data
-mhdul = fits.open(meerkat_file)
-meerkat_data = mhdul[0].data[0, 0]
-meerkat_header = mhdul[0].header
-wcs_M = WCS(meerkat_header).celestial
-
-# load lofar file
-lhdul = fits.open(lofar_file)
-lofar_data = lhdul[0].data if len(lhdul[0].data.shape) == 2 else lhdul[0].data[0, 0]
-lofar_header = lhdul[0].header
-wcs_L = WCS(lofar_header).celestial
+#lofar_files = np.sort(glob.glob(basedir+"LOFAR_and_MeerKAT/data/lofar_images/*.fits")) #0 high res; 1 low res
 
 # cutout (galactic lat,lon)
 cutout_lat = [-0.75, -0.05]
 cutout_lon = [34.25, 34.95]
+center, width, height = cutout_to_galactic_wh(cutout_lon, cutout_lat)
 
-l0 = np.mean(cutout_lon) * u.deg
-b0 = np.mean(cutout_lat) * u.deg
-center = SkyCoord(l=l0, b=b0, frame="galactic")
+# load meerkat data
+meerkat_file = get_meerkat_file(meerkat_files, center)
+mhdul = fits.open(meerkat_file)
+meerkat_data = mhdul[0].data[0, 0]
+wcs_M = WCS(mhdul[0].header).celestial
 
-dlon = (cutout_lon[1] - cutout_lon[0]) * u.deg
-dlat = (cutout_lat[1] - cutout_lat[0]) * u.deg
-width  = abs(dlon)
-height = abs(dlat)
+# load lofar file
+lofar_file = lofar_files[1]
+lhdul = fits.open(lofar_file)
+lofar_data = lhdul[0].data if len(lhdul[0].data.shape) == 2 else lhdul[0].data[0, 0]
+wcs_L = WCS(lhdul[0].header).celestial
 
-# choose an output pixel scale (pick the finer of the two so you don't lose detail)
-# cdelt is deg/pix; take absolute and min across both images
-scale_M = np.min(np.abs(wcs_M.wcs.cdelt)) * u.deg
-scale_L = np.min(np.abs(wcs_L.wcs.cdelt)) * u.deg
-pixscale = max(scale_M, scale_L)
-
-nx = int(np.ceil((width  / pixscale).decompose().value))
-ny = int(np.ceil((height / pixscale).decompose().value))
-
-# build WCS
-wcs_out = WCS(naxis=2)
-wcs_out.wcs.ctype = ["GLON-TAN", "GLAT-TAN"]
-wcs_out.wcs.cunit = ["deg", "deg"]
-wcs_out.wcs.crval = [center.galactic.l.deg, center.galactic.b.deg]
-wcs_out.wcs.crpix = [(nx + 1) / 2.0, (ny + 1) / 2.0]
-wcs_out.wcs.cdelt = [-pixscale.to_value(u.deg), pixscale.to_value(u.deg)]
-
-shape_out = (ny, nx)
+# get pixel scale and image size, and build new wcs
+pixscale, nx, ny = get_pixscale(wcs_M, wcs_L, width, height)
+wcs_out = generate_new_wcs(center, nx, ny, pixscale)
 
 # reproject both to the same grid
-meerkat_cut, meerkat_fp = reproject_interp((meerkat_data, wcs_M), wcs_out, shape_out=shape_out)
-lofar_cut,   lofar_fp   = reproject_interp((lofar_data,   wcs_L), wcs_out, shape_out=shape_out)
-
-
-
+meerkat_cut, meerkat_fp = reproject_interp((meerkat_data, wcs_M), wcs_out, shape_out=(nx, ny))
+lofar_cut,   lofar_fp   = reproject_interp((lofar_data,   wcs_L), wcs_out, shape_out=(nx, ny))
 
 #### analysis
-
-def spectral_index(S1, S2, v1, v2):
-    return (np.log(S1) - np.log(S2)) / (np.log(v1) - np.log(v2))
-
 plt.imshow(meerkat_cut, vmin=-np.nanstd(meerkat_cut), vmax=5*np.nanstd(meerkat_cut), origin='lower')
 plt.colorbar()
 plt.show()
