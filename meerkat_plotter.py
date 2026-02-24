@@ -15,7 +15,8 @@ warnings.filterwarnings("ignore", category=FITSFixedWarning)
 basedir = "/home/floris/Documents/PhD/Galactic plane/"
 
 meerkat_files = np.sort(glob.glob(basedir+"LOFAR_and_MeerKAT/data/smgps_mfs_images/*.fits"))
-lofar_files = np.sort(glob.glob(basedir+"P282+00/ddf/Multi/HogbomMulti/*.fits")) #1 restored; 3 dirty
+#lofar_files = np.sort(glob.glob(basedir+"P282+00/ddf/Multi/HogbomMulti/*.fits")) #1 restored; 3 dirty
+lofar_files = np.sort(glob.glob(basedir+"P282+00/ddf/Multi/MSC_deep/*.fits")) #1 restored; 3 dirty
 #lofar_files = np.sort(glob.glob(basedir+"LOFAR_and_MeerKAT/data/lofar_images/*.fits")) #0 high res; 1 low res
 
 # cutout (galactic lat,lon)
