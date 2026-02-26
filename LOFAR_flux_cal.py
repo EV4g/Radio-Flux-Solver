@@ -12,6 +12,7 @@ from scipy.optimize import curve_fit
 from tqdm import tqdm
 
 from functions import spectral_index, get_pixscale, generate_new_wcs, fit_gauss, gaussian_volume
+def line(x, a, b): return a * x + b
 
 racs_files = np.sort(glob.glob(os.getcwd()+"/data/racs/*.fits"))
 lofar_files = glob.glob(os.getcwd()+"/data/lofar_images/*.fits")
@@ -38,8 +39,12 @@ lofar_flux = np.zeros_like(cat_ra)
 racs_flux = np.zeros_like(cat_ra)
 peak_separation = np.zeros_like(cat_ra)
 
+# cutout width x height, and pixel and beam scaling
 w, h = 1.5 * u.arcmin, 1.5 * u.arcmin
 pixscale, nx, ny = get_pixscale(wcs_R, wcs_L, w, h)
+beam_area_lofar_px = (np.pi / (4 * np.log(2))) * (lhdul[0].header['BMAJ'] * 3600 / pixscale.value) * (lhdul[0].header['BMIN'] * 3600 / pixscale.value)
+beam_area_racs_px  = (np.pi / (4 * np.log(2))) * (hdul[0].header['BMAJ']  * 3600 / pixscale.value) * (hdul[0].header['BMIN']  * 3600 / pixscale.value)
+
 for i, (ra, dec) in tqdm(enumerate(zip(cat_ra, cat_dec))):    
     pos = SkyCoord(ra*u.deg, dec*u.deg, frame="icrs")
 
@@ -62,9 +67,8 @@ for i, (ra, dec) in tqdm(enumerate(zip(cat_ra, cat_dec))):
     dist = np.sqrt((lofar_popt[1] - racs_popt[1])**2 + (lofar_popt[2] - racs_popt[2])**2)
     peak_separation[i] = dist
     
-    lofar_flux[i] = gaussian_volume(lofar_popt[0], lofar_popt[3])
-    racs_flux[i] = gaussian_volume(racs_popt[0], racs_popt[3])
-
+    lofar_flux[i] = gaussian_volume(lofar_popt[0], lofar_popt[3]) / beam_area_lofar_px
+    racs_flux[i] = gaussian_volume(racs_popt[0], racs_popt[3]) / beam_area_racs_px
     
     # debug plot
     # fig, ax = plt.subplots(1, 2, figsize=(8, 3))
