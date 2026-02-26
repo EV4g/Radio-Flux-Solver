@@ -35,19 +35,19 @@ wcs_L = WCS(lhdul[0].header).celestial
 cat_ra, cat_dec = cat.data['RA'], cat.data['DEC']
 
 # arrays to fill with values
-lofar_flux = np.zeros_like(cat_ra)
-racs_flux = np.zeros_like(cat_ra)
-peak_separation = np.zeros_like(cat_ra)
+lofar_flux       = np.zeros_like(cat_ra)
+racs_flux        = np.zeros_like(cat_ra)
+peak_separation  = np.zeros_like(cat_ra)
+sigma_pcov_lofar = np.zeros_like(cat_ra)
+sigma_pcov_racs  = np.zeros_like(cat_ra)
 
 # cutout width x height, and pixel and beam scaling
 w, h = 1.5 * u.arcmin, 1.5 * u.arcmin
 pixscale, nx, ny = get_pixscale(wcs_R, wcs_L, w, h)
 beam_area_lofar_px = (np.pi / (4 * np.log(2))) * (lhdul[0].header['BMAJ'] * 3600 / pixscale.value) * (lhdul[0].header['BMIN'] * 3600 / pixscale.value)
 beam_area_racs_px  = (np.pi / (4 * np.log(2))) * (hdul[0].header['BMAJ']  * 3600 / pixscale.value) * (hdul[0].header['BMIN']  * 3600 / pixscale.value)
-#beam_area_lofar_px = lhdul[0].header['BMAJ'] * lhdul[0].header['BMIN']
-#beam_area_racs_px  = hdul[0].header['BMAJ'] * hdul[0].header['BMIN']
 
-for i, (ra, dec) in tqdm(enumerate(zip(cat_ra, cat_dec))):    
+for i, (ra, dec) in tqdm(enumerate(zip(cat_ra, cat_dec)), total=len(cat_ra)):    
     pos = SkyCoord(ra*u.deg, dec*u.deg, frame="icrs")
 
     # cutout each image around (ra,dec) in its native grid (fast)
@@ -66,6 +66,9 @@ for i, (ra, dec) in tqdm(enumerate(zip(cat_ra, cat_dec))):
     lofar_fit, lofar_popt, lofar_pcov = fit_gauss(lofar_cut, simple=True, debug=True)
     racs_fit, racs_popt, racs_pcov = fit_gauss(racs_cut, simple=True, debug=True)
     
+    sigma_pcov_lofar[i] = np.sqrt(lofar_pcov[3,3])
+    sigma_pcov_racs[i] =np.sqrt(racs_pcov[3,3])
+    
     dist = np.sqrt((lofar_popt[1] - racs_popt[1])**2 + (lofar_popt[2] - racs_popt[2])**2)
     peak_separation[i] = dist
     
@@ -81,25 +84,27 @@ for i, (ra, dec) in tqdm(enumerate(zip(cat_ra, cat_dec))):
 
 
 # quality filtering
-valid = (lofar_flux > 0) & (racs_flux > 0) & np.isfinite(lofar_flux) & np.isfinite(racs_flux) & (peak_separation < 2)
+valid = (lofar_flux > 1e-11) & (racs_flux > 1e-11) & np.isfinite(lofar_flux) & np.isfinite(racs_flux) \
+        & (peak_separation < 2) & (sigma_pcov_lofar < 0.3) & (sigma_pcov_racs < 0.3)
+        
 
 #### analysis
 spectral_index_alpha = -0.7
-lofar_freq = 150e6 #Hz
+lofar_freq = 144.6e6 #Hz
 racs_freq = 887.5e6 #Hz
+spectral_flux_ratio = (lofar_freq / racs_freq)**spectral_index_alpha
 
-#plt.scatter(racs_flux, lofar_flux)
-# plt.scatter(racs_flux[valid], lofar_flux[valid])
-# popt, _ = curve_fit(line, racs_flux[valid], lofar_flux[valid])
-# x = np.linspace(np.min(racs_flux[valid]), np.max(racs_flux[valid]), 100)
-# plt.plot(x, line(x, *popt), color='red', ls='--')
+# plt.loglog(racs_flux[valid], lofar_flux[valid], '.')
+popt, _ = curve_fit(line, np.log10(racs_flux[valid]), np.log10(lofar_flux[valid]))
+x = 10**np.linspace(np.min(np.log10(racs_flux[valid])), np.log10(np.max(racs_flux[valid])), 100)
+# plt.plot(x, 10**popt[1]*x**popt[0], color='red', ls='--')
 
 # plt.xlabel("RACS flux")
 # plt.ylabel("Lofar flux")
 # plt.title("Relative flux")
 # plt.show()
 
-ratio = lofar_flux[valid] / (racs_flux[valid] * (lofar_freq / racs_freq)**spectral_index_alpha)
+ratio = lofar_flux[valid] / (racs_flux[valid] * spectral_flux_ratio)
 valid_ratio = np.isfinite(ratio) & (ratio > 0)
 log_ratio = np.log10(ratio)
 
@@ -108,15 +113,16 @@ scatter      = np.std(log_ratio)
 N            = len(log_ratio)
 stderr       = scatter / np.sqrt(N)
 
-print(f"N valid sources     : {N}")
-print(f"Median log10(ratio) : {scale_factor:.4f}  ({10**scale_factor:.4f}×)")
-print(f"Scatter (1σ)        : {scatter:.4f} dex")
+print(f"N valid sources      : {N}")
+print(f"Median log10(ratio)  : {scale_factor:.4f}  ({10**scale_factor:.4f}×)")
+print(f"Scatter (1σ)         : {scatter:.4f} dex")
 print(f"Uncertainty on median: ±{stderr:.4f} dex")
 
-fig, ax = plt.subplots(1, 2, figsize=(12, 4))
+fig, ax = plt.subplots(1, 2, figsize=(11, 4))
 ax[0].scatter(racs_flux[valid], lofar_flux[valid], s=10, alpha=0.5)
-x = np.linspace(racs_flux[valid].min(), racs_flux[valid].max(), 100)
-ax[0].plot(x, x * (lofar_freq / racs_freq)**spectral_index_alpha, 'r--', label=f'Expected (α={spectral_index_alpha})')
+ax[0].plot(x, 10**popt[1]*x**popt[0], color='purple', ls='--', label="Data fit")
+x2 = np.linspace(racs_flux[valid].min(), racs_flux[valid].max(), 10)
+ax[0].plot(x2, x2 * spectral_flux_ratio, 'r--', label=f'Expected (α={spectral_index_alpha})')
 ax[0].set_xscale('log'); ax[0].set_yscale('log')
 ax[0].set_xlabel("RACS flux [Jy]"); ax[0].set_ylabel("LOFAR flux [Jy]")
 ax[0].legend()
@@ -124,7 +130,7 @@ ax[0].legend()
 # Log-ratio histogram
 ax[1].hist(log_ratio, bins=30, edgecolor='k')
 ax[1].axvline(scale_factor, color='red', ls='--', label=f'Median = {scale_factor:.3f}')
-ax[1].set_xlabel("log₁₀(S_LOFAR / S_RACS_corrected)")
+ax[1].set_xlabel(r"log$_{10}$(S_LOFAR / S_RACS_corrected)")
 ax[1].set_ylabel("N")
 ax[1].legend()
 plt.tight_layout()
