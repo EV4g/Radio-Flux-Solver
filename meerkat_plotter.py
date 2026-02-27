@@ -20,8 +20,8 @@ lofar_files = np.sort(glob.glob(basedir+"P282+00/ddf/Multi/MSC_deep/*.fits")) #1
 #lofar_files = np.sort(glob.glob(basedir+"LOFAR_and_MeerKAT/data/lofar_images/*.fits")) #0 high res; 1 low res
 
 # cutout (galactic lat,lon)
-cutout_lat = [-0.75, -0.05]
-cutout_lon = [34.25, 34.95]
+cutout_lat = [-0.72, -0.08]
+cutout_lon = [34.4, 34.92]
 center, width, height = cutout_to_galactic_wh(cutout_lon, cutout_lat)
 
 # load meerkat data
@@ -41,8 +41,8 @@ pixscale, nx, ny = get_pixscale(wcs_M, wcs_L, width, height)
 wcs_out = generate_new_wcs(center, nx, ny, pixscale)
 
 # reproject both to the same grid
-meerkat_cut, meerkat_fp = reproject_interp((meerkat_data, wcs_M), wcs_out, shape_out=(nx, ny))
-lofar_cut,   lofar_fp   = reproject_interp((lofar_data,   wcs_L), wcs_out, shape_out=(nx, ny))
+meerkat_cut, meerkat_fp = reproject_interp((meerkat_data, wcs_M), wcs_out, shape_out=(ny, nx))
+lofar_cut,   lofar_fp   = reproject_interp((lofar_data,   wcs_L), wcs_out, shape_out=(ny, nx))
 
 #### analysis
 plt.imshow(meerkat_cut, vmin=-np.nanstd(meerkat_cut), vmax=5*np.nanstd(meerkat_cut), origin='lower')
@@ -54,7 +54,7 @@ plt.colorbar()
 plt.show()
 
 # spectral index map
-spx = spectral_index(meerkat_cut, lofar_cut, 1359.7, 150)
+spx = spectral_index(meerkat_cut, lofar_cut*4, 1359.7, 144.6)
 plt.imshow(spx, origin='lower', vmin=-2, vmax=2, cmap='bwr')
 plt.colorbar()
 plt.show()
