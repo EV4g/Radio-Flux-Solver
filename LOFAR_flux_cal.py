@@ -45,6 +45,8 @@ racs_flux        = np.zeros_like(cat_ra)
 peak_separation  = np.zeros_like(cat_ra)
 sigma_pcov_lofar = np.zeros_like(cat_ra)
 sigma_pcov_racs  = np.zeros_like(cat_ra)
+local_snr        = np.zeros_like(cat_ra)
+local_snr_fit    = np.zeros_like(cat_ra)
 
 # cutout width x height, and pixel and beam scaling
 w, h = 1.5 * u.arcmin, 1.5 * u.arcmin
@@ -66,31 +68,38 @@ for i, (ra, dec) in tqdm(enumerate(zip(cat_ra, cat_dec)), total=len(cat_ra)):
     racs_cut, racs_fp = reproject_interp((r_co.data, r_co.wcs), wcs_out, shape_out=(nx, ny))
     lofar_cut, lofar_fp = reproject_interp((l_co.data, l_co.wcs), wcs_out, shape_out=(nx, ny))
     
-    
     # gaussian point fit popt=[amplitude, x, y, sigma, z_offset]
     lofar_fit, lofar_popt, lofar_pcov = fit_gauss(lofar_cut, simple=True, debug=True)
-    racs_fit, racs_popt, racs_pcov = fit_gauss(racs_cut, simple=True, debug=True)
+    racs_fit,  racs_popt,  racs_pcov  = fit_gauss(racs_cut, simple=True, debug=True)
+    
+    local_snr[i]     = np.nanmax(lofar_cut) / np.nanstd(lofar_cut) # S/N of actual data
+    local_snr_fit[i] = np.nanmax(lofar_fit) / np.nanstd(lofar_cut) # S/N of fitting gaussian relative to data noise
     
     sigma_pcov_lofar[i] = np.sqrt(lofar_pcov[3,3])
-    sigma_pcov_racs[i] =np.sqrt(racs_pcov[3,3])
+    sigma_pcov_racs[i]  = np.sqrt(racs_pcov[3,3])
     
     dist = np.sqrt((lofar_popt[1] - racs_popt[1])**2 + (lofar_popt[2] - racs_popt[2])**2)
     peak_separation[i] = dist
     
     lofar_flux[i] = gaussian_volume(lofar_popt[0], lofar_popt[3]) / beam_area_lofar_px
-    racs_flux[i] = gaussian_volume(racs_popt[0], racs_popt[3]) / beam_area_racs_px
+    racs_flux[i]  = gaussian_volume(racs_popt[0], racs_popt[3]) / beam_area_racs_px
     
     # debug plot
-    # fig, ax = plt.subplots(1, 2, figsize=(8, 3))
-    # ax[0].imshow(racs_cut, origin="lower", vmin=-np.nanstd(racs_cut), vmax=5*np.nanstd(racs_cut)); ax[0].set_title("RACS")
-    # ax[1].imshow(lofar_cut, origin="lower", vmin=-np.nanstd(lofar_cut), vmax=5*np.nanstd(lofar_cut)); ax[1].set_title("LOFAR")
-    # plt.suptitle(str(i))
-    # plt.show()
+    # is_valid = (lofar_flux[i] > 1e-3) & (racs_flux[i] > 1e-3) & np.isfinite(lofar_flux[i]) & np.isfinite(racs_flux[i]) & (dist < 2) & (sigma_pcov_lofar[i] < 0.3) & (sigma_pcov_racs[i] < 0.3)
+    # if is_valid:
+    #     fig, ax = plt.subplots(2, 2, figsize=(8, 8))
+    #     ax[0, 0].imshow(racs_cut, origin="lower", vmin=-np.nanstd(racs_cut), vmax=5*np.nanstd(racs_cut)); ax[0, 0].set_title("RACS")
+    #     ax[1, 0].imshow(lofar_cut, origin="lower", vmin=-np.nanstd(lofar_cut), vmax=5*np.nanstd(lofar_cut)); ax[1, 0].set_title("LOFAR")
+    #     ax[0, 1].imshow(racs_fit, origin="lower", vmin=-np.nanstd(racs_cut), vmax=5*np.nanstd(racs_cut))
+    #     ax[1, 1].imshow(lofar_fit, origin="lower", vmin=-np.nanstd(lofar_cut), vmax=5*np.nanstd(lofar_cut))
+    #     plt.suptitle(f"Source {i} is Valid: {is_valid}")
+    #     plt.show()
 
 
 # quality filtering
-valid = (lofar_flux > 1e-11) & (racs_flux > 1e-11) & np.isfinite(lofar_flux) & np.isfinite(racs_flux) \
-        & (peak_separation < 2) & (sigma_pcov_lofar < 0.3) & (sigma_pcov_racs < 0.3)
+valid = (lofar_flux > 1e-3) & (racs_flux > 1e-3) & np.isfinite(lofar_flux) & np.isfinite(racs_flux) \
+        & (peak_separation < 2) & (sigma_pcov_lofar < 0.3) & (sigma_pcov_racs < 0.3) \
+        & (local_snr > 5) & (local_snr_fit > 4)
         
 
 #### analysis
