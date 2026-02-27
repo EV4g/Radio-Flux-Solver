@@ -41,12 +41,14 @@ def cutout_to_galactic_wh(cutout_lon, cutout_lat):
     return center, width, height
 
 
-def get_pixscale(wcs_A, wcs_B, w, h):
+def get_pixscale(wcs_A, wcs_B, w, h, use_highest_res=True):
     # choose an output pixel scale (pick the finer of the two so you don't lose detail)
     # cdelt is deg/pix; take absolute and min across both images
     scale_M = np.min(np.abs(wcs_A.wcs.cdelt)) * u.deg
     scale_L = np.min(np.abs(wcs_B.wcs.cdelt)) * u.deg
-    pixscale = max(scale_M, scale_L)
+    
+    if use_highest_res: pixscale = min(scale_M, scale_L)
+    else: pixscale = max(scale_M, scale_L)
 
     nx = int(np.ceil((w  / pixscale).decompose().value))
     ny = int(np.ceil((h / pixscale).decompose().value))
