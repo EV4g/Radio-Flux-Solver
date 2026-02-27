@@ -50,9 +50,9 @@ local_snr_fit    = np.zeros_like(cat_ra)
 
 # cutout width x height, and pixel and beam scaling
 w, h = 1.5 * u.arcmin, 1.5 * u.arcmin
-pixscale, nx, ny = get_pixscale(wcs_R, wcs_L, w, h)
-beam_area_lofar_px = (np.pi / (4 * np.log(2))) * (lhdul[0].header['BMAJ'] * 3600 / pixscale.value) * (lhdul[0].header['BMIN'] * 3600 / pixscale.value)
-beam_area_racs_px  = (np.pi / (4 * np.log(2))) * (hdul[0].header['BMAJ']  * 3600 / pixscale.value) * (hdul[0].header['BMIN']  * 3600 / pixscale.value)
+pix_per_deg, nx, ny = get_pixscale(wcs_R, wcs_L, w, h) # pix_per_deg is degrees
+beam_area_lofar_px = (np.pi / (4 * np.log(2))) * (lhdul[0].header['BMAJ'] / pix_per_deg.value) * (lhdul[0].header['BMIN'] / pix_per_deg.value)
+beam_area_racs_px  = (np.pi / (4 * np.log(2))) * (hdul[0].header['BMAJ'] / pix_per_deg.value) * (hdul[0].header['BMIN'] / pix_per_deg.value)
 
 for i, (ra, dec) in tqdm(enumerate(zip(cat_ra, cat_dec)), total=len(cat_ra)):    
     pos = SkyCoord(ra*u.deg, dec*u.deg, frame="icrs")
@@ -61,8 +61,8 @@ for i, (ra, dec) in tqdm(enumerate(zip(cat_ra, cat_dec)), total=len(cat_ra)):
     r_co = Cutout2D(racs_data,  position=pos, size=(h, w), wcs=wcs_R, mode="partial", fill_value=np.nan)
     l_co = Cutout2D(lofar_data, position=pos, size=(h, w), wcs=wcs_L, mode="partial", fill_value=np.nan)
     
-    # build common output WCS centered on (ra,dec) with your chosen nx,ny,pixscale
-    wcs_out = generate_new_wcs(pos, nx, ny, pixscale)
+    # build common output WCS centered on (ra,dec) with your chosen nx,ny,pix_per_deg
+    wcs_out = generate_new_wcs(pos, nx, ny, pix_per_deg)
     
     # reproject both cutouts onto the same grid
     racs_cut, racs_fp = reproject_interp((r_co.data, r_co.wcs), wcs_out, shape_out=(nx, ny))
