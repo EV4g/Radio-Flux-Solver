@@ -12,7 +12,13 @@ from scipy.optimize import curve_fit
 from tqdm import tqdm
 
 from functions import spectral_index, get_pixscale, generate_new_wcs, fit_gauss, gaussian_volume
-def line(x, a, b): return a * x + b
+
+def line(x, a, b): 
+    return a * x + b
+
+def log_linspace(mn, mx, n):
+    return 10**np.linspace(np.log10(mn), np.log10(mx), n)
+    
 
 racs_files = np.sort(glob.glob(os.getcwd()+"/data/racs/*.fits"))
 lofar_files = glob.glob(os.getcwd()+"/data/lofar_images/*.fits")
@@ -94,15 +100,9 @@ lofar_freq = 144.6e6 #Hz
 racs_freq = 887.5e6 #Hz
 spectral_flux_ratio = (lofar_freq / racs_freq)**spectral_index_alpha
 
-# plt.loglog(racs_flux[valid], lofar_flux[valid], '.')
-popt, _ = curve_fit(line, np.log10(racs_flux[valid]), np.log10(lofar_flux[valid]))
-x = 10**np.linspace(np.min(np.log10(racs_flux[valid])), np.log10(np.max(racs_flux[valid])), 100)
-# plt.plot(x, 10**popt[1]*x**popt[0], color='red', ls='--')
-
-# plt.xlabel("RACS flux")
-# plt.ylabel("Lofar flux")
-# plt.title("Relative flux")
-# plt.show()
+# fitting a line through valid points
+index = 10**np.mean(np.log10(lofar_flux[valid] / racs_flux[valid]))
+x = log_linspace(np.min(racs_flux[valid]), np.max(racs_flux[valid]), 10)
 
 ratio = lofar_flux[valid] / (racs_flux[valid] * spectral_flux_ratio)
 valid_ratio = np.isfinite(ratio) & (ratio > 0)
@@ -119,10 +119,10 @@ print(f"Scatter (1σ)         : {scatter:.4f} dex")
 print(f"Uncertainty on median: ±{stderr:.4f} dex")
 
 fig, ax = plt.subplots(1, 2, figsize=(11, 4))
-ax[0].scatter(racs_flux[valid], lofar_flux[valid], s=10, alpha=0.5)
 ax[0].plot(x, 10**popt[1]*x**popt[0], color='purple', ls='--', label="Data fit")
-x2 = np.linspace(racs_flux[valid].min(), racs_flux[valid].max(), 10)
-ax[0].plot(x2, x2 * spectral_flux_ratio, 'r--', label=f'Expected (α={spectral_index_alpha})')
+ax[0].scatter(racs_flux[valid], lofar_flux[valid], s=10, alpha=0.7)
+ax[0].plot(x, x, color='black', ls='--', label="x = y")
+ax[0].plot(x, x * spectral_flux_ratio, 'r--', label=f'Expected (α={spectral_index_alpha})')
 ax[0].set_xscale('log'); ax[0].set_yscale('log')
 ax[0].set_xlabel("RACS flux [Jy]"); ax[0].set_ylabel("LOFAR flux [Jy]")
 ax[0].legend()
