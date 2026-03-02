@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
-
+"""List all meerkat files in dir that overlap with the given coordinate"""
 def get_meerkat_file(files, coord):
     for i, fn in enumerate(files):
 
@@ -31,6 +31,7 @@ def get_meerkat_file(files, coord):
 
     return None
 
+"""Get spectral index based on two fluxes and two frequencies"""
 def spectral_index(S1, S2, v1, v2):
     return (np.log(S1) - np.log(S2)) / (np.log(v1) - np.log(v2))
 
@@ -124,12 +125,13 @@ def gaussian_volume(A, sx, sy=None):
     if sy==None: return A * sx**2 * 2 * np.pi
     else:        return A * sx * sy * 2 * np.pi
     
-    
+"""Helper function required for get_flux()"""
 _get_flux_fixed = None
 def _worker(args):
     ra, dec = args
     return _get_flux_fixed(ra, dec)
 
+"""Gets the flux and other statistics from a (ra,dec) coordinate for two dataset files"""
 def get_flux(w, h, data1, data2, header1, header2, ra, dec):
     wcs1 = WCS(header1).celestial
     wcs2 = WCS(header2).celestial
@@ -164,6 +166,7 @@ def get_flux(w, h, data1, data2, header1, header2, ra, dec):
 
     return flux1, flux2, dist, sigma_pcov1, sigma_pcov2, local_snr, local_snr_fit
 
+"""Multithread the get_flux() function"""
 def get_flux_batch(w, h, data1, data2, header1, header2, ra, dec, max_workers=24, chunksize=8):
     global _get_flux_fixed
     _get_flux_fixed = partial(get_flux, w, h, data1, data2, header1, header2)
