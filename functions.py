@@ -14,6 +14,14 @@ from tqdm import tqdm
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
+"""Load fits file and extract data, header, wcs"""
+def prep_file(file):
+    hdul = fits.open(file)
+    data = hdul[0].data if len(hdul[0].data.shape) == 2 else hdul[0].data[0, 0]
+    header = hdul[0].header
+    wcs = WCS(header).celestial
+    return data, header, wcs
+
 """List all meerkat files in dir that overlap with the given coordinate"""
 def get_meerkat_file(files, coord):
     for i, fn in enumerate(files):

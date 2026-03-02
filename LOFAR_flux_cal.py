@@ -1,13 +1,11 @@
 from astropy.io import fits
-from astropy.wcs import WCS
 import astropy.units as u
 import numpy as np
 import matplotlib.pyplot as plt
 import glob
 import os
-#import multiprocessing; multiprocessing.set_start_method('fork')
-
-from functions import get_flux_batch
+#import multiprocessing; multiprocessing.set_start_method('fork') #for windows/mac
+from functions import get_flux_batch, prep_file
 
 def line(x, a, b): 
     return a * x + b
@@ -20,24 +18,16 @@ lofar_files = glob.glob(os.getcwd()+"/data/lofar_images/*.fits")
 #lofar_files = np.sort(glob.glob("/home/floris/Documents/PhD/Galactic plane/P282+00/ddf/Multi/MSC_deep/*.fits")) #1 restored; 3 dirty
 cat = fits.open(os.getcwd()+"/data/P282+00.offset_cat.fits")[1]
 
-# load racs file
-racs_file = racs_files[0]
-hdul = fits.open(racs_file)
-racs_data = hdul[0].data[0, 0]
-wcs_R = WCS(hdul[0].header).celestial
-
-# load lofar file
-lofar_file = lofar_files[2]
-lhdul = fits.open(lofar_file)
-lofar_data = lhdul[0].data if len(lhdul[0].data.shape) == 2 else lhdul[0].data[0, 0]
-wcs_L = WCS(lhdul[0].header).celestial
+# load lofar and racs files
+racs_data, racs_header, wcs_R = prep_file(racs_files[0])
+lofar_data, lofar_header, wcs_L = prep_file(lofar_files[2])
 
 # get calagogue ra, dec
 cat_ra, cat_dec = cat.data['RA'], cat.data['DEC']
 
 w, h = 1.5 * u.arcmin, 1.5 * u.arcmin
 
-lofar_flux, racs_flux, peak_separation, sigma_pcov_lofar, sigma_pcov_racs, local_snr, local_snr_fit = get_flux_batch(w, h, lofar_data, racs_data, lhdul[0].header, hdul[0].header, cat_ra, cat_dec)
+lofar_flux, racs_flux, peak_separation, sigma_pcov_lofar, sigma_pcov_racs, local_snr, local_snr_fit = get_flux_batch(w, h, lofar_data, racs_data, lofar_header, racs_header, cat_ra, cat_dec)
 
 # quality filtering
 valid = (lofar_flux > 1e-3) & (racs_flux > 1e-3) & np.isfinite(lofar_flux) & np.isfinite(racs_flux) \
