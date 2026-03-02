@@ -1,28 +1,19 @@
 from astropy.io import fits
 from astropy.wcs import WCS
-from astropy.coordinates import SkyCoord
 import astropy.units as u
 import numpy as np
-from reproject import reproject_interp
 import matplotlib.pyplot as plt
 import glob
 import os
-from astropy.nddata.utils import Cutout2D
-from tqdm import tqdm
-from concurrent.futures import ProcessPoolExecutor
-from functools import partial
+#import multiprocessing; multiprocessing.set_start_method('fork')
 
-from functions import get_pixscale, generate_new_wcs, fit_gauss, gaussian_volume
+from functions import get_flux_batch
 
 def line(x, a, b): 
     return a * x + b
 
 def log_linspace(mn, mx, n):
     return 10**np.linspace(np.log10(mn), np.log10(mx), n)
-    
-def _worker(args):
-    ra, dec = args
-    return get_flux_fixed(ra, dec)
 
 racs_files = np.sort(glob.glob(os.getcwd()+"/data/racs/*.fits"))
 lofar_files = glob.glob(os.getcwd()+"/data/lofar_images/*.fits")
@@ -46,46 +37,7 @@ cat_ra, cat_dec = cat.data['RA'], cat.data['DEC']
 
 w, h = 1.5 * u.arcmin, 1.5 * u.arcmin
 
-def get_flux(w, h, data1, data2, header1, header2, ra, dec):
-    wcs1 = WCS(header1).celestial
-    wcs2 = WCS(header2).celestial
-    pix_per_deg, nx, ny = get_pixscale(wcs1, wcs2, w, h)
-
-    beam_area_1 = (np.pi / (4*np.log(2))) * (header1['BMAJ'] / pix_per_deg.value) * (header1['BMIN'] / pix_per_deg.value)
-    beam_area_2 = (np.pi / (4*np.log(2))) * (header2['BMAJ'] / pix_per_deg.value) * (header2['BMIN'] / pix_per_deg.value)
-
-    pos = SkyCoord(ra*u.deg, dec*u.deg, frame="icrs")
-
-    cutout1 = Cutout2D(data1, position=pos, size=(h, w), wcs=wcs1, mode="partial", fill_value=np.nan)
-    cutout2 = Cutout2D(data2, position=pos, size=(h, w), wcs=wcs2, mode="partial", fill_value=np.nan)
-
-    wcs_out = generate_new_wcs(pos, nx, ny, pix_per_deg)
-
-    reproj1, _ = reproject_interp((cutout1.data, cutout1.wcs), wcs_out, shape_out=(nx, ny))
-    reproj2, _ = reproject_interp((cutout2.data, cutout2.wcs), wcs_out, shape_out=(nx, ny))
-
-    fit1, popt1, pcov1 = fit_gauss(reproj1, simple=True, debug=True)
-    fit2, popt2, pcov2 = fit_gauss(reproj2, simple=True, debug=True)
-
-    local_snr     = np.nanmax(reproj1) / np.nanstd(reproj1)
-    local_snr_fit = np.nanmax(reproj2) / np.nanstd(reproj2)
-
-    sigma_pcov1 = np.sqrt(pcov1[3, 3])
-    sigma_pcov2 = np.sqrt(pcov2[3, 3])
-
-    dist = np.sqrt((popt1[1] - popt2[1])**2 + (popt1[2] - popt2[2])**2)
-
-    flux1 = gaussian_volume(popt1[0], popt1[3]) / beam_area_1  # ← fixed: was popt2[0]
-    flux2 = gaussian_volume(popt2[0], popt2[3]) / beam_area_2
-
-    return flux1, flux2, dist, sigma_pcov1, sigma_pcov2, local_snr, local_snr_fit
-
-get_flux_fixed = partial(get_flux, w, h, lofar_data, racs_data, lhdul[0].header, hdul[0].header)
-
-with ProcessPoolExecutor(max_workers=24) as executor:
-    results = list(tqdm(executor.map(_worker, zip(cat_ra, cat_dec), chunksize=8), total=len(cat_ra)))
-
-lofar_flux, racs_flux, peak_separation, sigma_pcov_lofar, sigma_pcov_racs, local_snr, local_snr_fit = map(np.array, zip(*results))
+lofar_flux, racs_flux, peak_separation, sigma_pcov_lofar, sigma_pcov_racs, local_snr, local_snr_fit = get_flux_batch(w, h, lofar_data, racs_data, lhdul[0].header, hdul[0].header, cat_ra, cat_dec)
 
 # quality filtering
 valid = (lofar_flux > 1e-3) & (racs_flux > 1e-3) & np.isfinite(lofar_flux) & np.isfinite(racs_flux) \
