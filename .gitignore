@@ -1,3 +1,4 @@
 *.fits
 *.fits.gz
 /__pycache__
+*.gz
