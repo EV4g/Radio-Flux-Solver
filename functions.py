@@ -14,6 +14,10 @@ from tqdm import tqdm
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
+"""Linspace, but logarithmic scaling to avoid oversampling at low values"""
+def log_linspace(mn, mx, n):
+    return 10**np.linspace(np.log10(mn), np.log10(mx), n)
+
 """Load fits file and extract data, header, wcs"""
 def prep_file(file):
     hdul = fits.open(file)
@@ -54,7 +58,7 @@ def cutout_to_galactic_wh(cutout_lon, cutout_lat):
     height = abs(dlat)
     return center, width, height
 
-
+""""""
 def get_pixscale(wcs_A, wcs_B, w, h, use_highest_res=True):
     # choose an output pixel scale (pick the finer of the two so you don't lose detail)
     # cdelt is deg/pix; take absolute and min across both images
@@ -68,7 +72,7 @@ def get_pixscale(wcs_A, wcs_B, w, h, use_highest_res=True):
     ny = int(np.ceil((h / pixscale).decompose().value))
     return pixscale, nx, ny
     
-
+""""""
 def generate_new_wcs(center, nx, ny, pixscale):
     wcs_out = WCS(naxis=2)
     wcs_out.wcs.ctype = ["GLON-TAN", "GLAT-TAN"]
@@ -194,3 +198,27 @@ def get_flux_batch(w, h, data1, data2, header1, header2, ra, dec, max_workers=24
         results = list(tqdm(executor.map(_worker, zip(ra, dec), chunksize=chunksize), total=len(ra)))
 
     return map(np.array, zip(*results))
+
+"""Get frequency and flux arrays for two different datasets, and compute the flux-calibration offset between them compared to the -0.7 spectral index baseline
+data_1 gets compared versus the baseline of data_2. Returns (expected) fitted spectral_flux_ratio, and (actual) index, as well as the (offset) ratios and scaling factor.
+Optional Valid parameter to only select a subset of all arrays."""
+def compute_fluxcal_statistics(freq1, freq2, flux1, flux2, spectral_index=-0.7, valid=True):
+    spectral_flux_ratio = (freq1 / freq2)**spectral_index
+    index = 10**np.mean(np.log10(flux1[valid] / flux2[valid]))
+    x = log_linspace(np.min(flux2[valid]), np.max(flux2[valid]), 10)
+    
+    ratio = flux1[valid] / (flux2[valid] * spectral_flux_ratio)
+    #valid_ratio = np.isfinite(ratio) & (ratio > 0)
+    log_ratio = np.log10(ratio)
+
+    scale_factor = np.median(log_ratio)
+    scatter      = np.std(log_ratio)
+    N            = len(log_ratio)
+    stderr       = scatter / np.sqrt(N)
+    
+    print(f"N valid sources      : {N}")
+    print(f"Median log10(ratio)  : {scale_factor:.4f}  ({10**scale_factor:.4f}×)")
+    print(f"Scatter (1σ)         : {scatter:.4f} dex")
+    print(f"Uncertainty on median: ±{stderr:.4f} dex")
+    
+    return spectral_flux_ratio, index, x, log_ratio, scale_factor

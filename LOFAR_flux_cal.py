@@ -5,13 +5,10 @@ import matplotlib.pyplot as plt
 import glob
 import os
 #import multiprocessing; multiprocessing.set_start_method('fork') #for windows/mac
-from functions import get_flux_batch, prep_file
+from functions import get_flux_batch, prep_file, compute_fluxcal_statistics
 
 def line(x, a, b): 
     return a * x + b
-
-def log_linspace(mn, mx, n):
-    return 10**np.linspace(np.log10(mn), np.log10(mx), n)
 
 spectral_index_alpha = -0.7
 lofar_freq = 144.6e6 #Hz
@@ -31,37 +28,19 @@ meerkat_data, meerkat_header, wcs_M = prep_file(meerkat_files[11])
 
 # get calagogue ra, dec
 cat_ra, cat_dec = cat.data['RA'], cat.data['DEC']
-
 w, h = 1.5 * u.arcmin, 1.5 * u.arcmin
 
+######## LOFAR v RACS ########
+#### calculate fluxes for all valid catalogue sources
 lofar_flux, racs_flux, peak_separation, sigma_pcov_lofar, sigma_pcov_racs, local_snr, local_snr_fit = get_flux_batch(w, h, lofar_data, racs_data, lofar_header, racs_header, cat_ra, cat_dec)
 
-# quality filtering
+##### quality filtering
 valid = (lofar_flux > 1e-3) & (racs_flux > 1e-3) & np.isfinite(lofar_flux) & np.isfinite(racs_flux) \
         & (peak_separation < 2) & (sigma_pcov_lofar < 0.3) & (sigma_pcov_racs < 0.3) \
         & (local_snr > 5) & (local_snr_fit > 4)
 
 #### analysis
-spectral_flux_ratio = (lofar_freq / racs_freq)**spectral_index_alpha
-
-# fitting a line through valid points
-index = 10**np.mean(np.log10(lofar_flux[valid] / racs_flux[valid]))
-x = log_linspace(np.min(racs_flux[valid]), np.max(racs_flux[valid]), 10)
-
-# calculate ratio
-ratio = lofar_flux[valid] / (racs_flux[valid] * spectral_flux_ratio)
-valid_ratio = np.isfinite(ratio) & (ratio > 0)
-log_ratio = np.log10(ratio)
-
-scale_factor = np.median(log_ratio)
-scatter      = np.std(log_ratio)
-N            = len(log_ratio)
-stderr       = scatter / np.sqrt(N)
-
-print(f"N valid sources      : {N}")
-print(f"Median log10(ratio)  : {scale_factor:.4f}  ({10**scale_factor:.4f}×)")
-print(f"Scatter (1σ)         : {scatter:.4f} dex")
-print(f"Uncertainty on median: ±{stderr:.4f} dex")
+spectral_flux_ratio, index, x, log_ratio, scale_factor = compute_fluxcal_statistics(lofar_freq, racs_freq, lofar_flux, racs_flux, valid=valid)
 
 fig, ax = plt.subplots(1, 2, figsize=(11, 4))
 ax[0].scatter(racs_flux[valid], lofar_flux[valid], s=10, alpha=0.7, c=local_snr[valid])
@@ -79,41 +58,20 @@ ax[1].set_xlabel(r"log$_{10}$(S_LOFAR / S_RACS_corrected)")
 ax[1].set_ylabel("N")
 ax[1].legend()
 plt.tight_layout()
-
 #plt.savefig("flux_scale_comparison.png", dpi=150)
 plt.show()
 
-
-#### testing
-
+######## LOFAR v MEERKAT ########
+#### calculate fluxes for all valid catalogue sources
 lofar_flux, meerkat_flux, peak_separation, sigma_pcov_lofar, sigma_pcov_meerkat, local_snr, local_snr_fit = get_flux_batch(w, h, lofar_data, meerkat_data, lofar_header, meerkat_header, cat_ra, cat_dec)
 
-# quality filtering
+#### quality filtering
 valid = (lofar_flux > 1e-3) & (meerkat_flux > 5e-3) & np.isfinite(lofar_flux) & np.isfinite(meerkat_flux) \
         & (peak_separation < 2) & (sigma_pcov_lofar < 0.3) & (sigma_pcov_meerkat < 0.3) \
         & (local_snr > 5) & (local_snr_fit > 4)
 
 #### analysis
-spectral_flux_ratio = (lofar_freq / meerkat_freq)**spectral_index_alpha
-
-# fitting a line through valid point
-index = 10**np.mean(np.log10(lofar_flux[valid] / meerkat_flux[valid]))
-x = log_linspace(np.min(meerkat_flux[valid]), np.max(meerkat_flux[valid]), 10)
-
-# calculate ratio
-ratio = lofar_flux[valid] / (meerkat_flux[valid] * spectral_flux_ratio)
-valid_ratio = np.isfinite(ratio) & (ratio > 0)
-log_ratio = np.log10(ratio)
-
-scale_factor = np.median(log_ratio)
-scatter      = np.std(log_ratio)
-N            = len(log_ratio)
-stderr       = scatter / np.sqrt(N)
-
-print(f"N valid sources      : {N}")
-print(f"Median log10(ratio)  : {scale_factor:.4f}  ({10**scale_factor:.4f}×)")
-print(f"Scatter (1σ)         : {scatter:.4f} dex")
-print(f"Uncertainty on median: ±{stderr:.4f} dex")
+spectral_flux_ratio, index, x, log_ratio, scale_factor = compute_fluxcal_statistics(lofar_freq, meerkat_freq, lofar_flux, meerkat_flux, valid=valid)
 
 fig, ax = plt.subplots(1, 2, figsize=(11, 4))
 ax[0].scatter(meerkat_flux[valid], lofar_flux[valid], s=10, alpha=0.7, c=local_snr[valid])
@@ -131,6 +89,5 @@ ax[1].set_xlabel(r"log$_{10}$(S_LOFAR / S_MeerKat_corrected)")
 ax[1].set_ylabel("N")
 ax[1].legend()
 plt.tight_layout()
-
 #plt.savefig("flux_scale_comparison.png", dpi=150)
 plt.show()
