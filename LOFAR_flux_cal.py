@@ -61,6 +61,8 @@ plt.tight_layout()
 #plt.savefig("flux_scale_comparison.png", dpi=150)
 plt.show()
 
+
+
 ######## LOFAR v MEERKAT ########
 #### calculate fluxes for all valid catalogue sources
 lofar_flux, meerkat_flux, peak_separation, sigma_pcov_lofar, sigma_pcov_meerkat, local_snr, local_snr_fit = get_flux_batch(w, h, lofar_data, meerkat_data, lofar_header, meerkat_header, cat_ra, cat_dec)
@@ -91,3 +93,36 @@ ax[1].legend()
 plt.tight_layout()
 #plt.savefig("flux_scale_comparison.png", dpi=150)
 plt.show()
+
+
+
+# ######## RACS v MEERKAT ########
+# #### calculate fluxes for all valid catalogue sources
+# racs_flux, meerkat_flux, peak_separation, sigma_pcov_racs, sigma_pcov_meerkat, local_snr, local_snr_fit = get_flux_batch(w, h, racs_data, meerkat_data, racs_header, meerkat_header, cat_ra, cat_dec)
+
+# #### quality filtering
+# valid = (racs_flux > 1e-3) & (meerkat_flux > 1e-3) & np.isfinite(racs_flux) & np.isfinite(meerkat_flux) \
+#         & (peak_separation < 2) & (sigma_pcov_racs < 0.3) & (sigma_pcov_meerkat < 0.3) \
+#         & (local_snr > 2) & (local_snr_fit > 4)
+
+# #### analysis
+# spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor = compute_fluxcal_statistics(racs_freq, meerkat_freq, racs_flux, meerkat_flux, valid=valid)
+
+# fig, ax = plt.subplots(1, 2, figsize=(11, 4))
+# ax[0].scatter(meerkat_flux[valid], racs_flux[valid], s=10, alpha=0.7, c=local_snr[valid])
+# ax[0].plot(x, x * spectral_index_actual, color='purple', ls='--', label="Data fit")
+# ax[0].plot(x, x, color='black', ls='--', label="x = y")
+# ax[0].plot(x, x * spectral_flux_ratio, 'r--', label=f'Expected (α={spectral_index_theory})')
+# ax[0].set_xscale('log'); ax[0].set_yscale('log')
+# ax[0].set_xlabel("MeerKat flux [Jy]"); ax[0].set_ylabel("RACS flux [Jy]")
+# ax[0].legend()
+
+# # Log-ratio histogram
+# ax[1].hist(log_ratio, bins=15, edgecolor='k')
+# ax[1].axvline(scale_factor, color='red', ls='--', label=f'Median = {scale_factor:.3f}')
+# ax[1].set_xlabel(r"log$_{10}$(S_Meerkat / S_racs)")
+# ax[1].set_ylabel("N")
+# ax[1].legend()
+# plt.tight_layout()
+# #plt.savefig("flux_scale_comparison.png", dpi=150)
+# plt.show()
