@@ -27,7 +27,7 @@ def prep_file(file):
     return data, header, wcs
 
 """List all meerkat files in dir that overlap with the given coordinate"""
-def get_meerkat_file(files, coord):
+def get_survey_file(files, coord):
     for i, fn in enumerate(files):
 
         with fits.open(fn) as hdul:
@@ -47,6 +47,7 @@ def get_meerkat_file(files, coord):
 def spectral_index(S1, S2, v1, v2):
     return (np.log(S1) - np.log(S2)) / (np.log(v1) - np.log(v2))
 
+""""""
 def cutout_to_galactic_wh(cutout_lon, cutout_lat):
     l0 = np.mean(cutout_lon) * u.deg
     b0 = np.mean(cutout_lat) * u.deg

@@ -9,7 +9,7 @@ from reproject import reproject_interp
 import matplotlib.pyplot as plt
 import glob
 
-from functions import spectral_index, get_meerkat_file, cutout_to_galactic_wh, get_pixscale, generate_new_wcs
+from functions import spectral_index, get_survey_file, cutout_to_galactic_wh, get_pixscale, generate_new_wcs
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 basedir = "/home/floris/Documents/PhD/Galactic plane/"
@@ -25,7 +25,7 @@ cutout_lon = [34.4, 34.92]
 center, width, height = cutout_to_galactic_wh(cutout_lon, cutout_lat)
 
 # load meerkat data
-meerkat_file = get_meerkat_file(meerkat_files, center)
+meerkat_file = get_survey_file(meerkat_files, center)
 mhdul = fits.open(meerkat_file)
 meerkat_data = mhdul[0].data[0, 0]
 wcs_M = WCS(mhdul[0].header).celestial
