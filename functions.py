@@ -202,9 +202,9 @@ def get_flux_batch(w, h, data1, data2, header1, header2, ra, dec, max_workers=24
 """Get frequency and flux arrays for two different datasets, and compute the flux-calibration offset between them compared to the -0.7 spectral index baseline
 data_1 gets compared versus the baseline of data_2. Returns (expected) fitted spectral_flux_ratio, and (actual) index, as well as the (offset) ratios and scaling factor.
 Optional Valid parameter to only select a subset of all arrays."""
-def compute_fluxcal_statistics(freq1, freq2, flux1, flux2, spectral_index=-0.7, valid=True):
-    spectral_flux_ratio = (freq1 / freq2)**spectral_index
-    index = 10**np.mean(np.log10(flux1[valid] / flux2[valid]))
+def compute_fluxcal_statistics(freq1, freq2, flux1, flux2, spectral_index_theory=-0.7, valid=True):
+    spectral_flux_ratio = (freq1 / freq2)**spectral_index_theory
+    spectral_index_actual = 10**np.mean(np.log10(flux1[valid] / flux2[valid]))
     x = log_linspace(np.min(flux2[valid]), np.max(flux2[valid]), 10)
     
     ratio = flux1[valid] / (flux2[valid] * spectral_flux_ratio)
@@ -221,4 +221,4 @@ def compute_fluxcal_statistics(freq1, freq2, flux1, flux2, spectral_index=-0.7, 
     print(f"Scatter (1σ)         : {scatter:.4f} dex")
     print(f"Uncertainty on median: ±{stderr:.4f} dex")
     
-    return spectral_flux_ratio, index, x, log_ratio, scale_factor
+    return spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor
