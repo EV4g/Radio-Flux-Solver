@@ -13,6 +13,11 @@ def line(x, a, b):
 def log_linspace(mn, mx, n):
     return 10**np.linspace(np.log10(mn), np.log10(mx), n)
 
+spectral_index_alpha = -0.7
+lofar_freq = 144.6e6 #Hz
+racs_freq = 887.5e6 #Hz
+meerkat_freq = 1367e6 #Hz
+
 racs_files = np.sort(glob.glob(os.getcwd()+"/data/racs/*.fits"))
 lofar_files = glob.glob(os.getcwd()+"/data/lofar/*.fits")
 meerkat_files = np.sort(glob.glob(os.getcwd()+"/data/meerkat/*.fits"))
@@ -37,9 +42,6 @@ valid = (lofar_flux > 1e-3) & (racs_flux > 1e-3) & np.isfinite(lofar_flux) & np.
         & (local_snr > 5) & (local_snr_fit > 4)
 
 #### analysis
-spectral_index_alpha = -0.7
-lofar_freq = 144.6e6 #Hz
-racs_freq = 887.5e6 #Hz
 spectral_flux_ratio = (lofar_freq / racs_freq)**spectral_index_alpha
 
 # fitting a line through valid points
@@ -92,14 +94,11 @@ valid = (lofar_flux > 1e-3) & (meerkat_flux > 5e-3) & np.isfinite(lofar_flux) & 
         & (local_snr > 5) & (local_snr_fit > 4)
 
 #### analysis
-spectral_index_alpha = -0.7
-lofar_freq = 144.6e6 #Hz
-meerkat_freq = 1367e6 #Hz
 spectral_flux_ratio = (lofar_freq / meerkat_freq)**spectral_index_alpha
 
 # fitting a line through valid point
 index = 10**np.mean(np.log10(lofar_flux[valid] / meerkat_flux[valid]))
-x = log_linspace(np.min(racs_flux[valid]), np.max(meerkat_flux[valid]), 10)
+x = log_linspace(np.min(meerkat_flux[valid]), np.max(meerkat_flux[valid]), 10)
 
 # calculate ratio
 ratio = lofar_flux[valid] / (meerkat_flux[valid] * spectral_flux_ratio)
