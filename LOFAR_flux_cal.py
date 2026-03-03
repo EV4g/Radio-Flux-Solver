@@ -10,7 +10,7 @@ from functions import get_flux_batch, prep_file, compute_fluxcal_statistics
 def line(x, a, b): 
     return a * x + b
 
-spectral_index_alpha = -0.7
+spectral_index_theory = -0.7
 lofar_freq = 144.6e6 #Hz
 racs_freq = 887.5e6 #Hz
 meerkat_freq = 1367e6 #Hz
@@ -40,13 +40,13 @@ valid = (lofar_flux > 1e-3) & (racs_flux > 1e-3) & np.isfinite(lofar_flux) & np.
         & (local_snr > 5) & (local_snr_fit > 4)
 
 #### analysis
-spectral_flux_ratio, index, x, log_ratio, scale_factor = compute_fluxcal_statistics(lofar_freq, racs_freq, lofar_flux, racs_flux, valid=valid)
+spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor = compute_fluxcal_statistics(lofar_freq, racs_freq, lofar_flux, racs_flux, valid=valid)
 
 fig, ax = plt.subplots(1, 2, figsize=(11, 4))
 ax[0].scatter(racs_flux[valid], lofar_flux[valid], s=10, alpha=0.7, c=local_snr[valid])
-ax[0].plot(x, x * index, color='purple', ls='--', label="Data fit")
+ax[0].plot(x, x * spectral_index_actual, color='purple', ls='--', label="Data fit")
 ax[0].plot(x, x, color='black', ls='--', label="x = y")
-ax[0].plot(x, x * spectral_flux_ratio, 'r--', label=f'Expected (α={spectral_index_alpha})')
+ax[0].plot(x, x * spectral_flux_ratio, 'r--', label=f'Expected (α={spectral_index_theory})')
 ax[0].set_xscale('log'); ax[0].set_yscale('log')
 ax[0].set_xlabel("RACS flux [Jy]"); ax[0].set_ylabel("LOFAR flux [Jy]")
 ax[0].legend()
@@ -71,13 +71,13 @@ valid = (lofar_flux > 1e-3) & (meerkat_flux > 5e-3) & np.isfinite(lofar_flux) & 
         & (local_snr > 5) & (local_snr_fit > 4)
 
 #### analysis
-spectral_flux_ratio, index, x, log_ratio, scale_factor = compute_fluxcal_statistics(lofar_freq, meerkat_freq, lofar_flux, meerkat_flux, valid=valid)
+spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor = compute_fluxcal_statistics(lofar_freq, meerkat_freq, lofar_flux, meerkat_flux, valid=valid)
 
 fig, ax = plt.subplots(1, 2, figsize=(11, 4))
 ax[0].scatter(meerkat_flux[valid], lofar_flux[valid], s=10, alpha=0.7, c=local_snr[valid])
-ax[0].plot(x, x * index, color='purple', ls='--', label="Data fit")
+ax[0].plot(x, x * spectral_index_actual, color='purple', ls='--', label="Data fit")
 ax[0].plot(x, x, color='black', ls='--', label="x = y")
-ax[0].plot(x, x * spectral_flux_ratio, 'r--', label=f'Expected (α={spectral_index_alpha})')
+ax[0].plot(x, x * spectral_flux_ratio, 'r--', label=f'Expected (α={spectral_index_theory})')
 ax[0].set_xscale('log'); ax[0].set_yscale('log')
 ax[0].set_xlabel("MeerKat flux [Jy]"); ax[0].set_ylabel("LOFAR flux [Jy]")
 ax[0].legend()
