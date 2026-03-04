@@ -43,6 +43,39 @@ def get_survey_file(files, coord):
 
     return None
 
+"""Return all corners from one .fits file"""
+def get_corners(fn):
+    with fits.open(fn) as hdul:
+        hdr = hdul[0].header
+        w = WCS(hdr).celestial
+        nx, ny = hdr["NAXIS1"], hdr["NAXIS2"]
+    corners_pix = np.array([[0, 0], [nx-1, 0], [0, ny-1], [nx-1, ny-1]], dtype=float)
+    corners_sky = w.pixel_to_world(corners_pix[:, 0], corners_pix[:, 1])
+    return w, nx, ny, corners_sky
+
+"""Return whether or not the corners from one .fits file (corners_sky) are within the bounds of another .fits file (w, nx, ny)"""
+def any_corner_inside(corners_sky, w, nx, ny):
+    xs, ys = w.world_to_pixel(corners_sky)
+    return bool(np.any((xs >= 0) & (xs < nx) & (ys >= 0) & (ys < ny)))
+
+"""Check one .fits file against a host of others and return the files that overlap"""
+def get_overlapping_files(ref_file, files):
+    ref_w, ref_nx, ref_ny, ref_corners = get_corners(ref_file)
+
+    overlapping = []
+    for fn in files:
+        if fn == ref_file:
+            continue
+        try:
+            w, nx, ny, corners = get_corners(fn)
+            if any_corner_inside(ref_corners, w, nx, ny) or any_corner_inside(corners, ref_w, ref_nx, ref_ny):
+                overlapping.append(fn)
+        except Exception as e:
+            print(f"Skipping {fn}: {e}")
+
+    return overlapping
+
+
 """Get spectral index based on two fluxes and two frequencies"""
 def spectral_index(S1, S2, v1, v2):
     return (np.log(S1) - np.log(S2)) / (np.log(v1) - np.log(v2))
