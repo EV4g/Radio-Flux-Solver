@@ -256,3 +256,101 @@ def compute_fluxcal_statistics(freq1, freq2, flux1, flux2, spectral_index_theory
     print(f"Uncertainty on median: ±{stderr:.4f} dex")
     
     return spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor
+
+"""Fast catalogue matcher"""
+def match_catalogs_2D(ra_dec_list, thres_arc=0.20):
+    threshold = thres_arc / 3600.0
+    n = len(ra_dec_list)
+
+    matched_results = {}
+
+    for a in range(n):
+        for b in range(a + 1, n):
+            ra_a, dec_a = np.array(ra_dec_list[a][0]), np.array(ra_dec_list[a][1])
+            ra_b, dec_b = np.array(ra_dec_list[b][0]), np.array(ra_dec_list[b][1])
+
+            if len(ra_a) >= len(ra_b):
+                sup_ra, sup_dec, sub_ra, sub_dec, normal = ra_a, dec_a, ra_b, dec_b, True
+            else:
+                sup_ra, sup_dec, sub_ra, sub_dec, normal = ra_b, dec_b, ra_a, dec_a, False
+
+            tree = cKDTree(np.column_stack([sup_ra, sup_dec]))
+            dists, idxs = tree.query(np.column_stack([sub_ra, sub_dec]), k=1, distance_upper_bound=threshold)
+
+            # filter matches within threshold (unmatched get dist=inf)
+            valid    = dists < threshold
+            matched_sub = np.where(valid)[0]
+            matched_sup = idxs[valid]
+
+            # if duplicates: keep only the closest
+            if len(matched_sup) != len(np.unique(matched_sup)):
+                unique_sup, counts = np.unique(matched_sup, return_counts=True)
+                dupes = unique_sup[counts > 1]
+                keep = np.ones(len(matched_sub), dtype=bool)
+                for dup in dupes:
+                    dup_mask = matched_sup == dup
+                    best = np.argmin(dists[matched_sub[dup_mask]])
+                    dup_positions = np.where(dup_mask)[0]
+                    keep[dup_positions] = False
+                    keep[dup_positions[best]] = True
+                matched_sub = matched_sub[keep]
+                matched_sup = matched_sup[keep]
+
+            matched_results[(a, b)] = (matched_sup.tolist(), matched_sub.tolist()) if normal \
+                                  else (matched_sub.tolist(), matched_sup.tolist())
+
+    # rest of code not needed for just two cats
+    if n == 2:
+        return [np.array(matched_results[(0, 1)][0]),
+                np.array(matched_results[(0, 1)][1])]
+
+    # coalescence
+    match_dict = {i: {} for i in range(n)}
+    for (a, b), (idx_a, idx_b) in matched_results.items():
+        for i_a, i_b in zip(idx_a, idx_b):
+            match_dict[a][i_a] = match_dict[a].get(i_a, []) + [(b, i_b)]
+            match_dict[b][i_b] = match_dict[b].get(i_b, []) + [(a, i_a)]
+
+    used_indices       = {i: set() for i in range(n)}
+    consistent_matches = {i: [] for i in range(n)}
+
+    for idx in match_dict[0]:
+        if idx in used_indices[0]:
+            continue
+
+        group       = {0: idx}
+        to_check    = list(match_dict[0][idx])
+        valid_group = True
+
+        while to_check and valid_group:
+            curr_cat, curr_idx = to_check.pop()
+            if curr_cat in group:
+                if group[curr_cat] != curr_idx:
+                    valid_group = False
+                    break
+                continue
+            group[curr_cat] = curr_idx
+            for next_cat, next_idx in match_dict[curr_cat][curr_idx]:
+                if next_cat not in group:
+                    to_check.append((next_cat, next_idx))
+
+        if valid_group and len(group) == n:
+            group_valid = True
+            for a in range(n):
+                for b in range(a + 1, n):
+                    idx_a, idx_b = group[a], group[b]
+                    pair_a, pair_b = matched_results[(a, b)]
+                    pair_b_list = list(pair_b)
+                    if not (idx_b in pair_b_list and
+                            pair_a[pair_b_list.index(idx_b)] == idx_a):
+                        group_valid = False
+                        break
+                if not group_valid:
+                    break
+
+            if group_valid:
+                for cat, idx in group.items():
+                    consistent_matches[cat].append(idx)
+                    used_indices[cat].add(idx)
+
+    return [np.array(consistent_matches[i]) for i in range(n)]
