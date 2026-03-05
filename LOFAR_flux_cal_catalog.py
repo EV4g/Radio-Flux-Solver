@@ -34,9 +34,10 @@ def sources_in_fits(ra_deg, dec_deg, fn):
 
 
 spectral_index_theory = -0.7
-lofar_freq = 144.6e6 #Hz
-racs_freq = 887.5e6 #Hz
-meerkat_freq = 1367e6 #Hz
+lofar_freq   = 144.6e6 #Hz
+racs_freq    = 887.5e6 #Hz
+meerkat_freq = 1367e6  #Hz
+vlssr_freq   = 73.8e6  #Hz
 
 lofar_files = glob.glob(os.getcwd()+"/data/lofar/*.fits")[0]
 
