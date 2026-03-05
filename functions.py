@@ -11,6 +11,7 @@ from functools import partial
 from astropy.nddata.utils import Cutout2D
 from reproject import reproject_interp
 from tqdm import tqdm
+from scipy.spatial import cKDTree
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
@@ -170,6 +171,16 @@ def fit_gauss(array, simple=False, mf=1000, debug=False):
 def gaussian_volume(A, sx, sy=None):
     if sy==None: return A * sx**2 * 2 * np.pi
     else:        return A * sx * sy * 2 * np.pi
+
+"""Return beam size [degree] from fits header"""
+def get_beam_size(file):
+    hdul = fits.open(file)
+    header = hdul[0].header
+    try: 
+        return header['BMAJ'], header['BMIN'], header['BPA']
+    except: 
+        return header['CLEANBMJ'], header['CLEANBMN'], header['CLEANBPA']
+    return None
     
 """Helper function required for get_flux()"""
 _get_flux_fixed = None
@@ -236,12 +247,15 @@ def get_flux_batch(w, h, data1, data2, header1, header2, ra, dec, max_workers=24
 """Get frequency and flux arrays for two different datasets, and compute the flux-calibration offset between them compared to the -0.7 spectral index baseline
 data_1 gets compared versus the baseline of data_2. Returns (expected) fitted spectral_flux_ratio, and (actual) index, as well as the (offset) ratios and scaling factor.
 Optional Valid parameter to only select a subset of all arrays."""
-def compute_fluxcal_statistics(freq1, freq2, flux1, flux2, spectral_index_theory=-0.7, valid=True):
+def compute_fluxcal_statistics(freq1, freq2, flux1, flux2, spectral_index_theory=-0.7, valid=None):
+    if type(valid) != type(None):
+        flux1 = flux1[valid]
+        flux2 = flux2[valid]
     spectral_flux_ratio = (freq1 / freq2)**spectral_index_theory
-    spectral_index_actual = 10**np.mean(np.log10(flux1[valid] / flux2[valid]))
-    x = log_linspace(np.min(flux2[valid]), np.max(flux2[valid]), 10)
+    spectral_index_actual = 10**np.mean(np.log10(flux1 / flux2))
+    x = log_linspace(np.min(flux2), np.max(flux2), 10)
     
-    ratio = flux1[valid] / (flux2[valid] * spectral_flux_ratio)
+    ratio = flux1 / (flux2 * spectral_flux_ratio)
     #valid_ratio = np.isfinite(ratio) & (ratio > 0)
     log_ratio = np.log10(ratio)
 
