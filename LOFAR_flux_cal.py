@@ -23,7 +23,7 @@ racs_files = np.sort(glob.glob(os.getcwd()+"/data/racs/*.fits"))
 lofar_files = glob.glob(os.getcwd()+"/data/lofar/*.fits")
 meerkat_files = np.sort(glob.glob(os.getcwd()+"/data/meerkat/*.fits"))
 #lofar_files = np.sort(glob.glob("/home/floris/Documents/PhD/Galactic plane/P282+00/ddf/Multi/MSC_deep/*.fits")) #1 restored; 3 dirty
-cat = fits.open(os.getcwd()+"/data/P282+00.offset_cat.fits")[1]
+cat = fits.open(os.getcwd()+"/catalogs/lofar/P282+00.offset_cat.fits")[1]
 
 # load lofar and racs files
 racs_data, racs_header, wcs_R = prep_file(racs_files[0])
