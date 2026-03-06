@@ -32,10 +32,10 @@ def sources_in_fits(ra_deg, dec_deg, fn):
     return (x >= 0) & (x < nx) & (y >= 0) & (y < ny)
 
 """Get two catalogs and return flux and snr (flux / e_flux)"""
-def get_catalog_matched_flux(cat1, cat2):
+def get_catalog_matched_flux(cat1, cat2, thres_arc=2):
     idx_cat1, idx_cat2 = match_catalogs_2D([
         (cat1["ra"], cat1["dec"]),
-        (cat2["ra"], cat2["dec"])], thres_arc=2)
+        (cat2["ra"], cat2["dec"])], thres_arc=thres_arc)
 
     flux1 = cat1['flux_jy'][idx_cat1]
     snr1 = flux1 / cat1['e_flux_jy'][idx_cat1]
@@ -46,8 +46,8 @@ def get_catalog_matched_flux(cat1, cat2):
     return flux1, flux2, snr1, snr2
 
 """Load two catalogs and plot their relative fluxes, according to a powerlaw"""
-def quick_compare_catalog(cat1, cat2, freq1, freq2, name1, name2):
-    flux1, flux2, _, _ = get_catalog_matched_flux(cat1, cat2)
+def quick_compare_catalog(cat1, cat2, freq1, freq2, name1, name2, thres_arc=2):
+    flux1, flux2, _, _ = get_catalog_matched_flux(cat1, cat2, thres_arc=thres_arc)
     spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor = compute_fluxcal_statistics(freq1, freq2, flux1, flux2)
 
     fig, ax = plt.subplots(1, 2, figsize=(8, 4))
@@ -70,7 +70,13 @@ def quick_compare_catalog(cat1, cat2, freq1, freq2, name1, name2):
     plt.show()
     
     print(f"Compared {name1} to {name2}")
-    
+
+def radec_list(cats):
+    radec_list = []
+    for cat in cats:
+        radec_list.append((cat['ra'], cat['dec']))
+    return radec_list        
+
 spectral_index_theory = -0.7
 lofar_freq   = 144.6e6 #Hz
 racs_freq    = 887.5e6 #Hz
@@ -159,3 +165,16 @@ quick_compare_catalog(lofar, racs, lofar_freq, racs_freq, "lofar", "racs")
 
 # racs v meerkat
 quick_compare_catalog(racs, meerkat, racs_freq, meerkat_freq, "racs", "meerkat")
+
+
+
+
+#### beam dependant flux analysis
+i1, i2 = match_catalogs_2D(radec_list((tgss, lofar)), thres_arc=1.5)
+plot_location_dependant_index(lofar['ra'][i2], lofar['dec'][i2], lofar['flux_jy'][i2] / tgss['flux_jy'][i1])
+
+i1, i2 = match_catalogs_2D(radec_list((racs, lofar)), thres_arc=1.5)
+plot_location_dependant_index(lofar['ra'][i2], lofar['dec'][i2], lofar['flux_jy'][i2] / racs['flux_jy'][i1])
+
+i1, i2 = match_catalogs_2D(radec_list((meerkat, lofar)), thres_arc=1.5)
+plot_location_dependant_index(lofar['ra'][i2], lofar['dec'][i2], lofar['flux_jy'][i2] / meerkat['flux_jy'][i1])
