@@ -3,3 +3,5 @@
 /__pycache__
 *.gz
 *.xml
+catalogs/vlssr/VLSSR.CATALOG.FIT
+*.csv
