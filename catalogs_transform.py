@@ -2,10 +2,10 @@ import os
 from astropy.table import Table
 
 # get calagogs
-racs    = Table.read(os.getcwd()+"/catalogs/racs/RACS_DR1_Sources_GalacticRegion_v2021_08.xml")
-meerkat = Table.read(os.getcwd()+"/catalogs/meerkat/smgps_moment0_5beam_5sigma_510599row_compact_source_catalogue.csv")
-vlssr   = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_full.csv")
-tgss    = Table.read(os.getcwd()+"/catalogs/tgss/TGSSADR1_7sigma_catalog.fits")
+# racs    = Table.read(os.getcwd()+"/catalogs/racs/RACS_DR1_Sources_GalacticRegion_v2021_08.xml")
+# meerkat = Table.read(os.getcwd()+"/catalogs/meerkat/smgps_moment0_5beam_5sigma_510599row_compact_source_catalogue.csv")
+# vlssr   = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_full.csv")
+# tgss    = Table.read(os.getcwd()+"/catalogs/tgss/TGSSADR1_7sigma_catalog.fits")
 
 # from astroquery.vizier import Vizier
 # v = Vizier(row_limit=-1)
@@ -49,4 +49,8 @@ tgss    = Table.read(os.getcwd()+"/catalogs/tgss/TGSSADR1_7sigma_catalog.fits")
 # tgss.rename_column('DEC', 'dec')
 # tgss.rename_column('Total_flux', 'flux_jy')
 # tgss.rename_column('E_Total_flux', 'e_flux_jy')
-# tgss.write("tgss_clean.fits")
+
+# tgss['flux_jy'] *= 1e-3
+# tgss['e_flux_jy'] *= 1e-3
+
+# tgss.write("tgss_clean.fits", overwrite=True)
