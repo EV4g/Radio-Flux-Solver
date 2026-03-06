@@ -68,10 +68,10 @@ vlssr_full   = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.csv")
 lofar        = Table.read(os.getcwd()+"/catalogs/lofar/lofar_sources.fits")
 
 # fix lofar
-lofar['ra'] = lofar['RA']
-lofar['dec'] = lofar['DEC']
-lofar['flux_jy'] = lofar['Total_flux']
-lofar['e_flux_jy'] = lofar['E_Total_flux']
+lofar.rename_column("RA", "ra")
+lofar.rename_column("DEC", "dec")
+lofar.rename_column('Total_flux', 'flux_jy')
+lofar.rename_column('E_Total_flux', 'e_flux_jy')
 
 # check for sources in current file
 racs_valid      = sources_in_fits(racs_full['ra'],    racs_full['dec'],    lofar_files)
