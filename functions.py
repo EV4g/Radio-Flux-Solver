@@ -272,7 +272,7 @@ def compute_fluxcal_statistics(freq1, freq2, flux1, flux2, spectral_index_theory
     return spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor
 
 """Fast catalogue matcher"""
-def match_catalogs_2D(ra_dec_list, thres_arc=0.20):
+def match_catalogs_2D(ra_dec_list, thres_arc=2):
     threshold = thres_arc / 3600.0
     n = len(ra_dec_list)
 
