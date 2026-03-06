@@ -1,10 +1,4 @@
-from astropy.io import fits
-import astropy.units as u
-import numpy as np
-import matplotlib.pyplot as plt
-import glob
 import os
-from functions import get_flux_batch, prep_file, compute_fluxcal_statistics
 from astropy.table import Table
 
 # get calagogs
@@ -51,3 +45,8 @@ tgss    = Table.read(os.getcwd()+"/catalogs/tgss/TGSSADR1_7sigma_catalog.fits")
 # vlssr_out.write("vlssr_clean.csv", format="ascii.csv", overwrite=True)
 
 #### tgss ####
+# tgss.rename_column('RA', 'ra')
+# tgss.rename_column('DEC', 'dec')
+# tgss.rename_column('Total_flux', 'flux_jy')
+# tgss.rename_column('E_Total_flux', 'e_flux_jy')
+# tgss.write("tgss_clean.fits")
