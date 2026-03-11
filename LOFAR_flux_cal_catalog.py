@@ -46,9 +46,9 @@ def get_catalog_matched_flux(cat1, cat2, thres_arc=2):
     return flux1, flux2, snr1, snr2
 
 """Load two catalogs and plot their relative fluxes, according to a powerlaw"""
-def quick_compare_catalog(cat1, cat2, freq1, freq2, name1, name2, thres_arc=2):
+def quick_compare_catalog(cat1, cat2, freq1, freq2, name1, name2, thres_arc=2, spectral_index_theory=-0.7):
     flux1, flux2, _, _ = get_catalog_matched_flux(cat1, cat2, thres_arc=thres_arc)
-    spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor = compute_fluxcal_statistics(freq1, freq2, flux1, flux2)
+    spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor = compute_fluxcal_statistics(freq1, freq2, flux1, flux2, spectral_index_theory)
 
     fig, ax = plt.subplots(1, 2, figsize=(8, 4))
     ax[0].scatter(flux2, flux1, s=10, alpha=0.7)
@@ -69,7 +69,19 @@ def quick_compare_catalog(cat1, cat2, freq1, freq2, name1, name2, thres_arc=2):
     #plt.savefig("flux_scale_comparison.png", dpi=150)
     plt.show()
     
-    print(f"Compared {name1} to {name2}")
+    print(f"Compared {name1} to {name2} \n")
+
+def merge_catalogs(cats, thres_arc=2):
+    indices = match_catalogs_2D(radec_list(cats), thres_arc=thres_arc)
+    
+    catalog = Table()
+    catalog['ra'] = cats[0]['ra'][indices[0]]
+    catalog['dec'] = cats[0]['dec'][indices[0]]
+    
+    return catalog
+    
+
+
 
 def radec_list(cats):
     radec_list = []
@@ -93,13 +105,14 @@ lofar_files = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0]
 #     rms_box=(100, 25),    # (box_size, step_size) for rms map; tune to your image
 #     beam=(get_beam_size(lofar_files)),  # (maj_deg, min_deg, PA)
 # )
+# img.write_catalog(outfile="lofar_sources_pipeline.fits", format="fits", catalog_type="srl", clobber=True)
 
 # get calagogs
 racs_full    = Table.read(os.getcwd()+"/catalogs/racs/racs_clean.csv")
 meerkat_full = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.csv")
 vlssr_full   = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.csv")
 tgss_full    = Table.read(os.getcwd()+"/catalogs/tgss/tgss_clean.fits")
-lofar        = Table.read(os.getcwd()+"/catalogs/lofar/lofar_sources.fits")
+lofar        = Table.read(os.getcwd()+"/catalogs/lofar/lofar_sources_pipeline.fits")
 
 # fix lofar
 lofar.rename_column("RA", "ra")
@@ -157,11 +170,11 @@ plt.show()
 
 
 #### analysis
-quick_compare_catalog(lofar, meerkat, lofar_freq, meerkat_freq, "lofar", "meerkat")
-quick_compare_catalog(lofar, racs,    lofar_freq, racs_freq,    "lofar", "racs")
-quick_compare_catalog(lofar, tgss,    lofar_freq, tgss_freq,    "lofar", "tgss")
-quick_compare_catalog(lofar, vlssr,   lofar_freq, vlssr_freq,   "lofar", "vlssr", thres_arc=10)
-quick_compare_catalog(racs,  meerkat, racs_freq,  meerkat_freq, "racs",  "meerkat")
+quick_compare_catalog(lofar, meerkat, lofar_freq, meerkat_freq, "lofar", "meerkat", spectral_index_theory=spectral_index_theory)
+quick_compare_catalog(lofar, racs,    lofar_freq, racs_freq,    "lofar", "racs", spectral_index_theory=spectral_index_theory)
+quick_compare_catalog(lofar, tgss,    lofar_freq, tgss_freq,    "lofar", "tgss", spectral_index_theory=spectral_index_theory)
+quick_compare_catalog(lofar, vlssr,   lofar_freq, vlssr_freq,   "lofar", "vlssr", thres_arc=10, spectral_index_theory=spectral_index_theory)
+quick_compare_catalog(racs,  meerkat, racs_freq,  meerkat_freq, "racs",  "meerkat", spectral_index_theory=spectral_index_theory)
 
 """
 #### beam dependant flux analysis
@@ -193,7 +206,14 @@ plt.gca().set_box_aspect(1)
 plt.show()
 """
 
-#### spectral index 
+#### spectral index
+# combinations that are useful to consider:
+# (lofar) + racs + meerkat
+# (lofar) + tgss + meerkat
+# (lofar) + tgss + racs
+# vlssr doesn't have proper matches with the other surveys
+
+
 i1, i2, i3 =  match_catalogs_2D(radec_list((vlssr, lofar, racs)))
 
 
