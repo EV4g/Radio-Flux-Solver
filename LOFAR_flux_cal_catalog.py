@@ -176,35 +176,6 @@ quick_compare_catalog(lofar, tgss,    lofar_freq, tgss_freq,    "lofar", "tgss",
 quick_compare_catalog(lofar, vlssr,   lofar_freq, vlssr_freq,   "lofar", "vlssr", thres_arc=10, spectral_index_theory=spectral_index_theory)
 quick_compare_catalog(racs,  meerkat, racs_freq,  meerkat_freq, "racs",  "meerkat", spectral_index_theory=spectral_index_theory)
 
-"""
-#### beam dependant flux analysis
-i1, i2 = match_catalogs_2D(radec_list((tgss, lofar)), thres_arc=1.5)
-plot_location_dependant_index(lofar['ra'][i2], lofar['dec'][i2], lofar['flux_jy'][i2] / tgss['flux_jy'][i1])
-
-i1, i2 = match_catalogs_2D(radec_list((racs, lofar)), thres_arc=1.5)
-plot_location_dependant_index(lofar['ra'][i2], lofar['dec'][i2], lofar['flux_jy'][i2] / racs['flux_jy'][i1])
-
-i1, i2 = match_catalogs_2D(radec_list((meerkat, lofar)), thres_arc=1.5)
-plot_location_dependant_index(lofar['ra'][i2], lofar['dec'][i2], lofar['flux_jy'][i2] / meerkat['flux_jy'][i1])
-
-# combined plot
-i1, i2 = match_catalogs_2D(radec_list((tgss, lofar)), thres_arc=1.5)
-f = lofar['flux_jy'][i2] / tgss['flux_jy'][i1]
-plt.scatter(lofar['ra'][i2], lofar['dec'][i2], c=f / np.max(f))
-
-i1, i2 = match_catalogs_2D(radec_list((racs, lofar)), thres_arc=1.5)
-f = lofar['flux_jy'][i2] / racs['flux_jy'][i1]
-plt.scatter(lofar['ra'][i2], lofar['dec'][i2], c=f/np.max(f))
-
-i1, i2 = match_catalogs_2D(radec_list((meerkat, lofar)), thres_arc=1.5)
-f = lofar['flux_jy'][i2] / meerkat['flux_jy'][i1]
-plt.scatter(lofar['ra'][i2], lofar['dec'][i2], c=f/np.max(f))
-
-
-plt.colorbar()
-plt.gca().set_box_aspect(1)
-plt.show()
-"""
 
 #### spectral index
 # combinations that are useful to consider:
@@ -267,3 +238,10 @@ plt.colorbar(label = r"Spectral index $\alpha$")
 plt.xlabel("Lofar linear flux (Jy)")
 plt.ylabel("Lofar fitted flux (Jy)")
 plt.show()
+
+
+##########################
+# lofar + tgss + meerkat #
+##########################
+
+
