@@ -16,8 +16,8 @@ basedir = "/home/floris/Documents/PhD/Galactic plane/"
 
 meerkat_files = np.sort(glob.glob(basedir+"LOFAR_and_MeerKAT/data/meerkat/*.fits"))
 #lofar_files = np.sort(glob.glob(basedir+"P282+00/ddf/Multi/HogbomMulti/*.fits")) #1 restored; 3 dirty
-lofar_files = np.sort(glob.glob(basedir+"P282+00/ddf/Multi/MSC_deep/*.fits")) #1 restored; 3 dirty
-#lofar_files = np.sort(glob.glob(basedir+"LOFAR_and_MeerKAT/data/lofar/*.fits")) #0 high res; 1 low res
+#lofar_files = np.sort(glob.glob(basedir+"P282+00/ddf/Multi/MSC_deep/*.fits")) #1 restored; 3 dirty
+lofar_files = np.sort(glob.glob(basedir+"LOFAR_and_MeerKAT/data/lofar/*.fits")) #0 high res; 1 low res
 
 # cutout (galactic lat,lon)
 cutout_lat = [-0.72, -0.08]
@@ -31,7 +31,7 @@ meerkat_data = mhdul[0].data[0, 0]
 wcs_M = WCS(mhdul[0].header).celestial
 
 # load lofar file
-lofar_file = lofar_files[1]
+lofar_file = lofar_files[0]
 lhdul = fits.open(lofar_file)
 lofar_data = lhdul[0].data if len(lhdul[0].data.shape) == 2 else lhdul[0].data[0, 0]
 wcs_L = WCS(lhdul[0].header).celestial
@@ -54,7 +54,10 @@ plt.colorbar()
 plt.show()
 
 # spectral index map
-spx = spectral_index(meerkat_cut, lofar_cut*4, 1359.7, 144.6)
-plt.imshow(spx, origin='lower', vmin=-2, vmax=2, cmap='bwr')
-plt.colorbar()
+spx = spectral_index(meerkat_cut, lofar_cut*3.86, 1359.7, 144.6)
+plt.imshow(spx, origin='lower', vmin=-1.2, vmax=0.2, cmap='coolwarm')
+plt.ylabel("y (pixels)")
+plt.xlabel("x (pixels)")
+plt.colorbar(label=r"spectral index $\alpha$")
+plt.title("SNR source spectral index")
 plt.show()
