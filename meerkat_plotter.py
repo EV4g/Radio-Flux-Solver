@@ -9,7 +9,7 @@ from reproject import reproject_interp
 import matplotlib.pyplot as plt
 import glob
 
-from functions import spectral_index, get_survey_file, cutout_to_galactic_wh, get_pixscale, generate_new_wcs
+from functions import get_spectral_index, get_survey_file, cutout_to_galactic_wh, get_pixscale, generate_new_wcs
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 basedir = "/home/floris/Documents/PhD/Galactic plane/"
@@ -54,7 +54,7 @@ plt.colorbar()
 plt.show()
 
 # spectral index map
-spx = spectral_index(meerkat_cut, lofar_cut*3.86, 1359.7, 144.6)
+spx = get_spectral_index(meerkat_cut, lofar_cut*3.86, 1359.7, 144.6)
 plt.imshow(spx, origin='lower', vmin=-1.2, vmax=0.2, cmap='coolwarm')
 plt.ylabel("y (pixels)")
 plt.xlabel("x (pixels)")

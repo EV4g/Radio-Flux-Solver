@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import glob
 import os
 #import multiprocessing; multiprocessing.set_start_method('fork') #for windows/mac
-from functions import prep_file, get_beam_size, match_catalogs_2D, compute_fluxcal_statistics
+from functions import prep_file, get_beam_size, match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index
 from astropy.table import Table
 import bdsf
 
