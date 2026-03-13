@@ -193,10 +193,11 @@ def get_flux_from_index(spectral_index, reference_flux, current_frequency, refer
 ##########################
 i1, i2, i3 =  match_catalogs_2D(radec_list((lofar, racs, meerkat)))
 freqs = np.array([lofar_freq, racs_freq, meerkat_freq]) * 1e-6
-spectral_indices = []           # fitted spectral index based on racs, meerkat
-extrapolated_flux_linear = []   # extrapolated flux when assuming a simple -0.7
-extrapolated_flux_fit = []      # extrapolated flux when fitting the fluxes from racs and meerkat
-lofar_uncorrected_flux = []     # current lofar flux, no corrections
+spectral_indices = []             # fitted spectral index based on racs, meerkat
+extrapolated_flux_linear = []     # extrapolated flux when assuming a simple -0.7
+extrapolated_flux_fit = []        # extrapolated flux when fitting the fluxes from racs and meerkat
+lofar_uncorrected_flux = []       # current lofar flux, no corrections
+lofar_uncorrected_flux_error = [] # current lofar flux error, no corrections
 
 for i, (lofar_i, racs_i, meerkat_i) in enumerate(zip(i1, i2, i3)):
     lofar_F, racs_F, meerkat_F = lofar['flux_jy'][lofar_i], racs['flux_jy'][racs_i], meerkat['flux_jy'][meerkat_i]
@@ -204,6 +205,7 @@ for i, (lofar_i, racs_i, meerkat_i) in enumerate(zip(i1, i2, i3)):
     spectral_indices.append(spectral_index)
     
     lofar_uncorrected_flux.append(lofar_F)
+    lofar_uncorrected_flux_error.append(lofar['e_flux_jy'][lofar_i])
     
     # lofar flux when using racs flux and extrapolating back to lofar freq
     extrapolated_flux_fit.append(get_flux_from_index(spectral_index, racs_F, freqs[0], freqs[1]))
@@ -219,6 +221,7 @@ plt.show()
 
 extrapolated_flux_fit = np.array(extrapolated_flux_fit)
 lofar_uncorrected_flux = np.array(lofar_uncorrected_flux)
+lofar_uncorrected_flux_error = np.array(lofar_uncorrected_flux_error)
 spectral_indices = np.array(spectral_indices)
 
 valid_factor = (spectral_indices > -1) & (spectral_indices < 0)
@@ -237,7 +240,24 @@ plt.plot((mn, mx), (mn, mx), c='k', ls='--')
 plt.colorbar(label = r"Spectral index $\alpha$")
 plt.xlabel("Lofar linear flux (Jy)")
 plt.ylabel("Lofar fitted flux (Jy)")
+plt.title(r"Lofar flux, $\alpha$=-0.7 vs fitted")
 plt.show()
+
+# compare fitted spectral index with correction factor
+plt.scatter(spectral_indices, correction_factor, c=lofar_uncorrected_flux, norm='log')
+plt.yscale('log')
+plt.axvline(-0.7, ls='--', c='k')
+plt.axhline(1, ls='--', c='k')
+plt.colorbar(label='Flux (Jy)')
+plt.ylabel("Flux correction factor")
+plt.xlabel(r"Spectral index $\alpha$")
+plt.title("Flux correction as function of spectral index")
+plt.show()
+
+snr = lofar_uncorrected_flux / lofar_uncorrected_flux_error
+spectral_difference = 
+
+weighted_mean_correction = np.mean(snr )
 
 
 ##########################
