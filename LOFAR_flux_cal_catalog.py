@@ -112,6 +112,7 @@ racs_full    = Table.read(os.getcwd()+"/catalogs/racs/racs_clean.csv")
 meerkat_full = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.csv")
 vlssr_full   = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.csv")
 tgss_full    = Table.read(os.getcwd()+"/catalogs/tgss/tgss_clean.fits")
+gleam_300_full    = Table.read(os.getcwd()+"/catalogs/gleam/gleam_300_clean.fits")
 lofar        = Table.read(os.getcwd()+"/catalogs/lofar/lofar_sources_pipeline.fits")
 
 # fix lofar
@@ -121,35 +122,39 @@ lofar.rename_column('Total_flux', 'flux_jy')
 lofar.rename_column('E_Total_flux', 'e_flux_jy')
 
 # check for sources in current file
-racs_valid      = sources_in_fits(racs_full['ra'],    racs_full['dec'],    lofar_files)
-meerkat_valid   = sources_in_fits(meerkat_full['ra'], meerkat_full['dec'], lofar_files)
-vlssr_valid     = sources_in_fits(vlssr_full['ra'],   vlssr_full['dec'],   lofar_files)
-tgss_valid      = sources_in_fits(tgss_full['ra'],    tgss_full['dec'],    lofar_files)
+racs_valid      = sources_in_fits(racs_full['ra'],      racs_full['dec'],       lofar_files)
+meerkat_valid   = sources_in_fits(meerkat_full['ra'],   meerkat_full['dec'],    lofar_files)
+vlssr_valid     = sources_in_fits(vlssr_full['ra'],     vlssr_full['dec'],      lofar_files)
+tgss_valid      = sources_in_fits(tgss_full['ra'],      tgss_full['dec'],       lofar_files)
+gleam_300_valid = sources_in_fits(gleam_300_full['ra'], gleam_300_full['dec'],  lofar_files)
 
 # remove all non-valid points to reduce syntax clutter
-racs    = racs_full[racs_valid]
-meerkat = meerkat_full[meerkat_valid]
-vlssr   = vlssr_full[vlssr_valid]
-tgss    = tgss_full[tgss_valid]
+racs      = racs_full[racs_valid]
+meerkat   = meerkat_full[meerkat_valid]
+vlssr     = vlssr_full[vlssr_valid]
+tgss      = tgss_full[tgss_valid]
+gleam_300 = gleam_300_full[gleam_300_valid]
 
 """
 # catalog plot
-plt.hist(np.log10(racs_full['flux_jy']),    alpha=0.6, bins=100, label='racs')
-plt.hist(np.log10(meerkat_full['flux_jy']), alpha=0.6, bins=100, label='meerkat')
-plt.hist(np.log10(vlssr_full['flux_jy']),   alpha=0.6, bins=100, label='vlssr')
-plt.hist(np.log10(tgss_full['flux_jy']),    alpha=0.6, bins=100, label='tgss')
-plt.hist(np.log10(lofar['flux_jy']),        alpha=0.6, bins=50,  label='lofar')
+plt.hist(np.log10(racs_full['flux_jy']),      alpha=0.6, bins=100, label='racs')
+plt.hist(np.log10(meerkat_full['flux_jy']),   alpha=0.6, bins=100, label='meerkat')
+plt.hist(np.log10(vlssr_full['flux_jy']),     alpha=0.6, bins=100, label='vlssr')
+plt.hist(np.log10(tgss_full['flux_jy']),      alpha=0.6, bins=100, label='tgss')
+plt.hist(np.log10(gleam_300_full['flux_jy']), alpha=0.6, bins=100, label='gleam')
+plt.hist(np.log10(lofar['flux_jy']),          alpha=0.6, bins=50,  label='lofar')
 plt.xlabel("log10(flux/Jy)")
 plt.ylabel("count")
 plt.yscale('log')
 plt.legend()
 plt.show()
 
-plt.hist(np.log10(racs['flux_jy']),    alpha=0.6, bins=20, label='racs_v')
-plt.hist(np.log10(meerkat['flux_jy']), alpha=0.6, bins=20, label='meerkat_v')
-plt.hist(np.log10(vlssr['flux_jy']),   alpha=0.6, bins=20, label='vlssr_v')
-plt.hist(np.log10(tgss['flux_jy']),    alpha=0.6, bins=100, label='tgss_v')
-plt.hist(np.log10(lofar['flux_jy']),   alpha=0.6, bins=50, label='lofar')
+plt.hist(np.log10(racs['flux_jy']),      alpha=0.6, bins=20,  label='racs_v')
+plt.hist(np.log10(meerkat['flux_jy']),   alpha=0.6, bins=20,  label='meerkat_v')
+plt.hist(np.log10(vlssr['flux_jy']),     alpha=0.6, bins=20,  label='vlssr_v')
+plt.hist(np.log10(tgss['flux_jy']),      alpha=0.6, bins=100, label='tgss_v')
+plt.hist(np.log10(gleam_300['flux_jy']), alpha=0.6, bins=100, label='gleam_v')
+plt.hist(np.log10(lofar['flux_jy']),     alpha=0.6, bins=50,  label='lofar')
 plt.legend()
 plt.xlabel("log10(flux/Jy)")
 plt.ylabel("count")
@@ -157,11 +162,12 @@ plt.yscale('log')
 plt.show()
 
 # plot catalog as function of position
-plt.scatter(racs['ra'],    racs['dec'],    s=2, label='racs')
-plt.scatter(meerkat['ra'], meerkat['dec'], s=2, label='meerkat')
-plt.scatter(vlssr['ra'],   vlssr['dec'],   s=2, label='vlssr')
-plt.scatter(tgss['ra'],    tgss['dec'],    s=2, label='tgss')
-plt.scatter(lofar['ra'],   lofar['dec'],   s=1, label='lofar')
+plt.scatter(racs['ra'],      racs['dec'],      s=2, label='racs')
+plt.scatter(meerkat['ra'],   meerkat['dec'],   s=2, label='meerkat')
+plt.scatter(vlssr['ra'],     vlssr['dec'],     s=2, label='vlssr')
+plt.scatter(tgss['ra'],      tgss['dec'],      s=2, label='tgss')
+plt.scatter(gleam_300['ra'], gleam_300['dec'], s=2, label='gleam')
+plt.scatter(lofar['ra'],     lofar['dec'],     s=1, label='lofar')
 plt.gca().set_box_aspect(1)
 plt.xlabel("RA")
 plt.ylabel("Dec")
