@@ -6,6 +6,8 @@ from astropy.table import Table
 # meerkat = Table.read(os.getcwd()+"/catalogs/meerkat/smgps_moment0_5beam_5sigma_510599row_compact_source_catalogue.csv")
 # vlssr   = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_full.csv")
 # tgss    = Table.read(os.getcwd()+"/catalogs/tgss/TGSSADR1_7sigma_catalog.fits")
+gleam     = Table.read(os.getcwd()+"/catalogs/gleam/GLEAM300_source_catalogue.fits")
+
 
 # from astroquery.vizier import Vizier
 # v = Vizier(row_limit=-1)
@@ -54,3 +56,14 @@ from astropy.table import Table
 # tgss['e_flux_jy'] *= 1e-3
 
 # tgss.write("tgss_clean.fits", overwrite=True)
+
+#### gleam ####
+# gleam.rename_column("RAJ2000", "ra")
+# gleam.rename_column("DEJ2000", "dec")
+# gleam.rename_column("int_flux", 'flux_jy')
+# gleam.rename_column("err_int_flux", 'e_flux_jy')
+
+# for col in gleam.colnames:
+#     gleam[col].info.description = None
+
+# gleam.write("gleam_clean.fits", overwrite=True)
