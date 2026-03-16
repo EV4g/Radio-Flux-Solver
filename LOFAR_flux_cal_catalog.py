@@ -90,11 +90,12 @@ def radec_list(cats):
     return radec_list        
 
 spectral_index_theory = -0.7
-lofar_freq   = 144.6e6 #Hz
-racs_freq    = 887.5e6 #Hz
-meerkat_freq = 1359.7e6  #Hz
-vlssr_freq   = 73.8e6  #Hz
-tgss_freq    = 150e6   #Hz
+lofar_freq     = 144.6e6 #Hz
+racs_freq      = 887.5e6 #Hz
+meerkat_freq   = 1359.7e6  #Hz
+vlssr_freq     = 73.8e6  #Hz
+tgss_freq      = 150e6   #Hz
+gleam_300_freq = 300e6 #Hz
 
 lofar_files = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0]
 
@@ -109,11 +110,11 @@ lofar_files = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0]
 
 # get calagogs
 racs_full    = Table.read(os.getcwd()+"/catalogs/racs/racs_clean.csv")
-meerkat_full = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.csv")
-vlssr_full   = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.csv")
-tgss_full    = Table.read(os.getcwd()+"/catalogs/tgss/tgss_clean.fits")
-gleam_300_full    = Table.read(os.getcwd()+"/catalogs/gleam/gleam_300_clean.fits")
-lofar        = Table.read(os.getcwd()+"/catalogs/lofar/lofar_sources_pipeline.fits")
+meerkat_full   = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.csv")
+vlssr_full     = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.csv")
+tgss_full      = Table.read(os.getcwd()+"/catalogs/tgss/tgss_clean.fits")
+gleam_300_full = Table.read(os.getcwd()+"/catalogs/gleam/gleam_300_clean.fits")
+lofar          = Table.read(os.getcwd()+"/catalogs/lofar/lofar_sources_pipeline.fits")
 
 # fix lofar
 lofar.rename_column("RA", "ra")
