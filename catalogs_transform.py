@@ -66,4 +66,4 @@ gleam     = Table.read(os.getcwd()+"/catalogs/gleam/GLEAM300_source_catalogue.fi
 # for col in gleam.colnames:
 #     gleam[col].info.description = None
 
-# gleam.write("gleam_clean.fits", overwrite=True)
+# gleam.write("gleam_300_clean.fits", overwrite=True)
