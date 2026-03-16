@@ -17,7 +17,7 @@ def plot_location_dependant_index(ra, dec, ratio):
 spectral_index_theory = -0.7
 lofar_freq = 144.6e6 #Hz
 racs_freq = 887.5e6 #Hz
-meerkat_freq = 1367e6 #Hz
+meerkat_freq = 1359.7e6 #Hz
 
 racs_files = np.sort(glob.glob(os.getcwd()+"/data/racs/*.fits"))
 lofar_files = glob.glob(os.getcwd()+"/data/lofar/*.fits")
