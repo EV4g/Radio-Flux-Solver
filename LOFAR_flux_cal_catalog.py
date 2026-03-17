@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import glob
 import os
 #import multiprocessing; multiprocessing.set_start_method('fork') #for windows/mac
-from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index
+from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics
 from astropy.table import Table
 
 
@@ -85,7 +85,6 @@ def merge_catalogs(cats, thres_arc=2):
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
 def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2, return_coord=False):
     i1, i2, i3 =  match_catalogs_2D(radec_list(cats), thres_arc=thres_arc)
-    #freqs = np.array(freqs) * 1e-6
     spectral_indices = []             # fitted spectral index based on racs, meerkat
     extrapolated_flux_linear = []     # extrapolated flux when assuming a simple -0.7
     extrapolated_flux_fit = []        # extrapolated flux when fitting the fluxes from racs and meerkat
@@ -115,11 +114,14 @@ def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2,
         plt.show()
 
     extrapolated_flux_fit = np.array(extrapolated_flux_fit)
+    extrapolated_flux_linear = np.array(extrapolated_flux_linear)
+    extrapolated_flux_fit_to_linear_ratio = extrapolated_flux_fit / extrapolated_flux_linear
+    
+    
     lofar_uncorrected_flux = np.array(lofar_uncorrected_flux)
     lofar_uncorrected_flux_error = np.array(lofar_uncorrected_flux_error)
     spectral_indices = np.array(spectral_indices)
 
-    #valid_factor = (spectral_indices > -1) & (spectral_indices < 0)
     correction_factor = extrapolated_flux_fit / lofar_uncorrected_flux
     snr = lofar_uncorrected_flux / lofar_uncorrected_flux_error
 
@@ -151,9 +153,9 @@ def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2,
         plt.show()
         
     if return_coord:
-        return spectral_indices, snr, correction_factor, cats[0]['ra'][i1], cats[0]['dec'][i1]
+        return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, cats[0]['ra'][i1], cats[0]['dec'][i1]
     else:
-        return spectral_indices, snr, correction_factor
+        return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio
 
 """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
 def calculate_weighted_correction_factor(spx, snr, cor, spx_ref=-0.7, spectral_damping_factor=10):
@@ -270,50 +272,103 @@ def get_flux_from_index(spectral_index, reference_flux, current_frequency, refer
 ras, decs = [], []
 correction_factor_global = []
 spectral_index_global = []
+fitted_flux = []
+signal_to_noise = []
+fit_to_linear_ratio = []
+
+#### TODO ####
+# add a weighting for point crowding --> downweight sources that are very close to another since they might be confused during matching
+# add a weighting per catalog matching run, e.g. downweight [lofar, gleam, *], since it requires a larger thres_arc
 
 ##########################
 # lofar + racs + meerkat #
 ##########################
-spx, snr, cor, ra, dec = compute_flux_correction_factor((lofar, racs, meerkat), (lofar_freq, racs_freq, meerkat_freq), ("lofar", "racs", "meerkat"), debug=True, return_coord=True)
+spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, racs, meerkat), (lofar_freq, racs_freq, meerkat_freq), ("lofar", "racs", "meerkat"), debug=True, return_coord=True)
 weighted_mean_correction = calculate_weighted_correction_factor(spx, snr, cor)
 
 ras += [ra]; decs += [dec]
 correction_factor_global += [cor]
 spectral_index_global += [spx]
+fitted_flux += [flux]
+signal_to_noise += [snr]
+fit_to_linear_ratio += [ftl]
 
 
 ##########################
 # lofar + tgss + meerkat #
 ##########################
-spx, snr, cor, ra, dec = compute_flux_correction_factor((lofar, tgss, meerkat), (lofar_freq, tgss_freq, meerkat_freq), ("lofar", "tgss", "meerkat"), debug=True, return_coord=True)
+spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, tgss, meerkat), (lofar_freq, tgss_freq, meerkat_freq), ("lofar", "tgss", "meerkat"), debug=True, return_coord=True)
 weighted_mean_correction = calculate_weighted_correction_factor(spx, snr, cor)
 
 ras += [ra]; decs += [dec]
 correction_factor_global += [cor]
 spectral_index_global += [spx]
+fitted_flux += [flux]
+signal_to_noise += [snr]
+fit_to_linear_ratio += [ftl]
 
 
 #######################
 # lofar + tgss + racs #
 #######################
-spx, snr, cor, ra, dec = compute_flux_correction_factor((lofar, tgss, racs), (lofar_freq, tgss_freq, racs_freq), ("lofar", "tgss", "racs"), debug=True, return_coord=True)
+spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, tgss, racs), (lofar_freq, tgss_freq, racs_freq), ("lofar", "tgss", "racs"), debug=True, return_coord=True)
 weighted_mean_correction = calculate_weighted_correction_factor(spx, snr, cor)
 
 ras += [ra]; decs += [dec]
 correction_factor_global += [cor]
 spectral_index_global += [spx]
+fitted_flux += [flux]
+signal_to_noise += [snr]
+fit_to_linear_ratio += [ftl]
 
 
 ########################
 # lofar + gleam + racs #
 ########################
-spx, snr, cor, ra, dec = compute_flux_correction_factor((lofar, gleam_300, racs), (lofar_freq, gleam_300_freq, racs_freq), ("lofar", "gleam", "racs"), debug=True, return_coord=True, thres_arc=5)
+spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, gleam_300, racs), (lofar_freq, gleam_300_freq, racs_freq), ("lofar", "gleam", "racs"), debug=True, return_coord=True, thres_arc=5)
 weighted_mean_correction = calculate_weighted_correction_factor(spx, snr, cor)
 
 ras += [ra]; decs += [dec]
 correction_factor_global += [cor]
 spectral_index_global += [spx]
+fitted_flux += [flux]
+signal_to_noise += [snr]
+fit_to_linear_ratio += [ftl]
 
+
+ras = np.concatenate(ras)
+decs = np.concatenate(decs)
+correction_factor_global = np.concatenate(correction_factor_global)
+spectral_index_global = np.concatenate(spectral_index_global)
+fitted_flux = np.concatenate(fitted_flux)
+signal_to_noise = np.concatenate(signal_to_noise)
+fit_to_linear_ratio = np.concatenate(fit_to_linear_ratio)
+
+############################################################################
+#### plotting correction factor based on all previous catalog matchings ####
+############################################################################
+spectral_index_term = np.exp(-10 * (spectral_index_global + 0.7)**2)
+#ftl_factor_term     = np.exp(-10 * (fit_to_linear_ratio - 1)**2) 
+total_weighting_factor = spectral_index_term * signal_to_noise
+
+Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index_global, correction_factor_global, total_weighting_factor, logy=True)
+
+o = np.argsort(total_weighting_factor)
+
+fig, ax = plt.subplots()
+sc = ax.scatter(spectral_index_global[o], correction_factor_global[o], c=total_weighting_factor[o])
+ax.contour(Xi, Yi, Zi, levels=6, colors='red', alpha=0.7, linewidths=0.8)
+plt.colorbar(sc)
+plt.yscale('log')
+
+plt.axhline(py, ls="--", color="gray")
+plt.axvline(px, ls="--", color="gray")
+
+plt.show()
+
+
+
+#### Quad matchings below
 
 #################################
 # lofar + tgss + racs + meerkat #
