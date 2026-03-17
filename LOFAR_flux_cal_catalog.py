@@ -71,6 +71,7 @@ def quick_compare_catalog(cat1, cat2, freq1, freq2, name1, name2, thres_arc=2, s
     
     print(f"Compared {name1} to {name2} \n")
 
+"""w.i.p."""
 def merge_catalogs(cats, thres_arc=2):
     indices = match_catalogs_2D(radec_list(cats), thres_arc=thres_arc)
     
@@ -109,7 +110,7 @@ lofar_files = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0]
 # img.write_catalog(outfile="lofar_sources_pipeline.fits", format="fits", catalog_type="srl", clobber=True)
 
 # get calagogs
-racs_full    = Table.read(os.getcwd()+"/catalogs/racs/racs_clean.csv")
+racs_full      = Table.read(os.getcwd()+"/catalogs/racs/racs_clean.csv")
 meerkat_full   = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.csv")
 vlssr_full     = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.csv")
 tgss_full      = Table.read(os.getcwd()+"/catalogs/tgss/tgss_clean.fits")
@@ -196,6 +197,11 @@ quick_compare_catalog(racs,  meerkat, racs_freq,  meerkat_freq, "racs",  "meerka
 def get_flux_from_index(spectral_index, reference_flux, current_frequency, reference_frequency):
     return reference_flux * (current_frequency / reference_frequency) ** spectral_index
 
+# arrays to keep track of all individual runs
+ras, decs = [], []
+correction_factor_global = []
+spectral_index_global = []
+
 ##########################
 # lofar + racs + meerkat #
 ##########################
@@ -271,6 +277,13 @@ spectral_difference_factor = (1 - (spectral_difference / np.max(spectral_differe
 
 # logarithmic weighted mean of the flux correction factor
 weighted_mean_correction = 10**(np.mean(snr * spectral_difference_factor * np.log10(correction_factor)) / np.mean(snr * spectral_difference_factor))
+
+# add arrays to global ones to keep track
+ras += [lofar['ra'][i1]]
+decs += [lofar['dec'][i1]]
+correction_factor_global += [correction_factor]
+spectral_index_global += [spectral_indices]
+
 
 
 ##########################
@@ -349,6 +362,13 @@ spectral_difference_factor = (1 - (spectral_difference / np.max(spectral_differe
 # logarithmic weighted mean of the flux correction factor
 weighted_mean_correction = 10**(np.mean(snr * spectral_difference_factor * np.log10(correction_factor)) / np.mean(snr * spectral_difference_factor))
 
+# add arrays to global ones to keep track
+ras += [lofar['ra'][i1]]
+decs += [lofar['dec'][i1]]
+correction_factor_global += [correction_factor]
+spectral_index_global += [spectral_indices]
+
+
 
 #######################
 # lofar + tgss + racs #
@@ -426,6 +446,11 @@ spectral_difference_factor = (1 - (spectral_difference / np.max(spectral_differe
 # logarithmic weighted mean of the flux correction factor
 weighted_mean_correction = 10**(np.mean(snr * spectral_difference_factor * np.log10(correction_factor)) / np.mean(snr * spectral_difference_factor))
 
+# add arrays to global ones to keep track
+ras += [lofar['ra'][i1]]
+decs += [lofar['dec'][i1]]
+correction_factor_global += [correction_factor]
+spectral_index_global += [spectral_indices]
 
 
 #################################
