@@ -81,8 +81,83 @@ def merge_catalogs(cats, thres_arc=2):
     
     return catalog
     
+"""compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
+which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
+def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2):
+    i1, i2, i3 =  match_catalogs_2D(radec_list(cats), thres_arc=thres_arc)
+    #freqs = np.array(freqs) * 1e-6
+    spectral_indices = []             # fitted spectral index based on racs, meerkat
+    extrapolated_flux_linear = []     # extrapolated flux when assuming a simple -0.7
+    extrapolated_flux_fit = []        # extrapolated flux when fitting the fluxes from racs and meerkat
+    lofar_uncorrected_flux = []       # current lofar flux, no corrections
+    lofar_uncorrected_flux_error = [] # current lofar flux error, no corrections
 
+    for i, (ai, bi, ci) in enumerate(zip(i1, i2, i3)):
+        fluxes = [cats[0]['flux_jy'][ai], cats[1]['flux_jy'][bi], cats[2]['flux_jy'][ci]]
+        e_fluxes = [cats[0]['e_flux_jy'][ai], cats[1]['e_flux_jy'][bi], cats[2]['e_flux_jy'][ci]]
+        spectral_index = get_spectral_index(fluxes[1], fluxes[2], freqs[1], freqs[2])
+        spectral_indices.append(spectral_index)
+        
+        lofar_uncorrected_flux.append(fluxes[0])
+        lofar_uncorrected_flux_error.append(e_fluxes[0])
+        
+        # lofar flux when using racs flux and extrapolating back to lofar freq
+        extrapolated_flux_fit.append(get_flux_from_index(spectral_index, fluxes[1], freqs[0], freqs[1]))
+        extrapolated_flux_linear.append(0.5 * (get_flux_from_index(-0.7, fluxes[1], freqs[0], freqs[1]) + get_flux_from_index(-0.7, fluxes[2], freqs[0], freqs[2])))
+        
+        
+        if debug: plt.plot(freqs, fluxes)
+    
+    if debug:
+        plt.yscale('log')
+        plt.ylabel(r"log$_{10}$(Jy)")
+        plt.xlabel("Frequency (MHz)")
+        plt.show()
 
+    extrapolated_flux_fit = np.array(extrapolated_flux_fit)
+    lofar_uncorrected_flux = np.array(lofar_uncorrected_flux)
+    lofar_uncorrected_flux_error = np.array(lofar_uncorrected_flux_error)
+    spectral_indices = np.array(spectral_indices)
+
+    #valid_factor = (spectral_indices > -1) & (spectral_indices < 0)
+    correction_factor = extrapolated_flux_fit / lofar_uncorrected_flux
+    snr = lofar_uncorrected_flux / lofar_uncorrected_flux_error
+
+    if debug:
+        # compare -0.7 assumption versus fitted spectral indices
+        mn, mx = min(np.min(extrapolated_flux_fit), np.min(extrapolated_flux_linear)), max(np.max(extrapolated_flux_fit), np.max(extrapolated_flux_linear))
+        plt.scatter(extrapolated_flux_linear, extrapolated_flux_fit, c=spectral_indices)
+        plt.yscale('log')
+        plt.xscale('log')
+        plt.xlim(mn, mx)
+        plt.ylim(mn, mx)
+        plt.gca().set_box_aspect(1)
+        plt.plot((mn, mx), (mn, mx), c='k', ls='--')
+        plt.colorbar(label = r"Spectral index $\alpha$")
+        plt.xlabel(f"{names[0]} linear flux (Jy)")
+        plt.ylabel(f"{names[0]} fitted flux (Jy)")
+        plt.title(f"{names[0]} "+r"flux, $\alpha$=-0.7 vs fitted")
+        plt.show()
+    
+        # compare fitted spectral index with correction factor
+        plt.scatter(spectral_indices, correction_factor, c=lofar_uncorrected_flux, norm='log')
+        plt.yscale('log')
+        plt.axvline(-0.7, ls='--', c='k')
+        plt.axhline(1, ls='--', c='k')
+        plt.colorbar(label='Flux (Jy)')
+        plt.ylabel("Flux correction factor")
+        plt.xlabel(r"Spectral index $\alpha$")
+        plt.title("Flux correction as function of spectral index")
+        plt.show()
+
+    return spectral_indices, snr, correction_factor
+
+"""Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
+def calculate_weighted_correction_factor(spx, snr, cor, spx_ref=-0.7, spectral_damping_factor=10):
+    spectral_difference_factor = np.exp(-spectral_damping_factor * (spx - spx_ref)**2)
+    weighted_mean_correction = 10**(np.mean(snr * spectral_difference_factor * np.log10(cor)) / np.mean(snr * spectral_difference_factor))
+    return weighted_mean_correction
+    
 
 def radec_list(cats):
     radec_list = []
