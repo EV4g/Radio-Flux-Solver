@@ -186,7 +186,8 @@ meerkat_full   = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.csv")
 vlssr_full     = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.csv")
 tgss_full      = Table.read(os.getcwd()+"/catalogs/tgss/tgss_clean.fits")
 gleam_300_full = Table.read(os.getcwd()+"/catalogs/gleam/gleam_300_clean.fits")
-lofar          = Table.read(os.getcwd()+"/catalogs/lofar/lofar_sources_pipeline.fits")
+#lofar          = Table.read(os.getcwd()+"/catalogs/lofar/lofar_sources_pipeline.fits")
+lofar          = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl.fits")
 
 # fix lofar
 lofar.rename_column("RA", "ra")
@@ -194,12 +195,16 @@ lofar.rename_column("DEC", "dec")
 lofar.rename_column('Total_flux', 'flux_jy')
 lofar.rename_column('E_Total_flux', 'e_flux_jy')
 
+lofar['flux_jy'] *= 1e-3
+lofar['e_flux_jy'] *= 1e-3
+
 # check for sources in current file
 racs_valid      = sources_in_fits(racs_full['ra'],      racs_full['dec'],       lofar_files)
 meerkat_valid   = sources_in_fits(meerkat_full['ra'],   meerkat_full['dec'],    lofar_files)
 vlssr_valid     = sources_in_fits(vlssr_full['ra'],     vlssr_full['dec'],      lofar_files)
 tgss_valid      = sources_in_fits(tgss_full['ra'],      tgss_full['dec'],       lofar_files)
 gleam_300_valid = sources_in_fits(gleam_300_full['ra'], gleam_300_full['dec'],  lofar_files)
+lofar_valid     = sources_in_fits(lofar['ra'],          lofar['dec'],           lofar_files)
 
 # remove all non-valid points to reduce syntax clutter
 racs      = racs_full[racs_valid]
@@ -207,6 +212,7 @@ meerkat   = meerkat_full[meerkat_valid]
 vlssr     = vlssr_full[vlssr_valid]
 tgss      = tgss_full[tgss_valid]
 gleam_300 = gleam_300_full[gleam_300_valid]
+lofar     = lofar[lofar_valid]
 
 """
 # catalog plot
@@ -335,6 +341,26 @@ fitted_flux += [flux]
 signal_to_noise += [snr]
 fit_to_linear_ratio += [ftl]
 
+for spx, snr, cor in zip(spectral_index_global, signal_to_noise, correction_factor_global):
+    spectral_index_term = np.exp(-10 * (spx + 0.7)**2)
+    total_weighting_factor = spectral_index_term * snr
+    
+    Xi, Yi, Zi, px, py = calculate_contour_statistics(spx, cor, total_weighting_factor, logy=True)
+    
+    o = np.argsort(total_weighting_factor)
+    
+    fig, ax = plt.subplots()
+    sc = ax.scatter(spx[o], cor[o], c=total_weighting_factor[o])
+    ax.contour(Xi, Yi, Zi, levels=6, colors='red', alpha=0.7, linewidths=0.8)
+    plt.colorbar(sc)
+    plt.yscale('log')
+    
+    plt.axhline(py, ls="--", color="gray")
+    plt.axvline(px, ls="--", color="gray")
+    
+    plt.xlim(-2.2, 0.6)
+    plt.ylim(0.1, 100)
+    plt.show()
 
 ras = np.concatenate(ras)
 decs = np.concatenate(decs)
@@ -364,6 +390,8 @@ plt.yscale('log')
 plt.axhline(py, ls="--", color="gray")
 plt.axvline(px, ls="--", color="gray")
 
+plt.xlim(-2.2, 0.6)
+plt.ylim(0.1, 100)
 plt.show()
 
 
