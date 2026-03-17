@@ -1,12 +1,14 @@
 import os
 from astropy.table import Table
+import bdsf
+import glob
 
 # get calagogs
 # racs    = Table.read(os.getcwd()+"/catalogs/racs/RACS_DR1_Sources_GalacticRegion_v2021_08.xml")
 # meerkat = Table.read(os.getcwd()+"/catalogs/meerkat/smgps_moment0_5beam_5sigma_510599row_compact_source_catalogue.csv")
 # vlssr   = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_full.csv")
 # tgss    = Table.read(os.getcwd()+"/catalogs/tgss/TGSSADR1_7sigma_catalog.fits")
-gleam     = Table.read(os.getcwd()+"/catalogs/gleam/GLEAM300_source_catalogue.fits")
+#gleam     = Table.read(os.getcwd()+"/catalogs/gleam/GLEAM300_source_catalogue.fits")
 
 
 # from astroquery.vizier import Vizier
@@ -14,6 +16,17 @@ gleam     = Table.read(os.getcwd()+"/catalogs/gleam/GLEAM300_source_catalogue.fi
 # catalogs = v.get_catalogs("VIII/97")
 # vlssr = catalogs[0]
 # vlssr.write("vlssr_full.csv", format="ascii.csv", overwrite=True)
+
+#### lofar ####
+#lofar_files = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0]
+# img = bdsf.process_image(
+#     lofar_files,
+#     thresh_isl=3.0,       # island threshold (sigma)
+#     thresh_pix=5.0,       # peak detection threshold (sigma)
+#     rms_box=(100, 25),    # (box_size, step_size) for rms map; tune to your image
+#     beam=(get_beam_size(lofar_files)),  # (maj_deg, min_deg, PA)
+# )
+# img.write_catalog(outfile="lofar_sources_pipeline.fits", format="fits", catalog_type="srl", clobber=True)
 
 
 #### racs ####
