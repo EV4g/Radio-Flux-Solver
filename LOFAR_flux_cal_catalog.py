@@ -453,36 +453,121 @@ correction_factor_global += [correction_factor]
 spectral_index_global += [spectral_indices]
 
 
-#################################
-# lofar + tgss + racs + meerkat #
-#################################
-i1, i2, i3, i4 =  match_catalogs_2D(radec_list((lofar, tgss, racs, meerkat)))
-freqs = np.array([lofar_freq, tgss_freq, racs_freq, meerkat_freq]) * 1e-6
+
+########################
+# lofar + gleam + racs #
+########################
+i1, i2, i3 =  match_catalogs_2D(radec_list((lofar, gleam_300, racs)), thres_arc=5)
+freqs = np.array([lofar_freq, gleam_300_freq, racs_freq]) * 1e-6
 spectral_indices = []             # fitted spectral index based on racs, meerkat
 extrapolated_flux_linear = []     # extrapolated flux when assuming a simple -0.7
 extrapolated_flux_fit = []        # extrapolated flux when fitting the fluxes from racs and meerkat
 lofar_uncorrected_flux = []       # current lofar flux, no corrections
 lofar_uncorrected_flux_error = [] # current lofar flux error, no corrections
 
-for i, (lofar_i, tgss_i, racs_i, meerkat_i) in enumerate(zip(i1, i2, i3, i4)):
-    lofar_F, tgss_F, racs_F, meerkat_F = lofar['flux_jy'][lofar_i], tgss['flux_jy'][tgss_i], racs['flux_jy'][racs_i], meerkat['flux_jy'][meerkat_i]
-    #spectral_index = get_spectral_index(tgss_F, racs_F, freqs[1], freqs[2])
-    #spectral_indices.append(spectral_index)
+for i, (lofar_i, gleam_300_i, racs_i) in enumerate(zip(i1, i2, i3)):
+    lofar_F, gleam_300_F, racs_F = lofar['flux_jy'][lofar_i], gleam_300['flux_jy'][gleam_300_i], racs['flux_jy'][racs_i]
+    spectral_index = get_spectral_index(gleam_300_F, racs_F, freqs[1], freqs[2])
+    spectral_indices.append(spectral_index)
     
     lofar_uncorrected_flux.append(lofar_F)
     lofar_uncorrected_flux_error.append(lofar['e_flux_jy'][lofar_i])
     
     # lofar flux when using racs flux and extrapolating back to lofar freq
-    #extrapolated_flux_fit.append(get_flux_from_index(spectral_index, tgss_F, freqs[0], freqs[1]))
-    #extrapolated_flux_linear.append(0.5 * (get_flux_from_index(-0.7, tgss_F, freqs[0], freqs[1]) + get_flux_from_index(-0.7, racs_F, freqs[0], freqs[2])))
+    extrapolated_flux_fit.append(get_flux_from_index(spectral_index, gleam_300_F, freqs[0], freqs[1]))
+    extrapolated_flux_linear.append(0.5 * (get_flux_from_index(-0.7, gleam_300_F, freqs[0], freqs[1]) + get_flux_from_index(-0.7, racs_F, freqs[0], freqs[2])))
     
     
-    plt.plot(freqs, [lofar_F, tgss_F, racs_F, meerkat_F])
+    plt.plot(freqs, [lofar_F, gleam_300_F, racs_F])
     
 plt.yscale('log')
 plt.ylabel(r"log$_{10}$(Jy)")
 plt.xlabel("Frequency (MHz)")
 plt.show()
+
+extrapolated_flux_fit = np.array(extrapolated_flux_fit)
+lofar_uncorrected_flux = np.array(lofar_uncorrected_flux)
+lofar_uncorrected_flux_error = np.array(lofar_uncorrected_flux_error)
+spectral_indices = np.array(spectral_indices)
+
+valid_factor = (spectral_indices > -1) & (spectral_indices < 0)
+correction_factor = extrapolated_flux_fit / lofar_uncorrected_flux
+
+
+# compare -0.7 assumption versus fitted spectral indices
+mn, mx = min(np.min(extrapolated_flux_fit), np.min(extrapolated_flux_linear)), max(np.max(extrapolated_flux_fit), np.max(extrapolated_flux_linear))
+plt.scatter(extrapolated_flux_linear, extrapolated_flux_fit, c=spectral_indices)
+plt.yscale('log')
+plt.xscale('log')
+plt.xlim(mn, mx)
+plt.ylim(mn, mx)
+plt.gca().set_box_aspect(1)
+plt.plot((mn, mx), (mn, mx), c='k', ls='--')
+plt.colorbar(label = r"Spectral index $\alpha$")
+plt.xlabel("Lofar linear flux (Jy)")
+plt.ylabel("Lofar fitted flux (Jy)")
+plt.title(r"Lofar flux, $\alpha$=-0.7 vs fitted")
+plt.show()
+
+# compare fitted spectral index with correction factor
+plt.scatter(spectral_indices, correction_factor, c=lofar_uncorrected_flux, norm='log')
+plt.yscale('log')
+plt.axvline(-0.7, ls='--', c='k')
+plt.axhline(1, ls='--', c='k')
+plt.colorbar(label='Flux (Jy)')
+plt.ylabel("Flux correction factor")
+plt.xlabel(r"Spectral index $\alpha$")
+plt.title("Flux correction as function of spectral index")
+plt.show()
+
+# signal to noise
+snr = lofar_uncorrected_flux / lofar_uncorrected_flux_error
+
+# distance of spectral index to alpha = -0.7
+spectral_difference = np.abs(spectral_indices + 0.7)
+spectral_difference_factor = (1 - (spectral_difference / np.max(spectral_difference)))**2
+
+# logarithmic weighted mean of the flux correction factor
+weighted_mean_correction = 10**(np.mean(snr * spectral_difference_factor * np.log10(correction_factor)) / np.mean(snr * spectral_difference_factor))
+
+# add arrays to global ones to keep track
+ras += [lofar['ra'][i1]]
+decs += [lofar['dec'][i1]]
+correction_factor_global += [correction_factor]
+spectral_index_global += [spectral_indices]
+
+
+
+#################################
+# lofar + tgss + racs + meerkat #
+#################################
+# i1, i2, i3, i4 =  match_catalogs_2D(radec_list((lofar, tgss, racs, meerkat)))
+# freqs = np.array([lofar_freq, tgss_freq, racs_freq, meerkat_freq]) * 1e-6
+# spectral_indices = []             # fitted spectral index based on racs, meerkat
+# extrapolated_flux_linear = []     # extrapolated flux when assuming a simple -0.7
+# extrapolated_flux_fit = []        # extrapolated flux when fitting the fluxes from racs and meerkat
+# lofar_uncorrected_flux = []       # current lofar flux, no corrections
+# lofar_uncorrected_flux_error = [] # current lofar flux error, no corrections
+
+# for i, (lofar_i, tgss_i, racs_i, meerkat_i) in enumerate(zip(i1, i2, i3, i4)):
+#     lofar_F, tgss_F, racs_F, meerkat_F = lofar['flux_jy'][lofar_i], tgss['flux_jy'][tgss_i], racs['flux_jy'][racs_i], meerkat['flux_jy'][meerkat_i]
+#     #spectral_index = get_spectral_index(tgss_F, racs_F, freqs[1], freqs[2])
+#     #spectral_indices.append(spectral_index)
+    
+#     lofar_uncorrected_flux.append(lofar_F)
+#     lofar_uncorrected_flux_error.append(lofar['e_flux_jy'][lofar_i])
+    
+#     # lofar flux when using racs flux and extrapolating back to lofar freq
+#     #extrapolated_flux_fit.append(get_flux_from_index(spectral_index, tgss_F, freqs[0], freqs[1]))
+#     #extrapolated_flux_linear.append(0.5 * (get_flux_from_index(-0.7, tgss_F, freqs[0], freqs[1]) + get_flux_from_index(-0.7, racs_F, freqs[0], freqs[2])))
+    
+    
+#     plt.plot(freqs, [lofar_F, tgss_F, racs_F, meerkat_F])
+    
+# plt.yscale('log')
+# plt.ylabel(r"log$_{10}$(Jy)")
+# plt.xlabel("Frequency (MHz)")
+# plt.show()
 
 # extrapolated_flux_fit = np.array(extrapolated_flux_fit)
 # lofar_uncorrected_flux = np.array(lofar_uncorrected_flux)
