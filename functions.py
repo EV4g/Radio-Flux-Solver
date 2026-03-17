@@ -5,13 +5,14 @@ from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 import numpy as np
-from scipy.optimize import curve_fit
+from scipy.optimize import curve_fit, minimize
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 from astropy.nddata.utils import Cutout2D
 from reproject import reproject_interp
 from tqdm import tqdm
 from scipy.spatial import cKDTree
+from scipy.stats import gaussian_kde
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
@@ -368,3 +369,29 @@ def match_catalogs_2D(ra_dec_list, thres_arc=2):
                     used_indices[cat].add(idx)
 
     return [np.array(consistent_matches[i]) for i in range(n)]
+
+"""Add contours to scatterplot
+Takes x, y coordinated and a per-source weighting c. Can make the contour fitting work in logspace by using
+(logy, logx). n sets the 2D resolution of the mesh."""
+def calculate_contour_statistics(x, y, c, logx=False, logy=False, n=200):
+    if logx: x = np.log10(x)
+    if logy: y = np.log10(y)
+    
+    xi = np.linspace(x.min(), x.max(), n)
+    yi = np.linspace(y.min(), y.max(), n)
+    Xi, Yi = np.meshgrid(xi, yi)
+    
+    kde = gaussian_kde(np.vstack([x, y]), weights=c)
+    Zi = kde(np.vstack([Xi.ravel(), Yi.ravel()])).reshape(Xi.shape)
+    
+    peak_idx = np.argmax(Zi)
+    peak_x0 = Xi.ravel()[peak_idx]
+    peak_y0 = Yi.ravel()[peak_idx]
+    
+    result = minimize(lambda p: -kde(p), x0=[peak_x0, peak_y0], method='Nelder-Mead')
+    peak_x0, peak_y0 = result.x
+    
+    if logx: Xi = 10**Xi; peak_x0 = 10**peak_x0
+    if logy: Yi = 10**Yi; peak_y0 = 10**peak_y0
+    
+    return Xi, Yi, Zi, peak_x0, peak_y0
