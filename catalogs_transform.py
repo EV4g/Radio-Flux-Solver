@@ -4,12 +4,12 @@ import bdsf
 import glob
 
 # get calagogs
-# racs    = Table.read(os.getcwd()+"/catalogs/racs/RACS_DR1_Sources_GalacticRegion_v2021_08.xml")
-# meerkat = Table.read(os.getcwd()+"/catalogs/meerkat/smgps_moment0_5beam_5sigma_510599row_compact_source_catalogue.csv")
-# vlssr   = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_full.csv")
-# tgss    = Table.read(os.getcwd()+"/catalogs/tgss/TGSSADR1_7sigma_catalog.fits")
-#gleam     = Table.read(os.getcwd()+"/catalogs/gleam/GLEAM300_source_catalogue.fits")
-
+# racs      = Table.read(os.getcwd()+"/catalogs/racs/RACS_DR1_Sources_GalacticRegion_v2021_08.xml")
+# meerkat   = Table.read(os.getcwd()+"/catalogs/meerkat/smgps_moment0_5beam_5sigma_510599row_compact_source_catalogue.csv")
+# vlssr     = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_full.csv")
+# tgss      = Table.read(os.getcwd()+"/catalogs/tgss/TGSSADR1_7sigma_catalog.fits")
+# gleam     = Table.read(os.getcwd()+"/catalogs/gleam_300/GLEAM300_source_catalogue.fits")
+# gleam_xgp = Table.read(os.getcwd()+"/catalogs/gleam_x_gp/gleam_x_gp.fit")
 
 # from astroquery.vizier import Vizier
 # v = Vizier(row_limit=-1)
@@ -28,6 +28,24 @@ import glob
 # )
 # img.write_catalog(outfile="lofar_sources_pipeline.fits", format="fits", catalog_type="srl", clobber=True)
 
+#### gleam-x gp
+# gleam_xgp.rename_column("RAJ2000", "ra")
+# gleam_xgp.rename_column("e_RAJ2000", "e_ra")
+# gleam_xgp.rename_column("DEJ2000", "dec")
+# gleam_xgp.rename_column("e_DEJ2000", "e_dec")
+
+# for column in gleam_xgp.colnames:
+#     begin = column[:4]
+#     if begin == "Fint":
+#         new_col_name = "flux_jy"
+#         if len(column) > 4: new_col_name += "_"+column[4:]
+#         gleam_xgp.rename_column(column, new_col_name)
+#     elif begin == "e_Fi":
+#         new_col_name = "e_flux_jy"
+#         if len(column) > 6: new_col_name += "_"+column[6:]
+#         gleam_xgp.rename_column(column, new_col_name)
+
+# gleam_xgp.write("gleam_x_gp_clean.fits")
 
 #### racs ####
 # racs['flux_jy'] = racs['Total_flux_Source'] * 1e-3
