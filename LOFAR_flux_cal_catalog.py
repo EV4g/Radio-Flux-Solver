@@ -184,6 +184,7 @@ meerkat_freq   = 1359.7e6 #Hz
 vlssr_freq     = 73.8e6   #Hz
 tgss_freq      = 150e6    #Hz
 gleam_300_freq = 300e6    #Hz
+gleam_xgp_freq = 200e6    #Hz
 
 lofar_files = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0]
 
@@ -192,9 +193,10 @@ racs_full      = Table.read(os.getcwd()+"/catalogs/racs/racs_clean.csv")
 meerkat_full   = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.csv")
 vlssr_full     = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.csv")
 tgss_full      = Table.read(os.getcwd()+"/catalogs/tgss/tgss_clean.fits")
-gleam_300_full = Table.read(os.getcwd()+"/catalogs/gleam/gleam_300_clean.fits")
-#lofar          = Table.read(os.getcwd()+"/catalogs/lofar/lofar_sources_pipeline.fits")
-lofar          = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl.fits")
+gleam_300_full = Table.read(os.getcwd()+"/catalogs/gleam_300/gleam_300_clean.fits")
+gleam_xgp_full = Table.read(os.getcwd()+"/catalogs/gleam_x_gp/gleam_x_gp_clean.fits")
+lofar          = Table.read(os.getcwd()+"/catalogs/lofar/lofar_sources_pipeline.fits")
+#lofar          = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl.fits")
 
 # fix lofar
 lofar.rename_column("RA", "ra")
@@ -202,8 +204,10 @@ lofar.rename_column("DEC", "dec")
 lofar.rename_column('Total_flux', 'flux_jy')
 lofar.rename_column('E_Total_flux', 'e_flux_jy')
 
-lofar['flux_jy'] *= 1e-3
-lofar['e_flux_jy'] *= 1e-3
+# LOFAR-DR3 uses mJy, pybdsf uses Jy, force everything to Jy
+if str(lofar['flux_jy']) == 'mJy':
+    lofar['flux_jy'] *= 1e-3
+    lofar['e_flux_jy'] *= 1e-3
 
 # check for sources in current file
 racs_valid      = sources_in_fits(racs_full['ra'],      racs_full['dec'],       lofar_files)
@@ -211,6 +215,7 @@ meerkat_valid   = sources_in_fits(meerkat_full['ra'],   meerkat_full['dec'],    
 vlssr_valid     = sources_in_fits(vlssr_full['ra'],     vlssr_full['dec'],      lofar_files)
 tgss_valid      = sources_in_fits(tgss_full['ra'],      tgss_full['dec'],       lofar_files)
 gleam_300_valid = sources_in_fits(gleam_300_full['ra'], gleam_300_full['dec'],  lofar_files)
+gleam_xgp_valid = sources_in_fits(gleam_xgp_full['ra'], gleam_xgp_full['dec'],  lofar_files)
 lofar_valid     = sources_in_fits(lofar['ra'],          lofar['dec'],           lofar_files)
 
 # remove all non-valid points to reduce syntax clutter
@@ -219,6 +224,7 @@ meerkat   = meerkat_full[meerkat_valid]
 vlssr     = vlssr_full[vlssr_valid]
 tgss      = tgss_full[tgss_valid]
 gleam_300 = gleam_300_full[gleam_300_valid]
+gleam_xgp = gleam_xgp_full[gleam_xgp_valid]
 lofar     = lofar[lofar_valid]
 
 """
