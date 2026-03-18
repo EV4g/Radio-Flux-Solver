@@ -90,7 +90,12 @@ def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2,
     extrapolated_flux_fit = []        # extrapolated flux when fitting the fluxes from racs and meerkat
     lofar_uncorrected_flux = []       # current lofar flux, no corrections
     lofar_uncorrected_flux_error = [] # current lofar flux error, no corrections
-
+    
+    # if there are no sources, return
+    if len(i1) == 0: 
+        print("Error: no source-matches found between selected catalogs")
+        return
+    
     for i, (ai, bi, ci) in enumerate(zip(i1, i2, i3)):
         fluxes = [cats[0]['flux_jy'][ai], cats[1]['flux_jy'][bi], cats[2]['flux_jy'][ci]]
         e_fluxes = [cats[0]['e_flux_jy'][ai], cats[1]['e_flux_jy'][bi], cats[2]['e_flux_jy'][ci]]
@@ -151,6 +156,8 @@ def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2,
         plt.xlabel(r"Spectral index $\alpha$")
         plt.title("Flux correction as function of spectral index")
         plt.show()
+        
+    print(f"Completed set [{names[0]}, {names[1]}, {names[2]}]")
         
     if return_coord:
         return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, cats[0]['ra'][i1], cats[0]['dec'][i1]
@@ -286,10 +293,13 @@ fit_to_linear_ratio = []
 # add a weighting for point crowding --> downweight sources that are very close to another since they might be confused during matching
 # add a weighting per catalog matching run, e.g. downweight [lofar, gleam, *], since it requires a larger thres_arc
 
+#### Parameters
+debug = False
+
 ##########################
 # lofar + racs + meerkat #
 ##########################
-spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, racs, meerkat), (lofar_freq, racs_freq, meerkat_freq), ("lofar", "racs", "meerkat"), debug=True, return_coord=True)
+spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, racs, meerkat), (lofar_freq, racs_freq, meerkat_freq), ("lofar", "racs", "meerkat"), debug=debug, return_coord=True)
 weighted_mean_correction = calculate_weighted_correction_factor(spx, snr, cor)
 
 ras += [ra]; decs += [dec]
@@ -303,7 +313,7 @@ fit_to_linear_ratio += [ftl]
 ##########################
 # lofar + tgss + meerkat #
 ##########################
-spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, tgss, meerkat), (lofar_freq, tgss_freq, meerkat_freq), ("lofar", "tgss", "meerkat"), debug=True, return_coord=True)
+spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, tgss, meerkat), (lofar_freq, tgss_freq, meerkat_freq), ("lofar", "tgss", "meerkat"), debug=debug, return_coord=True)
 weighted_mean_correction = calculate_weighted_correction_factor(spx, snr, cor)
 
 ras += [ra]; decs += [dec]
@@ -317,7 +327,7 @@ fit_to_linear_ratio += [ftl]
 #######################
 # lofar + tgss + racs #
 #######################
-spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, tgss, racs), (lofar_freq, tgss_freq, racs_freq), ("lofar", "tgss", "racs"), debug=True, return_coord=True)
+spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, tgss, racs), (lofar_freq, tgss_freq, racs_freq), ("lofar", "tgss", "racs"), debug=debug, return_coord=True)
 weighted_mean_correction = calculate_weighted_correction_factor(spx, snr, cor)
 
 ras += [ra]; decs += [dec]
@@ -331,7 +341,7 @@ fit_to_linear_ratio += [ftl]
 ########################
 # lofar + gleam + racs #
 ########################
-spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, gleam_300, racs), (lofar_freq, gleam_300_freq, racs_freq), ("lofar", "gleam", "racs"), debug=True, return_coord=True, thres_arc=5)
+spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, gleam_300, racs), (lofar_freq, gleam_300_freq, racs_freq), ("lofar", "gleam", "racs"), debug=debug, return_coord=True, thres_arc=5)
 weighted_mean_correction = calculate_weighted_correction_factor(spx, snr, cor)
 
 ras += [ra]; decs += [dec]
@@ -352,14 +362,17 @@ for spx, snr, cor in zip(spectral_index_global, signal_to_noise, correction_fact
     fig, ax = plt.subplots()
     sc = ax.scatter(spx[o], cor[o], c=total_weighting_factor[o])
     ax.contour(Xi, Yi, Zi, levels=6, colors='red', alpha=0.7, linewidths=0.8)
-    plt.colorbar(sc)
+    plt.colorbar(sc, label="Combined weighting factor")
     plt.yscale('log')
     
     plt.axhline(py, ls="--", color="gray")
     plt.axvline(px, ls="--", color="gray")
     
-    plt.xlim(-2.2, 0.6)
-    plt.ylim(0.1, 100)
+    plt.xlim(np.percentile(spx, 1), np.percentile(spx, 99))
+    plt.ylim(np.percentile(cor, 1), np.percentile(cor, 99))
+    plt.ylabel("Correction factor")
+    plt.xlabel(r"Fitted spectral index $\alpha$")
+    plt.title("Correction factor as function of fitted spectral index")
     plt.show()
 
 ras = np.concatenate(ras)
@@ -384,17 +397,25 @@ o = np.argsort(total_weighting_factor)
 fig, ax = plt.subplots()
 sc = ax.scatter(spectral_index_global[o], correction_factor_global[o], c=total_weighting_factor[o])
 ax.contour(Xi, Yi, Zi, levels=6, colors='red', alpha=0.7, linewidths=0.8)
-plt.colorbar(sc)
+plt.colorbar(sc, label="Combined weighting factor")
 plt.yscale('log')
 
 plt.axhline(py, ls="--", color="gray")
 plt.axvline(px, ls="--", color="gray")
 
-plt.xlim(-2.2, 0.6)
-plt.ylim(0.1, 100)
+plt.xlim(np.percentile(spectral_index_global, 1), np.percentile(spectral_index_global, 99))
+plt.ylim(np.percentile(correction_factor_global, 1), np.percentile(correction_factor_global, 99))
+plt.ylabel("Correction factor")
+plt.xlabel(r"Fitted spectral index $\alpha$")
+plt.title("Correction factor as function of fitted spectral index\nall catalogs")
 plt.show()
 
-
+#### position dependant correction factor
+# plt.scatter(ras[o], decs[o], c=correction_factor_global[o], norm='log')
+# plt.colorbar()
+# plt.ylabel("DEC (deg)")
+# plt.xlabel("RA (deg)")
+# plt.show()
 
 #### Quad matchings below
 
