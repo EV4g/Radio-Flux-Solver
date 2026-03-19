@@ -350,8 +350,7 @@ catalog_weight_factor += [catw]
 ########################
 # lofar + gleam + racs #
 ########################
-spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, gleam_300, racs), (lofar_freq, gleam_300_freq, racs_freq), ("lofar", "gleam", "racs"), debug=debug, return_coord=True, thres_arc=5)
-weighted_mean_correction = calculate_weighted_correction_factor(spx, snr, cor)
+spx, snr, cor, flux, ftl, catw, ra, dec = compute_flux_correction_factor((lofar, gleam_300, racs), (lofar_freq, gleam_300_freq, racs_freq), ("lofar", "gleam_300", "racs"), debug=debug, return_coord=True, thres_arc=5)
 
 ras += [ra]; decs += [dec]
 correction_factor_global += [cor]
@@ -359,6 +358,20 @@ spectral_index_global += [spx]
 fitted_flux += [flux]
 signal_to_noise += [snr]
 fit_to_linear_ratio += [ftl]
+catalog_weight_factor += [catw]
+
+############################
+# lofar + gleam_xgp + racs #
+############################
+spx, snr, cor, flux, ftl, catw, ra, dec = compute_flux_correction_factor((lofar, gleam_xgp, racs), (lofar_freq, gleam_xgp_freq, racs_freq), ("lofar", "gleam_xgp", "racs"), debug=debug, return_coord=True, thres_arc=2)
+
+ras += [ra]; decs += [dec]
+correction_factor_global += [cor]
+spectral_index_global += [spx]
+fitted_flux += [flux]
+signal_to_noise += [snr]
+fit_to_linear_ratio += [ftl]
+catalog_weight_factor += [catw]
 
 for spx, snr, cor, catw in zip(spectral_index_global, signal_to_noise, correction_factor_global, catalog_weight_factor):
     total_weighting_factor = calculate_weighted_correction_factor(spx, snr, cor, catw)
@@ -382,6 +395,8 @@ for spx, snr, cor, catw in zip(spectral_index_global, signal_to_noise, correctio
     plt.xlabel(r"Fitted spectral index $\alpha$")
     plt.title("Correction factor as function of fitted spectral index")
     plt.show()
+
+    print(px, py)
 
 ras = np.concatenate(ras)
 decs = np.concatenate(decs)
@@ -415,6 +430,8 @@ plt.ylabel("Correction factor")
 plt.xlabel(r"Fitted spectral index $\alpha$")
 plt.title("Correction factor as function of fitted spectral index\nall catalogs")
 plt.show()
+
+print(px, py)
 
 #### position dependant correction factor
 # plt.scatter(ras[o], decs[o], c=correction_factor_global[o], norm='log')
