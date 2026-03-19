@@ -9,7 +9,7 @@ import os
 #import multiprocessing; multiprocessing.set_start_method('fork') #for windows/mac
 from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics
 from astropy.table import Table
-
+from itertools import combinations
 
 """Plot (log)ratio as function of position in field."""
 def plot_location_dependant_index(ra, dec, ratio):
@@ -177,11 +177,33 @@ def calculate_weighted_correction_factor(spx, snr, cor, catw, spx_ref=-0.7, spec
     
     return spectral_difference_factor * signal_to_noise_factor * catw
 
+"""(cat1, cat2) --> [(ra1, dec1), (ra2, dec2)]"""
 def radec_list(cats):
     radec_list = []
     for cat in cats:
         radec_list.append((cat['ra'], cat['dec']))
     return radec_list        
+
+
+"""Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""
+def get_triplet_combinations(frequencies, catalogs):
+    indexed = sorted(enumerate(zip(frequencies, catalogs)), key=lambda x: x[1][0])
+    return [(i1, i2, i3) for (i1, (f1, _)), (i2, (f2, _)), (i3, (f3, _)) in combinations(indexed, 3) if f1 < f2 < f3]
+
+# lofar fits file
+lofar_files = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0]
+
+# get calagogs, names in order of acquisition, lofar last
+survey_names = np.array(["racs", "meerkat", "vlssr", "tgss", "gleam_300", "gleam_xgp", "lofar"])
+
+racs_full      = Table.read(os.getcwd()+"/catalogs/racs/racs_clean.csv")
+meerkat_full   = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.csv")
+vlssr_full     = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.csv")
+tgss_full      = Table.read(os.getcwd()+"/catalogs/tgss/tgss_clean.fits")
+gleam_300_full = Table.read(os.getcwd()+"/catalogs/gleam_300/gleam_300_clean.fits")
+gleam_xgp_full = Table.read(os.getcwd()+"/catalogs/gleam_x_gp/gleam_x_gp_clean.fits")
+lofar          = Table.read(os.getcwd()+"/catalogs/lofar/lofar_sources_pipeline.fits")
+#lofar          = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl.fits")
 
 spectral_index_theory = -0.7
 lofar_freq     = 144.6e6  #Hz
@@ -192,17 +214,7 @@ tgss_freq      = 150e6    #Hz
 gleam_300_freq = 300e6    #Hz
 gleam_xgp_freq = 200e6    #Hz
 
-lofar_files = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0]
-
-# get calagogs
-racs_full      = Table.read(os.getcwd()+"/catalogs/racs/racs_clean.csv")
-meerkat_full   = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.csv")
-vlssr_full     = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.csv")
-tgss_full      = Table.read(os.getcwd()+"/catalogs/tgss/tgss_clean.fits")
-gleam_300_full = Table.read(os.getcwd()+"/catalogs/gleam_300/gleam_300_clean.fits")
-gleam_xgp_full = Table.read(os.getcwd()+"/catalogs/gleam_x_gp/gleam_x_gp_clean.fits")
-lofar          = Table.read(os.getcwd()+"/catalogs/lofar/lofar_sources_pipeline.fits")
-#lofar          = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl.fits")
+survey_frequencies = np.array(racs_freq, meerkat_freq, vlssr_freq, tgss_freq, gleam_300_freq, gleam_xgp_freq, lofar_freq)
 
 # fix lofar
 lofar.rename_column("RA", "ra")
