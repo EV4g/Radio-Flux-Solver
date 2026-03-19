@@ -13,6 +13,8 @@ from reproject import reproject_interp
 from tqdm import tqdm
 from scipy.spatial import cKDTree
 from scipy.stats import gaussian_kde
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
@@ -399,3 +401,13 @@ def calculate_contour_statistics(x, y, c, logx=False, logy=False, n=200):
     if logy: Yi = 10**Yi; peak_y0 = 10**peak_y0
     
     return Xi, Yi, Zi, peak_x0, peak_y0
+
+"""A simple way to save fits files to png"""
+def fits_to_png(fits_path, output_path, hdu_index=0, vmin=None, vmax=None, cmap="viridis"):
+    with fits.open(fits_path) as hdul:
+        data = hdul[hdu_index].data[0,0]
+    
+    plt.imsave(output_path, data, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
+
+    
+    
