@@ -129,7 +129,13 @@ def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2,
 
     correction_factor = extrapolated_flux_fit / lofar_uncorrected_flux
     snr = lofar_uncorrected_flux / lofar_uncorrected_flux_error
-
+    
+    catalog_weight_factor = np.ones_like(snr)
+    for name in names:
+        if name.lower() == "tgss": catalog_weight_factor *= 0.5
+        if name.lower() == "gleam_300": catalog_weight_factor *= 0.7
+        if name.lower() == "gleam_xgp": catalog_weight_factor *= 0.8
+    
     if debug:
         # compare -0.7 assumption versus fitted spectral indices
         mn, mx = min(np.min(extrapolated_flux_fit), np.min(extrapolated_flux_linear)), max(np.max(extrapolated_flux_fit), np.max(extrapolated_flux_linear))
@@ -157,19 +163,19 @@ def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2,
         plt.title("Flux correction as function of spectral index")
         plt.show()
         
-    print(f"Completed set [{names[0]}, {names[1]}, {names[2]}]")
+    print(f"Completed set [{names[0]}, {names[1]}, {names[2]}]", catalog_weight_factor[0] if debug else "")
         
     if return_coord:
-        return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, cats[0]['ra'][i1], cats[0]['dec'][i1]
+        return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, catalog_weight_factor, cats[0]['ra'][i1], cats[0]['dec'][i1]
     else:
-        return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio
+        return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, catalog_weight_factor
 
 """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
-def calculate_weighted_correction_factor(spx, snr, cor, spx_ref=-0.7, spectral_damping_factor=10):
+def calculate_weighted_correction_factor(spx, snr, cor, catw, spx_ref=-0.7, spectral_damping_factor=10):
     spectral_difference_factor = np.exp(-spectral_damping_factor * (spx - spx_ref)**2)
-    weighted_mean_correction = 10**(np.mean(snr * spectral_difference_factor * np.log10(cor)) / np.mean(snr * spectral_difference_factor))
-    return weighted_mean_correction
+    signal_to_noise_factor = snr
     
+    return spectral_difference_factor * signal_to_noise_factor * catw
 
 def radec_list(cats):
     radec_list = []
@@ -294,19 +300,18 @@ spectral_index_global = []
 fitted_flux = []
 signal_to_noise = []
 fit_to_linear_ratio = []
+catalog_weight_factor = []
 
 #### TODO ####
 # add a weighting for point crowding --> downweight sources that are very close to another since they might be confused during matching
-# add a weighting per catalog matching run, e.g. downweight [lofar, gleam, *], since it requires a larger thres_arc
 
 #### Parameters
-debug = False
+debug = True
 
 ##########################
 # lofar + racs + meerkat #
 ##########################
-spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, racs, meerkat), (lofar_freq, racs_freq, meerkat_freq), ("lofar", "racs", "meerkat"), debug=debug, return_coord=True)
-weighted_mean_correction = calculate_weighted_correction_factor(spx, snr, cor)
+spx, snr, cor, flux, ftl, catw, ra, dec = compute_flux_correction_factor((lofar, racs, meerkat), (lofar_freq, racs_freq, meerkat_freq), ("lofar", "racs", "meerkat"), debug=debug, return_coord=True)
 
 ras += [ra]; decs += [dec]
 correction_factor_global += [cor]
@@ -314,13 +319,12 @@ spectral_index_global += [spx]
 fitted_flux += [flux]
 signal_to_noise += [snr]
 fit_to_linear_ratio += [ftl]
-
+catalog_weight_factor += [catw]
 
 ##########################
 # lofar + tgss + meerkat #
 ##########################
-spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, tgss, meerkat), (lofar_freq, tgss_freq, meerkat_freq), ("lofar", "tgss", "meerkat"), debug=debug, return_coord=True)
-weighted_mean_correction = calculate_weighted_correction_factor(spx, snr, cor)
+spx, snr, cor, flux, ftl, catw, ra, dec = compute_flux_correction_factor((lofar, tgss, meerkat), (lofar_freq, tgss_freq, meerkat_freq), ("lofar", "tgss", "meerkat"), debug=debug, return_coord=True)
 
 ras += [ra]; decs += [dec]
 correction_factor_global += [cor]
@@ -328,13 +332,12 @@ spectral_index_global += [spx]
 fitted_flux += [flux]
 signal_to_noise += [snr]
 fit_to_linear_ratio += [ftl]
-
+catalog_weight_factor += [catw]
 
 #######################
 # lofar + tgss + racs #
 #######################
-spx, snr, cor, flux, ftl, ra, dec = compute_flux_correction_factor((lofar, tgss, racs), (lofar_freq, tgss_freq, racs_freq), ("lofar", "tgss", "racs"), debug=debug, return_coord=True)
-weighted_mean_correction = calculate_weighted_correction_factor(spx, snr, cor)
+spx, snr, cor, flux, ftl, catw, ra, dec = compute_flux_correction_factor((lofar, tgss, racs), (lofar_freq, tgss_freq, racs_freq), ("lofar", "tgss", "racs"), debug=debug, return_coord=True)
 
 ras += [ra]; decs += [dec]
 correction_factor_global += [cor]
@@ -342,7 +345,7 @@ spectral_index_global += [spx]
 fitted_flux += [flux]
 signal_to_noise += [snr]
 fit_to_linear_ratio += [ftl]
-
+catalog_weight_factor += [catw]
 
 ########################
 # lofar + gleam + racs #
@@ -357,9 +360,8 @@ fitted_flux += [flux]
 signal_to_noise += [snr]
 fit_to_linear_ratio += [ftl]
 
-for spx, snr, cor in zip(spectral_index_global, signal_to_noise, correction_factor_global):
-    spectral_index_term = np.exp(-10 * (spx + 0.7)**2)
-    total_weighting_factor = spectral_index_term * snr
+for spx, snr, cor, catw in zip(spectral_index_global, signal_to_noise, correction_factor_global, catalog_weight_factor):
+    total_weighting_factor = calculate_weighted_correction_factor(spx, snr, cor, catw)
     
     Xi, Yi, Zi, px, py = calculate_contour_statistics(spx, cor, total_weighting_factor, logy=True)
     
@@ -388,14 +390,12 @@ spectral_index_global = np.concatenate(spectral_index_global)
 fitted_flux = np.concatenate(fitted_flux)
 signal_to_noise = np.concatenate(signal_to_noise)
 fit_to_linear_ratio = np.concatenate(fit_to_linear_ratio)
+catalog_weight_factor = np.concatenate(catalog_weight_factor)
 
 ############################################################################
 #### plotting correction factor based on all previous catalog matchings ####
 ############################################################################
-spectral_index_term = np.exp(-10 * (spectral_index_global + 0.7)**2)
-#ftl_factor_term     = np.exp(-10 * (fit_to_linear_ratio - 1)**2) 
-total_weighting_factor = spectral_index_term * signal_to_noise
-
+total_weighting_factor = calculate_weighted_correction_factor(spectral_index_global, signal_to_noise, correction_factor_global, catalog_weight_factor)
 Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index_global, correction_factor_global, total_weighting_factor, logy=True)
 
 o = np.argsort(total_weighting_factor)
