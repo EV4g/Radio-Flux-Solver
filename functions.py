@@ -20,6 +20,10 @@ warnings.filterwarnings("ignore", category=FITSFixedWarning)
 def log_linspace(mn, mx, n):
     return 10**np.linspace(np.log10(mn), np.log10(mx), n)
 
+"""Average of an array in logspace"""
+def log_average(arr, w):
+    return np.exp(np.average(np.log(arr), weights=w))
+
 """Load fits file and extract data, header, wcs"""
 def prep_file(file):
     hdul = fits.open(file)
