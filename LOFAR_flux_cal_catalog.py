@@ -255,7 +255,7 @@ plt.show()
 
 # catalog as function of position
 for catalog, name in zip(catalogs, survey_names):
-    plt.plot(catalog['ra'], catalog['dec'], s=1, label=name)
+    plt.scatter(catalog['ra'], catalog['dec'], s=1, label=name)
 plt.gca().set_box_aspect(1)
 plt.xlabel("RA")
 plt.ylabel("Dec")
