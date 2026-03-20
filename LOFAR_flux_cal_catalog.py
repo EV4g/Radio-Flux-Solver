@@ -75,7 +75,7 @@ def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2,
     lofar_uncorrected_flux_error = [] # current lofar flux error, no corrections
     
     # if there are no sources, return
-    if len(i1) == 0: 
+    if len(i1) <= 1: 
         print("Error: no source-matches found between selected catalogs")
         return
     
@@ -146,7 +146,7 @@ def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2,
         plt.title("Flux correction as function of spectral index")
         plt.show()
         
-    print(f"Completed set [{names[0]}, {names[1]}, {names[2]}]", catalog_weight_factor[0] if debug else "")
+    print(f"Completed set [{names[0]}, {names[1]}, {names[2]}]", round(catalog_weight_factor[0],2) if debug else "")
         
     if return_coord:
         return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, catalog_weight_factor, cats[0]['ra'][i1], cats[0]['dec'][i1]
@@ -167,11 +167,15 @@ def radec_list(cats):
         radec_list.append((cat['ra'], cat['dec']))
     return radec_list        
 
-
 """Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""
-def get_triplet_combinations(frequencies, catalogs):
+def get_triplet_combinations(frequencies, catalogs, required_index=None, skip_index=None):
     indexed = sorted(enumerate(zip(frequencies, catalogs)), key=lambda x: x[1][0])
-    return [(i1, i2, i3) for (i1, (f1, _)), (i2, (f2, _)), (i3, (f3, _)) in combinations(indexed, 3) if f1 < f2 < f3]
+    return [(i1, i2, i3) for (i1, (f1, _)), (i2, (f2, _)), (i3, (f3, _)) in combinations(indexed, 3) if f1 < f2 < f3 
+        and (required_index is None or required_index in (i1, i2, i3)) and (skip_index is None or skip_index not in (i1, i2, i3))]
+
+"""Extrapolate flux based on two frequencies, one flux, and a spectral index"""
+def get_flux_from_index(spectral_index, reference_flux, current_frequency, reference_frequency):
+    return reference_flux * (current_frequency / reference_frequency) ** spectral_index
 
 # lofar fits file
 lofar_files = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0]
@@ -246,6 +250,7 @@ for catalog, name in zip(catalogs, survey_names):
 plt.xlabel("log10(flux/Jy)")
 plt.ylabel("count")
 plt.yscale('log')
+plt.legend()
 plt.show()
 
 # catalog as function of position
@@ -267,18 +272,13 @@ quick_compare_catalog(lofar, vlssr,   lofar_freq, vlssr_freq,   "lofar", "vlssr"
 quick_compare_catalog(racs,  meerkat, racs_freq,  meerkat_freq, "racs",  "meerkat", spectral_index_theory=spectral_index_theory)
 """
 
-#### spectral index
-# combinations that are useful to consider:
-# (lofar) + racs + meerkat
-# (lofar) + tgss + meerkat
-# (lofar) + tgss + racs
-# (lofar) + tgss + racs + meerkat
-# vlssr doesn't have proper matches with the other surveys
+#### TODO ####
+# add a weighting for point crowding --> downweight sources that are very close to another since they might be confused during matching
 
-def get_flux_from_index(spectral_index, reference_flux, current_frequency, reference_frequency):
-    return reference_flux * (current_frequency / reference_frequency) ** spectral_index
+#### Parameters
+debug = True
 
-# arrays to keep track of all individual runs
+#### variables
 ras, decs = [], []
 correction_factor_global = []
 spectral_index_global = []
@@ -287,80 +287,35 @@ signal_to_noise = []
 fit_to_linear_ratio = []
 catalog_weight_factor = []
 
-#### TODO ####
-# add a weighting for point crowding --> downweight sources that are very close to another since they might be confused during matching
+###################################################
+#### catalog three-way combination auto-looper ####
+###################################################
+for combination in get_triplet_combinations(survey_frequencies, survey_names, required_index=6, skip_index=2):
+    local_freqs = (survey_frequencies[combination[0]], survey_frequencies[combination[1]], survey_frequencies[combination[2]])
+    local_cats  = (catalogs[combination[0]],           catalogs[combination[1]],           catalogs[combination[2]])
+    local_names = (survey_names[combination[0]],       survey_names[combination[1]],       survey_names[combination[2]])
+    
+    output = compute_flux_correction_factor(local_cats, local_freqs, local_names, debug=debug, return_coord=True)
+    
+    if output == None:
+        print(f"{local_names[0]}, {local_names[1]}, {local_names[2]} did not return any matches")
+    else:
+        spx, snr, cor, flux, ftl, catw, ra, dec = output
 
-#### Parameters
-debug = True
+        ras += [ra]; decs += [dec]
+        correction_factor_global += [cor]
+        spectral_index_global += [spx]
+        fitted_flux += [flux]
+        signal_to_noise += [snr]
+        fit_to_linear_ratio += [ftl]
+        catalog_weight_factor += [catw]
 
-##########################
-# lofar + racs + meerkat #
-##########################
-spx, snr, cor, flux, ftl, catw, ra, dec = compute_flux_correction_factor((lofar, racs, meerkat), (lofar_freq, racs_freq, meerkat_freq), ("lofar", "racs", "meerkat"), debug=debug, return_coord=True)
 
-ras += [ra]; decs += [dec]
-correction_factor_global += [cor]
-spectral_index_global += [spx]
-fitted_flux += [flux]
-signal_to_noise += [snr]
-fit_to_linear_ratio += [ftl]
-catalog_weight_factor += [catw]
-
-##########################
-# lofar + tgss + meerkat #
-##########################
-spx, snr, cor, flux, ftl, catw, ra, dec = compute_flux_correction_factor((lofar, tgss, meerkat), (lofar_freq, tgss_freq, meerkat_freq), ("lofar", "tgss", "meerkat"), debug=debug, return_coord=True)
-
-ras += [ra]; decs += [dec]
-correction_factor_global += [cor]
-spectral_index_global += [spx]
-fitted_flux += [flux]
-signal_to_noise += [snr]
-fit_to_linear_ratio += [ftl]
-catalog_weight_factor += [catw]
-
-#######################
-# lofar + tgss + racs #
-#######################
-spx, snr, cor, flux, ftl, catw, ra, dec = compute_flux_correction_factor((lofar, tgss, racs), (lofar_freq, tgss_freq, racs_freq), ("lofar", "tgss", "racs"), debug=debug, return_coord=True)
-
-ras += [ra]; decs += [dec]
-correction_factor_global += [cor]
-spectral_index_global += [spx]
-fitted_flux += [flux]
-signal_to_noise += [snr]
-fit_to_linear_ratio += [ftl]
-catalog_weight_factor += [catw]
-
-########################
-# lofar + gleam + racs #
-########################
-spx, snr, cor, flux, ftl, catw, ra, dec = compute_flux_correction_factor((lofar, gleam_300, racs), (lofar_freq, gleam_300_freq, racs_freq), ("lofar", "gleam_300", "racs"), debug=debug, return_coord=True, thres_arc=5)
-
-ras += [ra]; decs += [dec]
-correction_factor_global += [cor]
-spectral_index_global += [spx]
-fitted_flux += [flux]
-signal_to_noise += [snr]
-fit_to_linear_ratio += [ftl]
-catalog_weight_factor += [catw]
-
-############################
-# lofar + gleam_xgp + racs #
-############################
-spx, snr, cor, flux, ftl, catw, ra, dec = compute_flux_correction_factor((lofar, gleam_xgp, racs), (lofar_freq, gleam_xgp_freq, racs_freq), ("lofar", "gleam_xgp", "racs"), debug=debug, return_coord=True, thres_arc=2)
-
-ras += [ra]; decs += [dec]
-correction_factor_global += [cor]
-spectral_index_global += [spx]
-fitted_flux += [flux]
-signal_to_noise += [snr]
-fit_to_linear_ratio += [ftl]
-catalog_weight_factor += [catw]
-
+###########################################################
+#### plotting correction factor for each catalog combo ####
+###########################################################
 for spx, snr, cor, catw in zip(spectral_index_global, signal_to_noise, correction_factor_global, catalog_weight_factor):
     total_weighting_factor = calculate_weighted_correction_factor(spx, snr, cor, catw)
-    
     Xi, Yi, Zi, px, py = calculate_contour_statistics(spx, cor, total_weighting_factor, logy=True)
     
     o = np.argsort(total_weighting_factor)
@@ -391,6 +346,7 @@ fitted_flux = np.concatenate(fitted_flux)
 signal_to_noise = np.concatenate(signal_to_noise)
 fit_to_linear_ratio = np.concatenate(fit_to_linear_ratio)
 catalog_weight_factor = np.concatenate(catalog_weight_factor)
+
 
 ############################################################################
 #### plotting correction factor based on all previous catalog matchings ####
