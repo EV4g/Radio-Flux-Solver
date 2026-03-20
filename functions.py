@@ -409,5 +409,10 @@ def fits_to_png(fits_path, output_path, hdu_index=0, vmin=None, vmax=None, cmap=
     
     plt.imsave(output_path, data, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
 
-    
+"""Plot (log)ratio as function of position in field."""
+def plot_location_dependant_index(ra, dec, ratio):
+    plt.scatter(ra, dec, c=ratio)
+    plt.colorbar()
+    plt.gca().set_box_aspect(1)
+    plt.show()
     

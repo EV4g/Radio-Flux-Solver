@@ -11,13 +11,6 @@ from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectra
 from astropy.table import Table
 from itertools import combinations
 
-"""Plot (log)ratio as function of position in field."""
-def plot_location_dependant_index(ra, dec, ratio):
-    plt.scatter(ra, dec, c=ratio)
-    plt.colorbar()
-    plt.gca().set_box_aspect(1)
-    plt.show()
-
 """Given arrays of RA/Dec (degrees) and a FITS file, return a boolean array of which sources fall within the image footprint."""
 def sources_in_fits(ra_deg, dec_deg, fn):
 
@@ -71,16 +64,6 @@ def quick_compare_catalog(cat1, cat2, freq1, freq2, name1, name2, thres_arc=2, s
     
     print(f"Compared {name1} to {name2} \n")
 
-"""w.i.p."""
-def merge_catalogs(cats, thres_arc=2):
-    indices = match_catalogs_2D(radec_list(cats), thres_arc=thres_arc)
-    
-    catalog = Table()
-    catalog['ra'] = cats[0]['ra'][indices[0]]
-    catalog['dec'] = cats[0]['dec'][indices[0]]
-    
-    return catalog
-    
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
 def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2, return_coord=False):
