@@ -228,45 +228,35 @@ gleam_300 = gleam_300_full[gleam_300_valid]
 gleam_xgp = gleam_xgp_full[gleam_xgp_valid]
 lofar     = lofar_full[lofar_valid]
 
-"""
-# catalog plot
-plt.hist(np.log10(racs_full['flux_jy']),      alpha=0.6, bins=100, label='racs')
-plt.hist(np.log10(meerkat_full['flux_jy']),   alpha=0.6, bins=100, label='meerkat')
-plt.hist(np.log10(vlssr_full['flux_jy']),     alpha=0.6, bins=100, label='vlssr')
-plt.hist(np.log10(tgss_full['flux_jy']),      alpha=0.6, bins=100, label='tgss')
-plt.hist(np.log10(gleam_300_full['flux_jy']), alpha=0.6, bins=100, label='gleam')
-plt.hist(np.log10(lofar['flux_jy']),          alpha=0.6, bins=50,  label='lofar')
+catalogs      = [racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, lofar]
+catalogs_full = [racs_full, meerkat_full, vlssr_full, tgss_full, gleam_300_full, gleam_xgp_full, lofar_full]
+
+# full catalog plot
+for catalog, name in zip(catalogs_full, survey_names):
+    plt.hist(np.log10(catalog['flux_jy']), alpha=0.6, bins=75, label=name)
 plt.xlabel("log10(flux/Jy)")
 plt.ylabel("count")
 plt.yscale('log')
 plt.legend()
 plt.show()
 
-plt.hist(np.log10(racs['flux_jy']),      alpha=0.6, bins=20, label='racs_v')
-plt.hist(np.log10(meerkat['flux_jy']),   alpha=0.6, bins=20, label='meerkat_v')
-plt.hist(np.log10(vlssr['flux_jy']),     alpha=0.6, bins=20, label='vlssr_v')
-plt.hist(np.log10(tgss['flux_jy']),      alpha=0.6, bins=50, label='tgss_v')
-plt.hist(np.log10(gleam_300['flux_jy']), alpha=0.6, bins=30, label='gleam_v')
-plt.hist(np.log10(lofar['flux_jy']),     alpha=0.6, bins=40, label='lofar')
-plt.legend()
+# cutdown catalog plot
+for catalog, name in zip(catalogs, survey_names):
+    plt.hist(np.log10(catalog['flux_jy']), alpha=0.6, bins=25, label=name)
 plt.xlabel("log10(flux/Jy)")
 plt.ylabel("count")
 plt.yscale('log')
 plt.show()
 
-# plot catalog as function of position
-plt.scatter(racs['ra'],      racs['dec'],      s=2, label='racs')
-plt.scatter(meerkat['ra'],   meerkat['dec'],   s=2, label='meerkat')
-plt.scatter(vlssr['ra'],     vlssr['dec'],     s=2, label='vlssr')
-plt.scatter(tgss['ra'],      tgss['dec'],      s=2, label='tgss')
-plt.scatter(gleam_300['ra'], gleam_300['dec'], s=2, label='gleam')
-plt.scatter(lofar['ra'],     lofar['dec'],     s=1, label='lofar')
+# catalog as function of position
+for catalog, name in zip(catalogs, survey_names):
+    plt.plot(catalog['ra'], catalog['dec'], s=1, label=name)
 plt.gca().set_box_aspect(1)
 plt.xlabel("RA")
 plt.ylabel("Dec")
 plt.legend()
 plt.show()
-"""
+
 
 """
 #### analysis
