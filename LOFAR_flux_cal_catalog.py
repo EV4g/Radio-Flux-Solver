@@ -336,7 +336,7 @@ for spx, snr, cor, catw in zip(spectral_index_global, signal_to_noise, correctio
     plt.title("Correction factor as function of fitted spectral index")
     plt.show()
 
-    print(px, py)
+    print(f"Spectral index: {round(px,3)}, correction factor: {round(py,3)}")
 
 ras = np.concatenate(ras)
 decs = np.concatenate(decs)
@@ -372,7 +372,8 @@ plt.xlabel(r"Fitted spectral index $\alpha$")
 plt.title("Correction factor as function of fitted spectral index\nall catalogs")
 plt.show()
 
-print(px, py)
+print("------------------------------------------------")
+print(f"Spectral index: {round(px,3)}, correction factor: {round(py,3)}")
 
 #### position dependant correction factor
 # plt.scatter(ras[o], decs[o], c=correction_factor_global[o], norm='log')
