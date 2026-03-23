@@ -18,14 +18,13 @@ class catalog:
         if isinstance(catalog, str):
             try:
                 catalog = Table.read(os.getcwd()+catalog)
-            except:
-                print("Data not found")
-                return None
+            except Exception as e:
+                raise FileNotFoundError(f"Could not read catalog: {e}")
 
-        self.flux       = catalog['flux_jy']
-        self.e_flux     = catalog['e_flux_jy']
-        self.ra         = catalog['ra']
-        self.dec        = catalog['dec']
+        self.flux       = np.array(catalog['flux_jy'])
+        self.e_flux     = np.array(catalog['e_flux_jy'])
+        self.ra         = np.array(catalog['ra'])
+        self.dec        = np.array(catalog['dec'])
         self.flux_unit  = str(catalog['flux_jy'].unit)
         self.freq       = freq_mhz
         self.name       = name
@@ -298,9 +297,7 @@ for combination in get_triplet_combinations(catalogs, required_index=6, skip_ind
     
     output = compute_flux_correction_factor(local_cats, debug=debug, return_coord=True)
     
-    if output is None:
-        print(f"{local_cats[0].name}, {local_cats[1].name}, {local_cats[2].name} did not return any matches")
-    else:
+    if output is not None:
         spx, snr, cor, flux, ftl, catw, ra, dec = output
 
         ras += [ra]; decs += [dec]
