@@ -415,4 +415,9 @@ def plot_location_dependant_index(ra, dec, ratio):
     plt.colorbar()
     plt.gca().set_box_aspect(1)
     plt.show()
-    
+
+# """Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""
+# def get_triplet_combinations(frequencies, catalogs, required_index=None, skip_index=None):
+#     indexed = sorted(enumerate(zip(frequencies, catalogs)), key=lambda x: x[1][0])
+#     return [(i1, i2, i3) for (i1, (f1, _)), (i2, (f2, _)), (i3, (f3, _)) in combinations(indexed, 3) if f1 < f2 < f3 
+#         and (required_index is None or required_index in (i1, i2, i3)) and (skip_index is None or skip_index not in (i1, i2, i3))]
