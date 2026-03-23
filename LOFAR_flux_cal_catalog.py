@@ -90,51 +90,38 @@ def quick_compare_catalog(cat1, cat2, thres_arc=2, spectral_index_theory=-0.7):
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
 def compute_flux_correction_factor(cats, debug=False, thres_arc=2, return_coord=False):
-    i1, i2, i3 =  match_catalogs_2D(cats, thres_arc=thres_arc)
-    spectral_indices = []             # fitted spectral index based on racs, meerkat
-    extrapolated_flux_linear = []     # extrapolated flux when assuming a simple -0.7
-    extrapolated_flux_fit = []        # extrapolated flux when fitting the fluxes from racs and meerkat
-    lofar_uncorrected_flux = []       # current lofar flux, no corrections
-    lofar_uncorrected_flux_error = [] # current lofar flux error, no corrections
-    
+    i0, i1, i2 =  match_catalogs_2D(cats, thres_arc=thres_arc)
+        
     # if there are no sources, return
-    if len(i1) <= 1: 
-        if debug: print("Error: no source-matches found between selected catalogs")
+    if len(i0) <= 1: 
+        if debug: print(f"Error: no source-matches found between {cats[0].name}, {cats[1].name}, {cats[2].name}")
         return None
     
-    for i, (ai, bi, ci) in enumerate(zip(i1, i2, i3)):
-        fluxes = [cats[0].flux[ai], cats[1].flux[bi], cats[2].flux[ci]]
-        e_fluxes = [cats[0].e_flux[ai], cats[1].e_flux[bi], cats[2].e_flux[ci]]
-        spectral_index = get_spectral_index(fluxes[1], fluxes[2], cats[1].freq, cats[2].freq)
-        spectral_indices.append(spectral_index)
-        
-        lofar_uncorrected_flux.append(fluxes[0])
-        lofar_uncorrected_flux_error.append(e_fluxes[0])
-        
-        # lofar flux when using racs flux and extrapolating back to lofar freq
-        extrapolated_flux_fit.append(get_flux_from_index(spectral_index, fluxes[1], cats[0].freq, cats[1].freq))
-        extrapolated_flux_linear.append(0.5 * (get_flux_from_index(-0.7, fluxes[1], cats[0].freq, cats[1].freq) + get_flux_from_index(-0.7, fluxes[2], cats[0].freq, cats[2].freq)))
-        
-        
-        if debug: plt.plot(np.array([cats[0].freq, cats[1].freq, cats[2].freq])*1e-6, fluxes)
+    # create subsets of all catalogs, such that we can ignore (i0,i1,i2) afterwards
+    for index, cat in enumerate(cats): cats[index] = cat.create_subset([i0, i1, i2][index])
     
+    uncorrected_flux = cats[0].flux
+    uncorrected_flux_error = cats[0].e_flux
+    
+    spectral_indices = get_spectral_index(cats[1].flux, cats[2].flux, cats[1].freq, cats[2].freq)
+    
+    # fit is based on measuring between two points, linear is average between assuming -0.7 for both
+    extrapolated_flux_fit = get_flux_from_index(spectral_indices, cats[1].flux, cats[0].freq, cats[1].freq)
+    extrapolated_flux_linear = 0.5 * (get_flux_from_index(-0.7, cats[1].flux, cats[0].freq, cats[1].freq) + get_flux_from_index(-0.7, cats[2].flux, cats[0].freq, cats[2].freq))
+
     if debug:
+        for flux in zip(cats[0].flux, cats[1].flux, cats[2].flux):
+            plt.plot(np.array([cats[0].freq, cats[1].freq, cats[2].freq])*1e-6, flux)
+        
         plt.yscale('log')
         plt.ylabel(r"log$_{10}$(Jy)")
         plt.xlabel("Frequency (MHz)")
         plt.show()
 
-    extrapolated_flux_fit = np.array(extrapolated_flux_fit)
-    extrapolated_flux_linear = np.array(extrapolated_flux_linear)
     extrapolated_flux_fit_to_linear_ratio = extrapolated_flux_fit / extrapolated_flux_linear
-    
-    
-    lofar_uncorrected_flux = np.array(lofar_uncorrected_flux)
-    lofar_uncorrected_flux_error = np.array(lofar_uncorrected_flux_error)
-    spectral_indices = np.array(spectral_indices)
 
-    correction_factor = extrapolated_flux_fit / lofar_uncorrected_flux
-    snr = lofar_uncorrected_flux / lofar_uncorrected_flux_error
+    correction_factor = extrapolated_flux_fit / uncorrected_flux
+    snr = uncorrected_flux / uncorrected_flux_error
     
     catalog_weight_factor = np.ones_like(snr)
     for cat in cats:
@@ -159,7 +146,7 @@ def compute_flux_correction_factor(cats, debug=False, thres_arc=2, return_coord=
         plt.show()
     
         # compare fitted spectral index with correction factor
-        plt.scatter(spectral_indices, correction_factor, c=lofar_uncorrected_flux, norm='log')
+        plt.scatter(spectral_indices, correction_factor, c=uncorrected_flux, norm='log')
         plt.yscale('log')
         plt.axvline(-0.7, ls='--', c='k')
         plt.axhline(1, ls='--', c='k')
@@ -172,7 +159,7 @@ def compute_flux_correction_factor(cats, debug=False, thres_arc=2, return_coord=
     print(f"Completed set [{cats[0].name:9}, {cats[1].name:9}, {cats[2].name:9}]", round(catalog_weight_factor[0],2) if debug else "")
         
     if return_coord:
-        return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, catalog_weight_factor, cats[0].ra[i1], cats[0].dec[i1]
+        return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, catalog_weight_factor, cats[0].ra, cats[0].dec
     else:
         return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, catalog_weight_factor
 
