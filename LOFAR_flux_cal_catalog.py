@@ -146,7 +146,7 @@ def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2,
         plt.title("Flux correction as function of spectral index")
         plt.show()
         
-    print(f"Completed set [{names[0]}, {names[1]}, {names[2]}]", round(catalog_weight_factor[0],2) if debug else "")
+    print(f"Completed set [{names[0]:9}, {names[1]:9}, {names[2]:9}]", round(catalog_weight_factor[0],2) if debug else "")
         
     if return_coord:
         return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, catalog_weight_factor, cats[0]['ra'][i1], cats[0]['dec'][i1]
