@@ -52,22 +52,20 @@ def sources_in_fits(ra_deg, dec_deg, fn):
 
 """Get two catalogs and return flux and snr (flux / e_flux)"""
 def get_catalog_matched_flux(cat1, cat2, thres_arc=2):
-    idx_cat1, idx_cat2 = match_catalogs_2D([
-        (cat1["ra"], cat1["dec"]),
-        (cat2["ra"], cat2["dec"])], thres_arc=thres_arc)
+    idx_cat1, idx_cat2 = match_catalogs_2D([cat1, cat2], thres_arc=thres_arc)
 
-    flux1 = cat1['flux_jy'][idx_cat1]
-    snr1 = flux1 / cat1['e_flux_jy'][idx_cat1]
+    flux1 = cat1.flux[idx_cat1]
+    snr1 = flux1 / cat1.e_flux[idx_cat1]
 
-    flux2 = cat2['flux_jy'][idx_cat2]
-    snr2 = flux2 / cat2['e_flux_jy'][idx_cat2]
+    flux2 = cat2.flux[idx_cat2]
+    snr2 = flux2 / cat2.e_flux[idx_cat2]
     
     return flux1, flux2, snr1, snr2
 
 """Load two catalogs and plot their relative fluxes, according to a powerlaw"""
-def quick_compare_catalog(cat1, cat2, freq1, freq2, name1, name2, thres_arc=2, spectral_index_theory=-0.7):
+def quick_compare_catalog(cat1, cat2, thres_arc=2, spectral_index_theory=-0.7):
     flux1, flux2, _, _ = get_catalog_matched_flux(cat1, cat2, thres_arc=thres_arc)
-    spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor = compute_fluxcal_statistics(freq1, freq2, flux1, flux2, spectral_index_theory)
+    spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor = compute_fluxcal_statistics(cat1.freq, cat2.freq, cat1.flux, cat2.flux, spectral_index_theory)
 
     fig, ax = plt.subplots(1, 2, figsize=(8, 4))
     ax[0].scatter(flux2, flux1, s=10, alpha=0.7)
@@ -75,25 +73,25 @@ def quick_compare_catalog(cat1, cat2, freq1, freq2, name1, name2, thres_arc=2, s
     ax[0].plot(x, x, color='black', ls='--', label="x = y")
     ax[0].plot(x, x * spectral_flux_ratio, 'r--', label=f'Expected (α={spectral_index_theory})')
     ax[0].set_xscale('log'); ax[0].set_yscale('log')
-    ax[0].set_xlabel(f"{name1} flux [Jy]"); ax[0].set_ylabel(f"{name2} flux [Jy]")
+    ax[0].set_xlabel(f"{cat1.name} flux [Jy]"); ax[0].set_ylabel(f"{cat2.name} flux [Jy]")
     ax[0].legend()
 
     # Log-ratio histogram
     ax[1].hist(log_ratio, bins=30, edgecolor='k')
     ax[1].axvline(scale_factor, color='red', ls='--', label=f'Median = {scale_factor:.3f}')
-    ax[1].set_xlabel(f"log10(S_{name1} / S_{name2})")
+    ax[1].set_xlabel(f"log10(S_{cat1.name} / S_{cat2.name})")
     ax[1].set_ylabel("N")
     ax[1].legend()
     plt.tight_layout()
     #plt.savefig("flux_scale_comparison.png", dpi=150)
     plt.show()
     
-    print(f"Compared {name1} to {name2} \n")
+    print(f"Compared {cat1.name} to {cat2.name} \n")
 
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
 def compute_flux_correction_factor(cats, debug=False, thres_arc=2, return_coord=False):
-    i1, i2, i3 =  match_catalogs_2D(radec_list(cats), thres_arc=thres_arc)
+    i1, i2, i3 =  match_catalogs_2D(cats, thres_arc=thres_arc)
     spectral_indices = []             # fitted spectral index based on racs, meerkat
     extrapolated_flux_linear = []     # extrapolated flux when assuming a simple -0.7
     extrapolated_flux_fit = []        # extrapolated flux when fitting the fluxes from racs and meerkat
@@ -102,8 +100,8 @@ def compute_flux_correction_factor(cats, debug=False, thres_arc=2, return_coord=
     
     # if there are no sources, return
     if len(i1) <= 1: 
-        print("Error: no source-matches found between selected catalogs")
-        return
+        if debug: print("Error: no source-matches found between selected catalogs")
+        return None
     
     for i, (ai, bi, ci) in enumerate(zip(i1, i2, i3)):
         fluxes = [cats[0].flux[ai], cats[1].flux[bi], cats[2].flux[ci]]
@@ -270,11 +268,11 @@ plt.show()
 
 """
 #### analysis
-quick_compare_catalog(lofar, meerkat, lofar_freq, meerkat_freq, "lofar", "meerkat", spectral_index_theory=spectral_index_theory)
-quick_compare_catalog(lofar, racs,    lofar_freq, racs_freq,    "lofar", "racs", spectral_index_theory=spectral_index_theory)
-quick_compare_catalog(lofar, tgss,    lofar_freq, tgss_freq,    "lofar", "tgss", spectral_index_theory=spectral_index_theory)
-quick_compare_catalog(lofar, vlssr,   lofar_freq, vlssr_freq,   "lofar", "vlssr", thres_arc=10, spectral_index_theory=spectral_index_theory)
-quick_compare_catalog(racs,  meerkat, racs_freq,  meerkat_freq, "racs",  "meerkat", spectral_index_theory=spectral_index_theory)
+quick_compare_catalog(lofar, meerkat, spectral_index_theory=spectral_index_theory)
+quick_compare_catalog(lofar, racs,    spectral_index_theory=spectral_index_theory)
+quick_compare_catalog(lofar, tgss,    spectral_index_theory=spectral_index_theory)
+quick_compare_catalog(lofar, vlssr,   thres_arc=10, spectral_index_theory=spectral_index_theory)
+quick_compare_catalog(racs,  meerkat, spectral_index_theory=spectral_index_theory)
 """
 
 #### TODO ####
@@ -300,7 +298,7 @@ for combination in get_triplet_combinations(catalogs, required_index=6, skip_ind
     
     output = compute_flux_correction_factor(local_cats, debug=debug, return_coord=True)
     
-    if output == None:
+    if output is None:
         print(f"{local_cats[0].name}, {local_cats[1].name}, {local_cats[2].name} did not return any matches")
     else:
         spx, snr, cor, flux, ftl, catw, ra, dec = output
@@ -390,7 +388,7 @@ print(f"Spectral index: {round(px,3)}, correction factor: {round(py,3)}")
 #################################
 # lofar + tgss + racs + meerkat #
 #################################
-# i1, i2, i3, i4 =  match_catalogs_2D(radec_list((lofar, tgss, racs, meerkat)))
+# i1, i2, i3, i4 =  match_catalogs_2D((lofar, tgss, racs, meerkat))
 # freqs = np.array([lofar_freq, tgss_freq, racs_freq, meerkat_freq]) * 1e-6
 # spectral_indices = []             # fitted spectral index based on racs, meerkat
 # extrapolated_flux_linear = []     # extrapolated flux when assuming a simple -0.7

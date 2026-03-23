@@ -279,16 +279,16 @@ def compute_fluxcal_statistics(freq1, freq2, flux1, flux2, spectral_index_theory
     return spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor
 
 """Fast catalogue matcher"""
-def match_catalogs_2D(ra_dec_list, thres_arc=2):
+def match_catalogs_2D(cat_list, thres_arc=2):
     threshold = thres_arc / 3600.0
-    n = len(ra_dec_list)
+    n = len(cat_list)
 
     matched_results = {}
 
     for a in range(n):
         for b in range(a + 1, n):
-            ra_a, dec_a = np.array(ra_dec_list[a][0]), np.array(ra_dec_list[a][1])
-            ra_b, dec_b = np.array(ra_dec_list[b][0]), np.array(ra_dec_list[b][1])
+            ra_a, dec_a = np.array(cat_list[a].ra), np.array(cat_list[a].dec)
+            ra_b, dec_b = np.array(cat_list[b].ra), np.array(cat_list[b].dec)
 
             if len(ra_a) >= len(ra_b):
                 sup_ra, sup_dec, sub_ra, sub_dec, normal = ra_a, dec_a, ra_b, dec_b, True
