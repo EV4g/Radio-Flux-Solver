@@ -10,6 +10,23 @@ import glob
 # tgss      = Table.read(os.getcwd()+"/catalogs/tgss/TGSSADR1_7sigma_catalog.fits")
 # gleam     = Table.read(os.getcwd()+"/catalogs/gleam_300/GLEAM300_source_catalogue.fits")
 # gleam_xgp = Table.read(os.getcwd()+"/catalogs/gleam_x_gp/gleam_x_gp.fit")
+#lofar_dr3  = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl.fits")
+
+
+#### lofar-dr3 ####
+# lofar_dr3.rename_column("RA", "ra")
+# lofar_dr3.rename_column("DEC", "dec")
+# lofar_dr3.rename_column("E_RA", "e_ra")
+# lofar_dr3.rename_column("E_DEC", "e_dec")
+# lofar_dr3.rename_column('Total_flux', 'flux_jy')
+# lofar_dr3.rename_column('E_Total_flux', 'e_flux_jy')
+
+# # LOFAR-DR3 uses mJy, pybdsf uses Jy, force everything to Jy
+# if str(lofar_dr3['flux_jy'].unit) == 'mJy':
+#     lofar_dr3['flux_jy'] *= 1e-3
+#     lofar_dr3['e_flux_jy'] *= 1e-3
+#     lofar_dr3['flux_jy'].unit = 'Jy'
+#     lofar_dr3['e_flux_jy'].unit = 'Jy'
 
 # from astroquery.vizier import Vizier
 # v = Vizier(row_limit=-1)
@@ -26,6 +43,18 @@ import glob
 #     rms_box=(100, 25),    # (box_size, step_size) for rms map; tune to your image
 #     beam=(get_beam_size(lofar_files)),  # (maj_deg, min_deg, PA)
 # )
+
+# lofar.rename_column("RA", "ra")
+# lofar.rename_column("DEC", "dec")
+# lofar.rename_column('Total_flux', 'flux_jy')
+# lofar.rename_column('E_Total_flux', 'e_flux_jy')
+
+# if str(lofar['flux_jy'].unit) == 'mJy':
+#     lofar['flux_jy'] *= 1e-3
+#     lofar['e_flux_jy'] *= 1e-3
+#     lofar['flux_jy'].unit = 'Jy'
+#     lofar['e_flux_jy'].unit = 'Jy'
+
 # img.write_catalog(outfile="lofar_sources_pipeline.fits", format="fits", catalog_type="srl", clobber=True)
 
 #### gleam-x gp
@@ -50,16 +79,20 @@ import glob
 #### racs ####
 # racs['flux_jy'] = racs['Total_flux_Source'] * 1e-3
 # racs['e_flux_jy'] = racs['E_Total_flux_Source'] * 1e-3
+# racs['flux_jy'].unit = 'Jy'
+# racs['e_flux_jy'].unit = 'Jy'
 # racs.rename_column("RA", "ra")
 # racs.rename_column("Dec", "dec")
 # racs_out = racs["Source_Name", "ra", "dec", "flux_jy", "e_flux_jy"]
-# racs_out.write("racs_clean.csv", format="ascii.csv", overwrite=True)
+# racs_out.write("racs_clean.fits", overwrite=True)
 
 #### meerkat ####
 # meerkat['flux_jy'] = meerkat['int_flux'] * 1e-3
 # meerkat['e_flux_jy'] = meerkat['err_int_flux'] * 1e-3
+# meerkat['flux_jy'].unit = 'Jy'
+# meerkat['e_flux_jy'].unit = 'Jy'
 # meerkat_out = meerkat["csc_id", "ra", "dec", "snr", "flux_jy", "e_flux_jy"]
-# meerkat_out.write("meerkat_clean.csv", format="ascii.csv", overwrite=True)
+# meerkat_out.write("meerkat_clean.fits", overwrite=True)
 
 #### vlssr ####
 # DEG_TO_ARCSEC = 3600.0
@@ -70,12 +103,14 @@ import glob
 
 # vlssr['flux_jy'] = vlssr["Sp"] * (src_maj * src_min) / (VLSSR_BEAM_ARCSEC ** 2)
 # vlssr['e_flux_jy'] = vlssr["e_Sp"] * (src_maj * src_min) / (VLSSR_BEAM_ARCSEC ** 2)
+# vlssr_full['flux_jy'].unit = 'Jy'
+# vlssr_full['e_flux_jy'].unit = 'Jy'
 
 # vlssr.rename_column("ra_deg", "ra")
 # vlssr.rename_column("dec_deg", "dec")
 
 # vlssr_out = vlssr["ra", "dec", "flux_jy", 'e_flux_jy']
-# vlssr_out.write("vlssr_clean.csv", format="ascii.csv", overwrite=True)
+# vlssr_out.write("vlssr_clean.fits", overwrite=True)
 
 #### tgss ####
 # tgss.rename_column('RA', 'ra')
@@ -85,7 +120,8 @@ import glob
 
 # tgss['flux_jy'] *= 1e-3
 # tgss['e_flux_jy'] *= 1e-3
-
+# tgss['flux_jy'].unit = 'Jy'
+# tgss['e_flux_jy'].unit = 'Jy'
 # tgss.write("tgss_clean.fits", overwrite=True)
 
 #### gleam ####
