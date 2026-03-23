@@ -175,7 +175,7 @@ def compute_flux_correction_factor(cats, debug=False, thres_arc=2, return_coord=
     print(f"Completed set [{cats[0].name:9}, {cats[1].name:9}, {cats[2].name:9}]", round(catalog_weight_factor[0],2) if debug else "")
         
     if return_coord:
-        return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, catalog_weight_factor, cats[0]['ra'][i1], cats[0]['dec'][i1]
+        return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, catalog_weight_factor, cats[0].ra[i1], cats[0].dec[i1]
     else:
         return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, catalog_weight_factor
 
@@ -190,7 +190,7 @@ def calculate_weighted_correction_factor(spx, snr, cor, catw, spx_ref=-0.7, spec
 def radec_list(cats):
     radec_list = []
     for cat in cats:
-        radec_list.append((cat['ra'], cat['dec']))
+        radec_list.append((cat.ra, cat.dec))
     return radec_list        
 
 """Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""

@@ -416,6 +416,13 @@ def plot_location_dependant_index(ra, dec, ratio):
     plt.gca().set_box_aspect(1)
     plt.show()
 
+"""(cat1, cat2) --> [(ra1, dec1), (ra2, dec2)]"""
+def radec_list_simple(cats):
+    radec_list = []
+    for cat in cats:
+        radec_list.append((cat['ra'], cat['dec']))
+    return radec_list       
+
 # """Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""
 # def get_triplet_combinations(frequencies, catalogs, required_index=None, skip_index=None):
 #     indexed = sorted(enumerate(zip(frequencies, catalogs)), key=lambda x: x[1][0])
