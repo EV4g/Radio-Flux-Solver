@@ -182,14 +182,14 @@ lofar_files = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0]
 # get calagogs, names in order of acquisition, lofar last
 survey_names = np.array(["racs", "meerkat", "vlssr", "tgss", "gleam_300", "gleam_xgp", "lofar"])
 
-racs_full      = Table.read(os.getcwd()+"/catalogs/racs/racs_clean.csv")
-meerkat_full   = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.csv")
-vlssr_full     = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.csv")
+racs_full      = Table.read(os.getcwd()+"/catalogs/racs/racs_clean.fits")
+meerkat_full   = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.fits")
+vlssr_full     = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.fits")
 tgss_full      = Table.read(os.getcwd()+"/catalogs/tgss/tgss_clean.fits")
 gleam_300_full = Table.read(os.getcwd()+"/catalogs/gleam_300/gleam_300_clean.fits")
 gleam_xgp_full = Table.read(os.getcwd()+"/catalogs/gleam_x_gp/gleam_x_gp_clean.fits")
 lofar_full     = Table.read(os.getcwd()+"/catalogs/lofar/lofar_sources_pipeline.fits")
-#lofar_full    = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl.fits")
+#lofar_full    = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits")
 
 spectral_index_theory = -0.7
 lofar_freq     = 144.6e6  #Hz
@@ -201,17 +201,6 @@ gleam_300_freq = 300e6    #Hz
 gleam_xgp_freq = 200e6    #Hz
 
 survey_frequencies = np.array([racs_freq, meerkat_freq, vlssr_freq, tgss_freq, gleam_300_freq, gleam_xgp_freq, lofar_freq])
-
-# fix lofar
-lofar_full.rename_column("RA", "ra")
-lofar_full.rename_column("DEC", "dec")
-lofar_full.rename_column('Total_flux', 'flux_jy')
-lofar_full.rename_column('E_Total_flux', 'e_flux_jy')
-
-# LOFAR-DR3 uses mJy, pybdsf uses Jy, force everything to Jy
-if str(lofar_full['flux_jy'].unit) == 'mJy':
-    lofar_full['flux_jy'] *= 1e-3
-    lofar_full['e_flux_jy'] *= 1e-3
 
 # check for sources in current file
 racs_valid      = sources_in_fits(racs_full['ra'],      racs_full['dec'],       lofar_files)
