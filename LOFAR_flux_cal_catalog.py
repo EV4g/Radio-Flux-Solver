@@ -6,10 +6,37 @@ import numpy as np
 import matplotlib.pyplot as plt
 import glob
 import os
+import copy
 #import multiprocessing; multiprocessing.set_start_method('fork') #for windows/mac
 from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics
 from astropy.table import Table
 from itertools import combinations
+
+class catalog:
+    def __init__(self, catalog, freq_mhz=None, name=None):
+        # if a string is given, try to read it as Path
+        if isinstance(catalog, str):
+            try:
+                catalog = Table.read(os.getcwd()+catalog)
+            except:
+                print("Data not found")
+                return None
+
+        self.flux       = catalog['flux_jy']
+        self.e_flux     = catalog['e_flux_jy']
+        self.ra         = catalog['ra']
+        self.dec        = catalog['dec']
+        self.flux_unit  = str(catalog['flux_jy'].unit)
+        self.freq       = freq_mhz
+        self.name       = name
+
+    def create_subset(self, valid):
+        subset = copy.deepcopy(self)
+        subset.flux   = self.flux[valid]
+        subset.e_flux = self.e_flux[valid]
+        subset.ra     = self.ra[valid]
+        subset.dec    = self.dec[valid]
+        return subset
 
 """Given arrays of RA/Dec (degrees) and a FITS file, return a boolean array of which sources fall within the image footprint."""
 def sources_in_fits(ra_deg, dec_deg, fn):
@@ -65,7 +92,7 @@ def quick_compare_catalog(cat1, cat2, freq1, freq2, name1, name2, thres_arc=2, s
 
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
-def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2, return_coord=False):
+def compute_flux_correction_factor(cats, debug=False, thres_arc=2, return_coord=False):
     i1, i2, i3 =  match_catalogs_2D(radec_list(cats), thres_arc=thres_arc)
     spectral_indices = []             # fitted spectral index based on racs, meerkat
     extrapolated_flux_linear = []     # extrapolated flux when assuming a simple -0.7
@@ -79,20 +106,20 @@ def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2,
         return
     
     for i, (ai, bi, ci) in enumerate(zip(i1, i2, i3)):
-        fluxes = [cats[0]['flux_jy'][ai], cats[1]['flux_jy'][bi], cats[2]['flux_jy'][ci]]
-        e_fluxes = [cats[0]['e_flux_jy'][ai], cats[1]['e_flux_jy'][bi], cats[2]['e_flux_jy'][ci]]
-        spectral_index = get_spectral_index(fluxes[1], fluxes[2], freqs[1], freqs[2])
+        fluxes = [cats[0].flux[ai], cats[1].flux[bi], cats[2].flux[ci]]
+        e_fluxes = [cats[0].e_flux[ai], cats[1].e_flux[bi], cats[2].e_flux[ci]]
+        spectral_index = get_spectral_index(fluxes[1], fluxes[2], cats[1].freq, cats[2].freq)
         spectral_indices.append(spectral_index)
         
         lofar_uncorrected_flux.append(fluxes[0])
         lofar_uncorrected_flux_error.append(e_fluxes[0])
         
         # lofar flux when using racs flux and extrapolating back to lofar freq
-        extrapolated_flux_fit.append(get_flux_from_index(spectral_index, fluxes[1], freqs[0], freqs[1]))
-        extrapolated_flux_linear.append(0.5 * (get_flux_from_index(-0.7, fluxes[1], freqs[0], freqs[1]) + get_flux_from_index(-0.7, fluxes[2], freqs[0], freqs[2])))
+        extrapolated_flux_fit.append(get_flux_from_index(spectral_index, fluxes[1], cats[0].freq, cats[1].freq))
+        extrapolated_flux_linear.append(0.5 * (get_flux_from_index(-0.7, fluxes[1], cats[0].freq, cats[1].freq) + get_flux_from_index(-0.7, fluxes[2], cats[0].freq, cats[2].freq)))
         
         
-        if debug: plt.plot(np.array(freqs)*1e-6, fluxes)
+        if debug: plt.plot(np.array([cats[0].freq, cats[1].freq, cats[2].freq])*1e-6, fluxes)
     
     if debug:
         plt.yscale('log')
@@ -113,10 +140,10 @@ def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2,
     snr = lofar_uncorrected_flux / lofar_uncorrected_flux_error
     
     catalog_weight_factor = np.ones_like(snr)
-    for name in names:
-        if name.lower() == "tgss": catalog_weight_factor *= 0.5
-        if name.lower() == "gleam_300": catalog_weight_factor *= 0.7
-        if name.lower() == "gleam_xgp": catalog_weight_factor *= 0.8
+    for cat in cats:
+        if cat.name.lower() == "tgss": catalog_weight_factor *= 0.5
+        if cat.name.lower() == "gleam_300": catalog_weight_factor *= 0.7
+        if cat.name.lower() == "gleam_xgp": catalog_weight_factor *= 0.8
     
     if debug:
         # compare -0.7 assumption versus fitted spectral indices
@@ -129,9 +156,9 @@ def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2,
         plt.gca().set_box_aspect(1)
         plt.plot((mn, mx), (mn, mx), c='k', ls='--')
         plt.colorbar(label = r"Spectral index $\alpha$")
-        plt.xlabel(f"{names[0]} linear flux (Jy)")
-        plt.ylabel(f"{names[0]} fitted flux (Jy)")
-        plt.title(f"{names[0]} "+r"flux, $\alpha$=-0.7 vs fitted")
+        plt.xlabel(f"{cats[0].name} linear flux (Jy)")
+        plt.ylabel(f"{cats[0].name} fitted flux (Jy)")
+        plt.title(f"{cats[0].name} "+r"flux, $\alpha$=-0.7 vs fitted")
         plt.show()
     
         # compare fitted spectral index with correction factor
@@ -145,7 +172,7 @@ def compute_flux_correction_factor(cats, freqs, names, debug=False, thres_arc=2,
         plt.title("Flux correction as function of spectral index")
         plt.show()
         
-    print(f"Completed set [{names[0]:9}, {names[1]:9}, {names[2]:9}]", round(catalog_weight_factor[0],2) if debug else "")
+    print(f"Completed set [{cats[0].name:9}, {cats[1].name:9}, {cats[2].name:9}]", round(catalog_weight_factor[0],2) if debug else "")
         
     if return_coord:
         return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, catalog_weight_factor, cats[0]['ra'][i1], cats[0]['dec'][i1]
@@ -167,8 +194,10 @@ def radec_list(cats):
     return radec_list        
 
 """Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""
-def get_triplet_combinations(frequencies, catalogs, required_index=None, skip_index=None):
-    indexed = sorted(enumerate(zip(frequencies, catalogs)), key=lambda x: x[1][0])
+def get_triplet_combinations(cats, required_index=None, skip_index=None):
+    freqs = [];
+    for cat in cats: freqs += [cat.freq]
+    indexed = sorted(enumerate(zip(freqs, cats)), key=lambda x: x[1][0])
     return [(i1, i2, i3) for (i1, (f1, _)), (i2, (f2, _)), (i3, (f3, _)) in combinations(indexed, 3) if f1 < f2 < f3 
         and (required_index is None or required_index in (i1, i2, i3)) and (skip_index is None or skip_index not in (i1, i2, i3))]
 
@@ -179,53 +208,41 @@ def get_flux_from_index(spectral_index, reference_flux, current_frequency, refer
 # lofar fits file
 lofar_files = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0]
 
-# get calagogs, names in order of acquisition, lofar last
-survey_names = np.array(["racs", "meerkat", "vlssr", "tgss", "gleam_300", "gleam_xgp", "lofar"])
 
-racs_full      = Table.read(os.getcwd()+"/catalogs/racs/racs_clean.fits")
-meerkat_full   = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.fits")
-vlssr_full     = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.fits")
-tgss_full      = Table.read(os.getcwd()+"/catalogs/tgss/tgss_clean.fits")
-gleam_300_full = Table.read(os.getcwd()+"/catalogs/gleam_300/gleam_300_clean.fits")
-gleam_xgp_full = Table.read(os.getcwd()+"/catalogs/gleam_x_gp/gleam_x_gp_clean.fits")
-lofar_full     = Table.read(os.getcwd()+"/catalogs/lofar/lofar_sources_pipeline.fits")
-#lofar_full    = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits")
-
-spectral_index_theory = -0.7
-lofar_freq     = 144.6e6  #Hz
-racs_freq      = 887.5e6  #Hz
-meerkat_freq   = 1359.7e6 #Hz
-vlssr_freq     = 73.8e6   #Hz
-tgss_freq      = 150e6    #Hz
-gleam_300_freq = 300e6    #Hz
-gleam_xgp_freq = 200e6    #Hz
-
-survey_frequencies = np.array([racs_freq, meerkat_freq, vlssr_freq, tgss_freq, gleam_300_freq, gleam_xgp_freq, lofar_freq])
+# load catalogs, names in order of acquisition, lofar last
+racs_full      = catalog("/catalogs/racs/racs_clean.fits",                 887.5e6,    "racs")
+meerkat_full   = catalog("/catalogs/meerkat/meerkat_clean.fits",           1359.7e6,   "meerkat")
+vlssr_full     = catalog("/catalogs/vlssr/vlssr_clean.fits",               73.8e6,     "vlssr")
+tgss_full      = catalog("/catalogs/tgss/tgss_clean.fits",                 150e6,      "tgss")
+gleam_300_full = catalog("/catalogs/gleam_300/gleam_300_clean.fits",       300e6,      "gleam_300")
+gleam_xgp_full = catalog("/catalogs/gleam_x_gp/gleam_x_gp_clean.fits",     200e6,      "gleam_xgp")
+lofar_full     = catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar")
+#lofar_full    = catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",   144.6e6,    "lofar")
 
 # check for sources in current file
-racs_valid      = sources_in_fits(racs_full['ra'],      racs_full['dec'],       lofar_files)
-meerkat_valid   = sources_in_fits(meerkat_full['ra'],   meerkat_full['dec'],    lofar_files)
-vlssr_valid     = sources_in_fits(vlssr_full['ra'],     vlssr_full['dec'],      lofar_files)
-tgss_valid      = sources_in_fits(tgss_full['ra'],      tgss_full['dec'],       lofar_files)
-gleam_300_valid = sources_in_fits(gleam_300_full['ra'], gleam_300_full['dec'],  lofar_files)
-gleam_xgp_valid = sources_in_fits(gleam_xgp_full['ra'], gleam_xgp_full['dec'],  lofar_files)
-lofar_valid     = sources_in_fits(lofar_full['ra'],     lofar_full['dec'],      lofar_files)
+racs_valid      = sources_in_fits(racs_full.ra,      racs_full.dec,       lofar_files)
+meerkat_valid   = sources_in_fits(meerkat_full.ra,   meerkat_full.dec,    lofar_files)
+vlssr_valid     = sources_in_fits(vlssr_full.ra,     vlssr_full.dec,      lofar_files)
+tgss_valid      = sources_in_fits(tgss_full.ra,      tgss_full.dec,       lofar_files)
+gleam_300_valid = sources_in_fits(gleam_300_full.ra, gleam_300_full.dec,  lofar_files)
+gleam_xgp_valid = sources_in_fits(gleam_xgp_full.ra, gleam_xgp_full.dec,  lofar_files)
+lofar_valid     = sources_in_fits(lofar_full.ra,     lofar_full.dec,      lofar_files)
 
 # remove all non-valid points to reduce syntax clutter
-racs      = racs_full[racs_valid]
-meerkat   = meerkat_full[meerkat_valid]
-vlssr     = vlssr_full[vlssr_valid]
-tgss      = tgss_full[tgss_valid]
-gleam_300 = gleam_300_full[gleam_300_valid]
-gleam_xgp = gleam_xgp_full[gleam_xgp_valid]
-lofar     = lofar_full[lofar_valid]
+racs      = racs_full.create_subset(racs_valid)
+meerkat   = meerkat_full.create_subset(meerkat_valid)
+vlssr     = vlssr_full.create_subset(vlssr_valid)
+tgss      = tgss_full.create_subset(tgss_valid)
+gleam_300 = gleam_300_full.create_subset(gleam_300_valid)
+gleam_xgp = gleam_xgp_full.create_subset(gleam_xgp_valid)
+lofar     = lofar_full.create_subset(lofar_valid)
 
 catalogs      = [racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, lofar]
 catalogs_full = [racs_full, meerkat_full, vlssr_full, tgss_full, gleam_300_full, gleam_xgp_full, lofar_full]
 
 # full catalog plot
-for catalog, name in zip(catalogs_full, survey_names):
-    plt.hist(np.log10(catalog['flux_jy']), alpha=0.6, bins=75, label=name)
+for cat in catalogs_full:
+    plt.hist(np.log10(cat.flux), alpha=0.6, bins=75, label=cat.name)
 plt.xlabel("log10(flux/Jy)")
 plt.ylabel("count")
 plt.yscale('log')
@@ -233,8 +250,8 @@ plt.legend()
 plt.show()
 
 # cutdown catalog plot
-for catalog, name in zip(catalogs, survey_names):
-    plt.hist(np.log10(catalog['flux_jy']), alpha=0.6, bins=25, label=name)
+for cat in catalogs:
+    plt.hist(np.log10(cat.flux), alpha=0.6, bins=25, label=cat.name)
 plt.xlabel("log10(flux/Jy)")
 plt.ylabel("count")
 plt.yscale('log')
@@ -242,8 +259,8 @@ plt.legend()
 plt.show()
 
 # catalog as function of position
-for catalog, name in zip(catalogs, survey_names):
-    plt.scatter(catalog['ra'], catalog['dec'], s=1, label=name)
+for cat in catalogs:
+    plt.scatter(cat.ra, cat.dec, s=1, label=cat.name)
 plt.gca().set_box_aspect(1)
 plt.xlabel("RA")
 plt.ylabel("Dec")
@@ -278,15 +295,13 @@ catalog_weight_factor = []
 ###################################################
 #### catalog three-way combination auto-looper ####
 ###################################################
-for combination in get_triplet_combinations(survey_frequencies, survey_names, required_index=6, skip_index=2):
-    local_freqs = (survey_frequencies[combination[0]], survey_frequencies[combination[1]], survey_frequencies[combination[2]])
-    local_cats  = (catalogs[combination[0]],           catalogs[combination[1]],           catalogs[combination[2]])
-    local_names = (survey_names[combination[0]],       survey_names[combination[1]],       survey_names[combination[2]])
+for combination in get_triplet_combinations(catalogs, required_index=6, skip_index=2):
+    local_cats  = [catalogs[combination[0]], catalogs[combination[1]], catalogs[combination[2]]]
     
-    output = compute_flux_correction_factor(local_cats, local_freqs, local_names, debug=debug, return_coord=True)
+    output = compute_flux_correction_factor(local_cats, debug=debug, return_coord=True)
     
     if output == None:
-        print(f"{local_names[0]}, {local_names[1]}, {local_names[2]} did not return any matches")
+        print(f"{local_cats[0].name}, {local_cats[1].name}, {local_cats[2].name} did not return any matches")
     else:
         spx, snr, cor, flux, ftl, catw, ra, dec = output
 
