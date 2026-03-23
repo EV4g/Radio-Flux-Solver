@@ -13,7 +13,6 @@ from itertools import combinations
 
 """Given arrays of RA/Dec (degrees) and a FITS file, return a boolean array of which sources fall within the image footprint."""
 def sources_in_fits(ra_deg, dec_deg, fn):
-
     with fits.open(fn) as hdul:
         w  = WCS(hdul[0].header).celestial
         nx = hdul[0].header["NAXIS1"]
@@ -210,7 +209,7 @@ lofar_full.rename_column('Total_flux', 'flux_jy')
 lofar_full.rename_column('E_Total_flux', 'e_flux_jy')
 
 # LOFAR-DR3 uses mJy, pybdsf uses Jy, force everything to Jy
-if str(lofar_full['flux_jy']) == 'mJy':
+if str(lofar_full['flux_jy'].unit) == 'mJy':
     lofar_full['flux_jy'] *= 1e-3
     lofar_full['e_flux_jy'] *= 1e-3
 
