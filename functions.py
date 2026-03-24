@@ -14,7 +14,8 @@ from tqdm import tqdm
 from scipy.spatial import cKDTree
 from scipy.stats import gaussian_kde
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
+#import matplotlib.colors as mcolors
+from itertools import combinations
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
@@ -453,6 +454,14 @@ def remove_outliers_2D_iterative(var1, var2, clip_percentage, n):
         var2 = var2[condition]
 
     return var1, var2
+
+"""Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""
+def get_triplet_combinations(cats, required_index=None, skip_index=None):
+    freqs = []
+    for cat in cats: freqs += [cat.freq]
+    indexed = sorted(enumerate(zip(freqs, cats)), key=lambda x: x[1][0])
+    return [(i1, i2, i3) for (i1, (f1, _)), (i2, (f2, _)), (i3, (f3, _)) in combinations(indexed, 3) if f1 < f2 < f3
+        and (required_index is None or required_index in (i1, i2, i3)) and (skip_index is None or skip_index not in (i1, i2, i3))]
 
 # """Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""
 # def get_triplet_combinations(frequencies, catalogs, required_index=None, skip_index=None):

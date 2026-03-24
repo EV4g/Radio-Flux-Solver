@@ -8,9 +8,9 @@ import glob
 import os
 import copy
 #import multiprocessing; multiprocessing.set_start_method('fork') #for windows/mac
-from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics
+from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics, get_triplet_combinations
 from astropy.table import Table
-from itertools import combinations
+
 
 class catalog:
     def __init__(self, catalog, freq_hz=None, name=None):
@@ -177,14 +177,6 @@ def radec_list(cats):
     for cat in cats:
         radec_list.append((cat.ra, cat.dec))
     return radec_list
-
-"""Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""
-def get_triplet_combinations(cats, required_index=None, skip_index=None):
-    freqs = []
-    for cat in cats: freqs += [cat.freq]
-    indexed = sorted(enumerate(zip(freqs, cats)), key=lambda x: x[1][0])
-    return [(i1, i2, i3) for (i1, (f1, _)), (i2, (f2, _)), (i3, (f3, _)) in combinations(indexed, 3) if f1 < f2 < f3
-        and (required_index is None or required_index in (i1, i2, i3)) and (skip_index is None or skip_index not in (i1, i2, i3))]
 
 """Extrapolate flux based on two frequencies, one flux, and a spectral index"""
 def get_flux_from_index(spectral_index, reference_flux, current_frequency, reference_frequency):
