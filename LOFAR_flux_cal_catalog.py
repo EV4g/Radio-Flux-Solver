@@ -110,7 +110,7 @@ def quick_compare_catalog(cat1, cat2, config):
 
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
-def compute_flux_correction_factor(cats, config, debug=False, return_coord=False):
+def compute_flux_correction_factor(cats, config, debug=False):
     (i0, i1, i2), quality =  match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True)
 
     # if there are no sources, return
@@ -195,10 +195,7 @@ def compute_flux_correction_factor(cats, config, debug=False, return_coord=False
 
     print(f"Completed set [{cats[0].name:9}, {cats[1].name:9}, {cats[2].name:9}]", round(catalog_weight_factor[0],2) if debug else "")
 
-    if return_coord:
-        return spectral_indices, snr, correction_factor, extrapolated_flux_fit, catalog_weight_factor, max_sep, cats[0].ra, cats[0].dec
-    else:
-        return spectral_indices, snr, correction_factor, extrapolated_flux_fit, catalog_weight_factor, max_sep
+    return (spectral_indices, snr, correction_factor, extrapolated_flux_fit, catalog_weight_factor, max_sep, p_weight, cats[0].ra, cats[0].dec)
 
 """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
 def calculate_weighted_correction_factor(spx, snr, catw, max_sep, config):
@@ -317,7 +314,7 @@ max_separation = []             # maximum per-source separation between all thre
 for combination in get_triplet_combinations(catalogs, required_index=6, skip_index=2):
     local_cats  = [catalogs[combination[0]], catalogs[combination[1]], catalogs[combination[2]]]
 
-    output = compute_flux_correction_factor(local_cats, default_config, debug=debug, return_coord=True)
+    output = compute_flux_correction_factor(local_cats, default_config, debug=debug)
 
     if output is not None:
         spx, snr, cor, flux, catw, max_sep, ra, dec = output
