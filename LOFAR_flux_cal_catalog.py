@@ -220,13 +220,6 @@ def calculate_weighted_correction_factor(spx, snr, catw, max_sep, config):
 
     return spectral_difference_factor * signal_to_noise_factor * catw * separation_weight
 
-"""(cat1, cat2) --> [(ra1, dec1), (ra2, dec2)]"""
-def radec_list(cats):
-    radec_list = []
-    for cat in cats:
-        radec_list.append((cat.ra, cat.dec))
-    return radec_list
-
 """Extrapolate flux based on two frequencies, one flux, and a spectral index"""
 def get_flux_from_index(spectral_index, reference_flux, current_frequency, reference_frequency):
     return reference_flux * (current_frequency / reference_frequency) ** spectral_index

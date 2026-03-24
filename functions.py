@@ -628,6 +628,13 @@ def get_triplet_combinations(cats, required_index=None, skip_index=None):
     return [(i1, i2, i3) for (i1, (f1, _)), (i2, (f2, _)), (i3, (f3, _)) in combinations(indexed, 3) if f1 < f2 < f3
         and (required_index is None or required_index in (i1, i2, i3)) and (skip_index is None or skip_index not in (i1, i2, i3))]
 
+"""(cat1, cat2) --> [(ra1, dec1), (ra2, dec2)]"""
+def radec_list(cats):
+    radec_list = []
+    for cat in cats:
+        radec_list.append((cat.ra, cat.dec))
+    return radec_list
+
 # """Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""
 # def get_triplet_combinations(frequencies, catalogs, required_index=None, skip_index=None):
 #     indexed = sorted(enumerate(zip(frequencies, catalogs)), key=lambda x: x[1][0])
