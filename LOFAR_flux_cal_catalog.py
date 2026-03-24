@@ -13,7 +13,7 @@ from astropy.table import Table
 from itertools import combinations
 
 class catalog:
-    def __init__(self, catalog, freq_mhz=None, name=None):
+    def __init__(self, catalog, freq_hz=None, name=None):
         # if a string is given, try to read it as Path
         if isinstance(catalog, str):
             try:
@@ -26,7 +26,8 @@ class catalog:
         self.ra         = np.array(catalog['ra'])
         self.dec        = np.array(catalog['dec'])
         self.flux_unit  = str(catalog['flux_jy'].unit)
-        self.freq       = freq_mhz
+        self.freq       = freq_hz
+        self.freq_unit  = 'Hz'
         self.name       = name
 
     def create_subset(self, valid):
