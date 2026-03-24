@@ -164,7 +164,7 @@ def compute_flux_correction_factor(cats, debug=False, thres_arc=2, return_coord=
         return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, catalog_weight_factor
 
 """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
-def calculate_weighted_correction_factor(spx, snr, cor, catw, spx_ref=-0.7, spectral_damping_factor=10):
+def calculate_weighted_correction_factor(spx, snr, catw, spx_ref=-0.7, spectral_damping_factor=10):
     spectral_difference_factor = np.exp(-spectral_damping_factor * (spx - spx_ref)**2)
     signal_to_noise_factor = snr
     
@@ -300,7 +300,7 @@ for combination in get_triplet_combinations(catalogs, required_index=6, skip_ind
 #### plotting correction factor for each catalog combo ####
 ###########################################################
 for spx, snr, cor, catw in zip(spectral_index_global, signal_to_noise, correction_factor_global, catalog_weight_factor):
-    total_weighting_factor = calculate_weighted_correction_factor(spx, snr, cor, catw)
+    total_weighting_factor = calculate_weighted_correction_factor(spx, snr, catw)
     Xi, Yi, Zi, px, py = calculate_contour_statistics(spx, cor, total_weighting_factor, logy=True)
     
     o = np.argsort(total_weighting_factor)
@@ -336,7 +336,7 @@ catalog_weight_factor = np.concatenate(catalog_weight_factor)
 ############################################################################
 #### plotting correction factor based on all previous catalog matchings ####
 ############################################################################
-total_weighting_factor = calculate_weighted_correction_factor(spectral_index_global, signal_to_noise, correction_factor_global, catalog_weight_factor)
+total_weighting_factor = calculate_weighted_correction_factor(spectral_index_global, signal_to_noise, catalog_weight_factor)
 Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index_global, correction_factor_global, total_weighting_factor, logy=True)
 
 o = np.argsort(total_weighting_factor)
