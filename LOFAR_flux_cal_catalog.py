@@ -180,7 +180,7 @@ def radec_list(cats):
 
 """Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""
 def get_triplet_combinations(cats, required_index=None, skip_index=None):
-    freqs = [];
+    freqs = []
     for cat in cats: freqs += [cat.freq]
     indexed = sorted(enumerate(zip(freqs, cats)), key=lambda x: x[1][0])
     return [(i1, i2, i3) for (i1, (f1, _)), (i2, (f2, _)), (i3, (f3, _)) in combinations(indexed, 3) if f1 < f2 < f3

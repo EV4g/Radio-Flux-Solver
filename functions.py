@@ -93,7 +93,7 @@ def cutout_to_galactic_wh(cutout_lon, cutout_lat):
     l0 = np.mean(cutout_lon) * u.deg
     b0 = np.mean(cutout_lat) * u.deg
     center = SkyCoord(l=l0, b=b0, frame="galactic")
-    
+
     dlon = (cutout_lon[1] - cutout_lon[0]) * u.deg
     dlat = (cutout_lat[1] - cutout_lat[0]) * u.deg
     width  = abs(dlon)
@@ -106,14 +106,14 @@ def get_pixscale(wcs_A, wcs_B, w, h, use_highest_res=True):
     # cdelt is deg/pix; take absolute and min across both images
     scale_M = np.min(np.abs(wcs_A.wcs.cdelt)) * u.deg
     scale_L = np.min(np.abs(wcs_B.wcs.cdelt)) * u.deg
-    
+
     if use_highest_res: pixscale = min(scale_M, scale_L)
     else: pixscale = max(scale_M, scale_L)
 
     nx = int(np.ceil((w  / pixscale).decompose().value))
     ny = int(np.ceil((h / pixscale).decompose().value))
     return pixscale, nx, ny
-    
+
 """"""
 def generate_new_wcs(center, nx, ny, pixscale):
     wcs_out = WCS(naxis=2)
@@ -125,13 +125,13 @@ def generate_new_wcs(center, nx, ny, pixscale):
     return wcs_out
 
 """A 2D gaussian function, used for fitting point sources"""
-def twoD_Gaussian(xy, amplitude, xo, yo, sigma_x, sigma_y, theta, offset):    
+def twoD_Gaussian(xy, amplitude, xo, yo, sigma_x, sigma_y, theta, offset):
     x, y = xy
-    
+
     dx, dy = x - xo, y - yo
     sint_sq, cost_sq = np.sin(theta)**2, np.cos(theta)**2
     two_sig_x_sq, two_sig_y_sq = 2*sigma_x**2, 2*sigma_y**2
-    
+
     a = cost_sq / two_sig_x_sq + sint_sq / two_sig_y_sq
     b = -np.sin(2*theta) / (2 * two_sig_x_sq) + np.sin(2*theta) / (2 * two_sig_y_sq)
     c = sint_sq / two_sig_x_sq + cost_sq / two_sig_y_sq
@@ -139,7 +139,7 @@ def twoD_Gaussian(xy, amplitude, xo, yo, sigma_x, sigma_y, theta, offset):
     return g.T.ravel()
 
 """A simplified 2D gaussian function, used for fitting point sources"""
-def twoD_Gaussian_simple(xy, amplitude, xo, yo, sigma, offset):    
+def twoD_Gaussian_simple(xy, amplitude, xo, yo, sigma, offset):
     x, y = xy
     dx, dy = x - xo, y - yo
     a = 1 / (2 * sigma**2)
@@ -149,46 +149,46 @@ def twoD_Gaussian_simple(xy, amplitude, xo, yo, sigma, offset):
 """Function to automatically fit a gaussian, and return the best fit"""
 def fit_gauss(array, simple=False, mf=1000, debug=False):
     xy = np.where(np.isfinite(array) & (array != 0))
-    
+
     x = np.linspace(0, array.shape[0] - 1, array.shape[0])
     y = np.linspace(0, array.shape[1] - 1, array.shape[1])
     x, y = np.meshgrid(x, y)
-    
+
     mx, mn = np.nanmax(array),  np.nanmin(array)
-    diff = mx - mn 
+    diff = mx - mn
     half_x, half_y = array.shape[0]/2, array.shape[1]/2
-    
+
     if debug or simple:
         # amplitude, x, y, sigma, z_offset
         init = (mx, half_x, half_y, 1, mn)
         bounds = [[mn, 0, 0, 0, -np.inf], [mx, array.shape[0], array.shape[1], np.inf, mx]]
         popt, pcov = curve_fit(twoD_Gaussian_simple, xy, array[xy], p0=init, bounds=bounds, maxfev=mf)
-        
+
         if debug: return twoD_Gaussian_simple((x, y), *popt).reshape((array.shape[0], array.shape[1])), popt, pcov
         else:     return twoD_Gaussian_simple((x, y), *popt).reshape((array.shape[0], array.shape[1]))
-        
+
     else:
         # amplitude, x, y, sigma_x, sigma_y, theta, z_offset
         init = (diff, half_x, half_y, 1, 1, 0, 0)
         bounds = [[0, half_x-10, half_y-10, 0, 0, 0, -np.inf], [2 * diff, half_x+10, half_y+10, np.inf, np.inf, 2*np.pi, mx]]
         popt, _ = curve_fit(twoD_Gaussian, xy, array[xy], p0=init, bounds=bounds, maxfev=mf)
         return twoD_Gaussian((x, y), *popt).reshape((array.shape[0], array.shape[1]))
-    
+
 """Volume under a 2D gaussian """
 def gaussian_volume(A, sx, sy=None):
-    if sy==None: return A * sx**2 * 2 * np.pi
+    if sy is None: return A * sx**2 * 2 * np.pi
     else:        return A * sx * sy * 2 * np.pi
 
 """Return beam size [degree] from fits header"""
 def get_beam_size(file):
     hdul = fits.open(file)
     header = hdul[0].header
-    try: 
+    try:
         return header['BMAJ'], header['BMIN'], header['BPA']
-    except: 
+    except:
         return header['CLEANBMJ'], header['CLEANBMN'], header['CLEANBPA']
     return None
-    
+
 """Helper function required for get_flux()"""
 _get_flux_fixed = None
 def _worker(args):
@@ -200,45 +200,45 @@ def get_flux(w, h, data1, data2, header1, header2, ra, dec):
     wcs1 = WCS(header1).celestial
     wcs2 = WCS(header2).celestial
     pix_per_deg, nx, ny = get_pixscale(wcs1, wcs2, w, h)
-    
+
     try:    beam_area_1 = (np.pi / (4*np.log(2))) * (header1['BMAJ'] / pix_per_deg.value) * (header1['BMIN'] / pix_per_deg.value)
     except: beam_area_1 = (np.pi / (4*np.log(2))) * (header1['CLEANBMJ'] / pix_per_deg.value) * (header1['CLEANBMN'] / pix_per_deg.value)
-    
+
     try:    beam_area_2 = (np.pi / (4*np.log(2))) * (header2['BMAJ'] / pix_per_deg.value) * (header2['BMIN'] / pix_per_deg.value)
     except: beam_area_2 = (np.pi / (4*np.log(2))) * (header2['CLEANBMJ'] / pix_per_deg.value) * (header2['CLEANBMN'] / pix_per_deg.value)
-    
+
     pos = SkyCoord(ra*u.deg, dec*u.deg, frame="icrs")
 
     try:
         cutout1 = Cutout2D(data1, position=pos, size=(h, w), wcs=wcs1, mode="partial", fill_value=np.nan)
         cutout2 = Cutout2D(data2, position=pos, size=(h, w), wcs=wcs2, mode="partial", fill_value=np.nan)
     except: return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
-        
-    
+
+
     if np.isnan(cutout1.data).all() or np.isnan(cutout2.data).all():
         return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
     else:
         wcs_out = generate_new_wcs(pos, nx, ny, pix_per_deg)
-        
+
         try:
             reproj1, _ = reproject_interp((cutout1.data, cutout1.wcs), wcs_out, shape_out=(nx, ny))
             reproj2, _ = reproject_interp((cutout2.data, cutout2.wcs), wcs_out, shape_out=(nx, ny))
         except: return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
-        
+
         fit1, popt1, pcov1 = fit_gauss(reproj1, simple=True, debug=True)
         fit2, popt2, pcov2 = fit_gauss(reproj2, simple=True, debug=True)
-    
+
         local_snr     = np.nanmax(reproj1) / np.nanstd(reproj1)
         local_snr_fit = np.nanmax(reproj2) / np.nanstd(reproj2)
-    
+
         sigma_pcov1 = np.sqrt(pcov1[3, 3])
         sigma_pcov2 = np.sqrt(pcov2[3, 3])
-    
+
         dist = np.sqrt((popt1[1] - popt2[1])**2 + (popt1[2] - popt2[2])**2)
-    
+
         flux1 = gaussian_volume(popt1[0], popt1[3]) / beam_area_1
         flux2 = gaussian_volume(popt2[0], popt2[3]) / beam_area_2
-    
+
         return flux1, flux2, dist, sigma_pcov1, sigma_pcov2, local_snr, local_snr_fit
 
 """Multithread the get_flux() function"""
@@ -255,13 +255,13 @@ def get_flux_batch(w, h, data1, data2, header1, header2, ra, dec, max_workers=24
 data_1 gets compared versus the baseline of data_2. Returns (expected) fitted spectral_flux_ratio, and (actual) index, as well as the (offset) ratios and scaling factor.
 Optional Valid parameter to only select a subset of all arrays."""
 def compute_fluxcal_statistics(freq1, freq2, flux1, flux2, spectral_index_theory=-0.7, valid=None):
-    if type(valid) != type(None):
+    if type(valid) is not type(None):
         flux1 = flux1[valid]
         flux2 = flux2[valid]
     spectral_flux_ratio = (freq1 / freq2)**spectral_index_theory
     spectral_index_actual = 10**np.mean(np.log10(flux1 / flux2))
     x = log_linspace(np.min(flux2), np.max(flux2), 10)
-    
+
     ratio = flux1 / (flux2 * spectral_flux_ratio)
     #valid_ratio = np.isfinite(ratio) & (ratio > 0)
     log_ratio = np.log10(ratio)
@@ -270,12 +270,12 @@ def compute_fluxcal_statistics(freq1, freq2, flux1, flux2, spectral_index_theory
     scatter      = np.std(log_ratio)
     N            = len(log_ratio)
     stderr       = scatter / np.sqrt(N)
-    
+
     print(f"N valid sources      : {N}")
     print(f"Median log10(ratio)  : {scale_factor:.4f}  ({10**scale_factor:.4f}×)")
     print(f"Scatter (1σ)         : {scatter:.4f} dex")
     print(f"Uncertainty on median: ±{stderr:.4f} dex")
-    
+
     return spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor
 
 """Fast catalogue matcher"""
@@ -382,31 +382,31 @@ Takes x, y coordinated and a per-source weighting c. Can make the contour fittin
 def calculate_contour_statistics(x, y, c, logx=False, logy=False, n=200):
     if logx: x = np.log10(x)
     if logy: y = np.log10(y)
-    
+
     xi = np.linspace(x.min(), x.max(), n)
     yi = np.linspace(y.min(), y.max(), n)
     Xi, Yi = np.meshgrid(xi, yi)
-    
+
     kde = gaussian_kde(np.vstack([x, y]), weights=c)
     Zi = kde(np.vstack([Xi.ravel(), Yi.ravel()])).reshape(Xi.shape)
-    
+
     peak_idx = np.argmax(Zi)
     peak_x0 = Xi.ravel()[peak_idx]
     peak_y0 = Yi.ravel()[peak_idx]
-    
+
     result = minimize(lambda p: -kde(p), x0=[peak_x0, peak_y0], method='Nelder-Mead')
     peak_x0, peak_y0 = result.x
-    
+
     if logx: Xi = 10**Xi; peak_x0 = 10**peak_x0
     if logy: Yi = 10**Yi; peak_y0 = 10**peak_y0
-    
+
     return Xi, Yi, Zi, peak_x0, peak_y0
 
 """A simple way to save fits files to png"""
 def fits_to_png(fits_path, output_path, hdu_index=0, vmin=None, vmax=None, cmap="viridis"):
     with fits.open(fits_path) as hdul:
         data = hdul[hdu_index].data[0,0]
-    
+
     plt.imsave(output_path, data, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
 
 """Plot (log)ratio as function of position in field."""
@@ -435,9 +435,9 @@ def remove_outliers_2D(var1, var2, clip_percentage):
     v1_clip_bottom = np.percentile(var1, clip_percentage)
     v2_clip_top = np.percentile(var2, 100 - clip_percentage)
     v2_clip_bottom = np.percentile(var2, clip_percentage)
-    
+
     condition = (var1 > v1_clip_bottom) & (var1 < v1_clip_top) & (var2 > v2_clip_bottom) & (var2 < v2_clip_top)
-    
+
     return var1[condition], var2[condition]
 
 """Remove outliers at eitherside of the distribution, consider two variables at once, repeat n times"""
@@ -447,15 +447,15 @@ def remove_outliers_2D_iterative(var1, var2, clip_percentage, n):
         v1_clip_bottom = np.percentile(var1, clip_percentage)
         v2_clip_top = np.percentile(var2, 100 - clip_percentage)
         v2_clip_bottom = np.percentile(var2, clip_percentage)
-        
+
         condition = (var1 > v1_clip_bottom) & (var1 < v1_clip_top) & (var2 > v2_clip_bottom) & (var2 < v2_clip_top)
         var1 = var1[condition]
         var2 = var2[condition]
-        
+
     return var1, var2
 
 # """Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""
 # def get_triplet_combinations(frequencies, catalogs, required_index=None, skip_index=None):
 #     indexed = sorted(enumerate(zip(frequencies, catalogs)), key=lambda x: x[1][0])
-#     return [(i1, i2, i3) for (i1, (f1, _)), (i2, (f2, _)), (i3, (f3, _)) in combinations(indexed, 3) if f1 < f2 < f3 
+#     return [(i1, i2, i3) for (i1, (f1, _)), (i2, (f2, _)), (i3, (f3, _)) in combinations(indexed, 3) if f1 < f2 < f3
 #         and (required_index is None or required_index in (i1, i2, i3)) and (skip_index is None or skip_index not in (i1, i2, i3))]
