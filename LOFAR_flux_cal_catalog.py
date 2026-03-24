@@ -7,8 +7,9 @@ import matplotlib.pyplot as plt
 import glob
 import os
 import copy
-from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics, get_triplet_combinations
+from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics, get_triplet_combinations, get_pos_err_arcsec
 from astropy.table import Table
+from scipy.stats import chi2
 
 # wrapper class for incoming Table data
 class catalog:
@@ -46,6 +47,8 @@ class catalog:
         subset.e_flux = self.e_flux[valid]
         subset.ra     = self.ra[valid]
         subset.dec    = self.dec[valid]
+        if self.e_ra is not None:  subset.e_ra  = self.e_ra[valid]
+        if self.e_dec is not None: subset.e_dec = self.e_dec[valid]
         return subset
 
 # wrapper class for passable parameters
@@ -56,7 +59,6 @@ class config:
         self.snr_lower_limit = snr_lower_limit
         self.minimum_points = minimum_points
         self.spectral_index_theory = spectral_index_theory
-        
 
 """Given arrays of RA/Dec (degrees) and a FITS file, return a boolean array of which sources fall within the image footprint."""
 def sources_in_fits(ra_deg, dec_deg, fn):
@@ -136,6 +138,13 @@ def compute_flux_correction_factor(cats, config, debug=False):
     sep_12  = coords[1].separation(coords[2]).arcsec
     max_sep = np.maximum(sep_01, np.maximum(sep_02, sep_12))
 
+    # point probability weighting
+    sig = [get_pos_err_arcsec(cat) for cat in cats]   # arcsec, per-source
+    p01 = 1.0 - chi2.cdf((sep_01 / np.hypot(sig[0], sig[1])) ** 2, df=2)
+    p02 = 1.0 - chi2.cdf((sep_02 / np.hypot(sig[0], sig[2])) ** 2, df=2)
+    p12 = 1.0 - chi2.cdf((sep_12 / np.hypot(sig[1], sig[2])) ** 2, df=2)
+    p_weight = p01 * p02 * p12
+    
     # flux and flux error
     uncorrected_flux = cats[0].flux
     uncorrected_flux_error = cats[0].e_flux
@@ -307,6 +316,7 @@ fitted_flux = []                # catalog0 flux based on two-point spectral inde
 signal_to_noise = []            # signal-to-noise (flux_jy / e_flux_jy)
 catalog_weight_factor = []      # weighting factor based on systematic catalog uncertainty; to be deprecated
 max_separation = []             # maximum per-source separation between all three matched catalog positions
+point_probability = []          # probability of points matching
 
 ###################################################
 #### catalog three-way combination auto-looper ####
@@ -317,7 +327,7 @@ for combination in get_triplet_combinations(catalogs, required_index=6, skip_ind
     output = compute_flux_correction_factor(local_cats, default_config, debug=debug)
 
     if output is not None:
-        spx, snr, cor, flux, catw, max_sep, ra, dec = output
+        spx, snr, cor, flux, catw, max_sep, p_weight, ra, dec = output
 
         ras += [ra]; decs += [dec]
         correction_factor_global += [cor]
@@ -326,6 +336,7 @@ for combination in get_triplet_combinations(catalogs, required_index=6, skip_ind
         signal_to_noise += [snr]
         catalog_weight_factor += [catw]
         max_separation += [max_sep]
+        point_probability += [p_weight]
 
 ###########################################################
 #### plotting correction factor for each catalog combo ####

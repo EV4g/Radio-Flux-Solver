@@ -287,6 +287,14 @@ def _project_radec(ra_deg, dec_deg, ra0_deg, dec0_deg):
     y = (dec - dec0)
     return x, y
 
+"""Return a per-source 1D positional RMS (deg) for a catalog.
+If e_ra / e_dec are stored on the object they are combined as
+  sigma_1d = sqrt((e_ra^2 + e_dec^2) / 2).
+If neither is available, returns a constant array of `fallback` deg."""
+def get_pos_err_arcsec(cat, fallback=2.0/3600):
+    if cat.e_ra is not None and cat.e_dec is not None:
+        return np.sqrt((cat.e_ra ** 2 + cat.e_dec ** 2) / 2.0)
+    return np.full(len(cat.ra), fallback)
 
 def match_catalogs_2D(cat_list, thres_arc=2, pos_err_arcsec=None, nsigma=3.0, crowd_radius_arc=None, anchor_index=0, return_quality=False):    
     """Fast n-catalogue cross-matcher with adaptive positional uncertainties,
@@ -341,9 +349,14 @@ def match_catalogs_2D(cat_list, thres_arc=2, pos_err_arcsec=None, nsigma=3.0, cr
             e = np.asarray(pos_err_arcsec[i], dtype=float)
             if e.ndim == 0 or e.size == 1:
                 e = np.full(len(cat.ra), float(e))
-            errs.append(np.deg2rad(e / 3600.0))
+            errs.append(np.deg2rad(e))
     else:
-        errs = None
+        has_any = any(c.e_ra is not None for c in cat_list)
+        if has_any:
+            errs = [np.deg2rad(get_pos_err_arcsec(cat))
+            for cat in cat_list]
+        else:
+            errs = None
 
     # For each source, counts how many other sources in the same catalogue lie within 
     # crowd_radius_arc arcsec. Sources near others are unreliable
@@ -398,7 +411,7 @@ def match_catalogs_2D(cat_list, thres_arc=2, pos_err_arcsec=None, nsigma=3.0, cr
             # When per-source uncertainties are given, use nsigma * median(combined_sigma) 
             # as the coarse KD-tree radius; otherwise fall back to the fixed thres_arc.
             if errs is not None:
-                sigma_pair   = np.median(np.hypot(err_sup, err_sub))
+                sigma_pair = np.hypot(np.median(err_sup), np.median(err_sub))
                 query_radius = nsigma * sigma_pair
             else:
                 query_radius = np.deg2rad(thres_arc / 3600.0)
