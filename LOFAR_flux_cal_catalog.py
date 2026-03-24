@@ -13,7 +13,7 @@ from astropy.table import Table
 
 
 class catalog:
-    def __init__(self, catalog, freq_hz=None, name=None):
+    def __init__(self, catalog, freq_hz=None, name=None, store_raw=False):
         # if a string is given, try to read it as Path
         if isinstance(catalog, str):
             try:
@@ -29,6 +29,8 @@ class catalog:
         self.freq       = freq_hz
         self.freq_unit  = 'Hz'
         self.name       = name
+
+        self.raw = catalog if store_raw else None
 
     def create_subset(self, valid):
         subset = copy.deepcopy(self)
