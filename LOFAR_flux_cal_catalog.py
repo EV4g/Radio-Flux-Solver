@@ -10,7 +10,7 @@ import copy
 from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics, get_triplet_combinations
 from astropy.table import Table
 
-
+# wrapper class for incoming Table data
 class catalog:
     def __init__(self, catalog, freq_hz=None, name=None, store_raw=False):
         # if a string is given, try to read it as Path
@@ -47,6 +47,16 @@ class catalog:
         subset.ra     = self.ra[valid]
         subset.dec    = self.dec[valid]
         return subset
+
+# wrapper class for passable parameters
+class config:
+    def __init__(self, thres_arc, spectral_damping_factor, snr_lower_limit, spectral_index_theory=-0.7, minimum_points=2):
+        self.thres_arc = thres_arc
+        self.spectral_damping_factor = spectral_damping_factor
+        self.snr_lower_limit = snr_lower_limit
+        self.minimum_points = minimum_points
+        self.spectral_index_theory = spectral_index_theory
+        
 
 """Given arrays of RA/Dec (degrees) and a FITS file, return a boolean array of which sources fall within the image footprint."""
 def sources_in_fits(ra_deg, dec_deg, fn):
@@ -231,48 +241,47 @@ lofar     = lofar_full.create_subset(lofar_valid)
 catalogs      = [racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, lofar]
 catalogs_full = [racs_full, meerkat_full, vlssr_full, tgss_full, gleam_300_full, gleam_xgp_full, lofar_full]
 
-# full catalog plot
-for cat in catalogs_full:
-    plt.hist(np.log10(cat.flux), alpha=0.6, bins=75, label=cat.name)
-plt.xlabel("log10(flux/Jy)")
-plt.ylabel("count")
-plt.yscale('log')
-plt.legend()
-plt.show()
-
-# cutdown catalog plot
-for cat in catalogs:
-    plt.hist(np.log10(cat.flux), alpha=0.6, bins=25, label=cat.name)
-plt.xlabel("log10(flux/Jy)")
-plt.ylabel("count")
-plt.yscale('log')
-plt.legend()
-plt.show()
-
-# catalog as function of position
-for cat in catalogs:
-    plt.scatter(cat.ra, cat.dec, s=1, label=cat.name)
-plt.gca().set_box_aspect(1)
-plt.xlabel("RA")
-plt.ylabel("Dec")
-plt.legend()
-plt.show()
-
-
-"""
-#### analysis
-quick_compare_catalog(lofar, meerkat, spectral_index_theory=spectral_index_theory)
-quick_compare_catalog(lofar, racs,    spectral_index_theory=spectral_index_theory)
-quick_compare_catalog(lofar, tgss,    spectral_index_theory=spectral_index_theory)
-quick_compare_catalog(lofar, vlssr,   thres_arc=10, spectral_index_theory=spectral_index_theory)
-quick_compare_catalog(racs,  meerkat, spectral_index_theory=spectral_index_theory)
-"""
-
-#### TODO ####
-# add a weighting for point crowding --> downweight sources that are very close to another since they might be confused during matching
-
 #### Parameters
 debug = True
+default_config = config(thres_arc=2, spectral_damping_factor=10, snr_lower_limit=7)
+vlssr_config   = config(thres_arc=10, spectral_damping_factor=10, snr_lower_limit=7)
+
+if debug:
+    # full catalog plot
+    for cat in catalogs_full:
+        plt.hist(np.log10(cat.flux), alpha=0.6, bins=75, label=cat.name)
+    plt.xlabel("log10(flux/Jy)")
+    plt.ylabel("count")
+    plt.yscale('log')
+    plt.legend()
+    plt.show()
+    
+    # cutdown catalog plot
+    for cat in catalogs:
+        plt.hist(np.log10(cat.flux), alpha=0.6, bins=25, label=cat.name)
+    plt.xlabel("log10(flux/Jy)")
+    plt.ylabel("count")
+    plt.yscale('log')
+    plt.legend()
+    plt.show()
+    
+    # catalog as function of position
+    for cat in catalogs:
+        plt.scatter(cat.ra, cat.dec, s=1, label=cat.name)
+    plt.gca().set_box_aspect(1)
+    plt.xlabel("RA")
+    plt.ylabel("Dec")
+    plt.legend()
+    plt.show()
+
+    """
+    #### analysis
+    quick_compare_catalog(lofar, meerkat, default_config)
+    quick_compare_catalog(lofar, racs,    default_config)
+    quick_compare_catalog(lofar, tgss,    default_config)
+    quick_compare_catalog(lofar, vlssr,   vlssr_config)
+    quick_compare_catalog(racs,  meerkat, default_config)
+    """
 
 #### variables
 ras, decs = [], []
