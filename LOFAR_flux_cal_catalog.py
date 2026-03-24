@@ -117,10 +117,26 @@ def compute_flux_correction_factor(cats, config, debug=False, return_coord=False
     if len(i0) <= 1:
         if debug: print(f"Error: no source-matches found between {cats[0].name}, {cats[1].name}, {cats[2].name}")
         return None
+    
+    # if crowding parameter is available, remove overcrowded points; else skip
+    if quality['n_crowd']:
+        crowd_ok = np.ones(len(i0), dtype=bool)
+        for cat_idx, match_idx in zip([0, 1, 2], [i0, i1, i2]):
+            nc = quality['n_crowd'].get(cat_idx)
+            if nc is not None and len(nc): crowd_ok &= (nc[match_idx] == 0)
+        i0, i1, i2 = i0[crowd_ok], i1[crowd_ok], i2[crowd_ok]
 
     # create subsets of all catalogs, such that we can ignore (i0,i1,i2) afterwards
     for index, cat in enumerate(cats): cats[index] = cat.create_subset([i0, i1, i2][index])
+    
+    # per source maximum separation
+    coords = [SkyCoord(ra=cat.ra * u.deg, dec=cat.dec * u.deg) for cat in cats]
+    sep_01  = coords[0].separation(coords[1]).arcsec
+    sep_02  = coords[0].separation(coords[2]).arcsec
+    sep_12  = coords[1].separation(coords[2]).arcsec
+    max_sep = np.maximum(sep_01, np.maximum(sep_02, sep_12))
 
+    # flux and flux error
     uncorrected_flux = cats[0].flux
     uncorrected_flux_error = cats[0].e_flux
 
@@ -196,7 +212,7 @@ def calculate_weighted_correction_factor(spx, snr, catw, max_sep, config):
     # weighting based on separation between points
     separation_weight = 1#np.exp(-(max_sep / config.thres_arc) ** 2)
 
-    return spectral_difference_factor * signal_to_noise_factor * catw
+    return spectral_difference_factor * signal_to_noise_factor * catw * separation_weight
 
 """(cat1, cat2) --> [(ra1, dec1), (ra2, dec2)]"""
 def radec_list(cats):
@@ -293,6 +309,7 @@ spectral_index_global = []      # per-source two-point spectral index
 fitted_flux = []                # catalog0 flux based on two-point spectral index extrapolation
 signal_to_noise = []            # signal-to-noise (flux_jy / e_flux_jy)
 catalog_weight_factor = []      # weighting factor based on systematic catalog uncertainty; to be deprecated
+max_separation = []             # maximum per-source separation between all three matched catalog positions
 
 ###################################################
 #### catalog three-way combination auto-looper ####
@@ -303,7 +320,7 @@ for combination in get_triplet_combinations(catalogs, required_index=6, skip_ind
     output = compute_flux_correction_factor(local_cats, default_config, debug=debug, return_coord=True)
 
     if output is not None:
-        spx, snr, cor, flux, ftl, catw, ra, dec = output
+        spx, snr, cor, flux, catw, max_sep, ra, dec = output
 
         ras += [ra]; decs += [dec]
         correction_factor_global += [cor]
@@ -311,13 +328,13 @@ for combination in get_triplet_combinations(catalogs, required_index=6, skip_ind
         fitted_flux += [flux]
         signal_to_noise += [snr]
         catalog_weight_factor += [catw]
-
+        max_separation += [max_sep]
 
 ###########################################################
 #### plotting correction factor for each catalog combo ####
 ###########################################################
-for spx, snr, cor, catw in zip(spectral_index_global, signal_to_noise, correction_factor_global, catalog_weight_factor):
-    total_weighting_factor = calculate_weighted_correction_factor(spx, snr, catw)
+for spx, snr, cor, catw, max_sep in zip(spectral_index_global, signal_to_noise, correction_factor_global, catalog_weight_factor, max_separation):
+    total_weighting_factor = calculate_weighted_correction_factor(spx, snr, catw, max_sep, default_config)
     Xi, Yi, Zi, px, py = calculate_contour_statistics(spx, cor, total_weighting_factor, logy=True)
 
     o = np.argsort(total_weighting_factor)
@@ -346,14 +363,14 @@ correction_factor_global = np.concatenate(correction_factor_global)
 spectral_index_global = np.concatenate(spectral_index_global)
 fitted_flux = np.concatenate(fitted_flux)
 signal_to_noise = np.concatenate(signal_to_noise)
-fit_to_linear_ratio = np.concatenate(fit_to_linear_ratio)
 catalog_weight_factor = np.concatenate(catalog_weight_factor)
+max_separation = np.concatenate(max_separation)
 
 
 ############################################################################
 #### plotting correction factor based on all previous catalog matchings ####
 ############################################################################
-total_weighting_factor = calculate_weighted_correction_factor(spectral_index_global, signal_to_noise, catalog_weight_factor)
+total_weighting_factor = calculate_weighted_correction_factor(spectral_index_global, signal_to_noise, catalog_weight_factor, max_separation, default_config)
 Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index_global, correction_factor_global, total_weighting_factor, logy=True)
 
 o = np.argsort(total_weighting_factor)
