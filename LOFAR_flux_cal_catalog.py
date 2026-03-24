@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import glob
 import os
 import copy
-#import multiprocessing; multiprocessing.set_start_method('fork') #for windows/mac
 from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics, get_triplet_combinations
 from astropy.table import Table
 
@@ -23,9 +22,18 @@ class catalog:
 
         self.flux       = np.array(catalog['flux_jy'])
         self.e_flux     = np.array(catalog['e_flux_jy'])
+        self.flux_unit  = str(catalog['flux_jy'].unit)
+        
         self.ra         = np.array(catalog['ra'])
         self.dec        = np.array(catalog['dec'])
-        self.flux_unit  = str(catalog['flux_jy'].unit)
+        
+        try:
+            self.e_ra   = np.array(catalog['e_ra'])
+            self.e_dec  = np.array(catalog['e_dec'])
+        except:
+            self.e_ra   = None
+            self.e_dec  = None
+        
         self.freq       = freq_hz
         self.freq_unit  = 'Hz'
         self.name       = name
