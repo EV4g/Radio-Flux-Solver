@@ -29,6 +29,15 @@ import numpy as np
 #     lofar_dr3['flux_jy'].unit = 'Jy'
 #     lofar_dr3['e_flux_jy'].unit = 'Jy'
 
+# if str(lofar_dr3['e_ra'].unit) == 'arcsec':
+#     lofar_dr3['e_ra'] /= 3600
+#     lofar_dr3['e_ra'].unit = 'deg'
+# if str(lofar_dr3['e_dec'].unit) == 'arcsec':
+#     lofar_dr3['e_dec'] /= 3600
+#     lofar_dr3['e_dec'].unit = 'deg'
+
+# lofar_dr3.write('LoTSS_DR3_v1.0.srl_clean.fits', overwrite=True)
+
 # from astroquery.vizier import Vizier
 # v = Vizier(row_limit=-1)
 # catalogs = v.get_catalogs("VIII/97")
@@ -89,6 +98,13 @@ import numpy as np
 # racs.rename_column("E_RA", "e_ra")
 # racs.rename_column("E_Dec", "e_dec")
 
+# if str(racs['e_ra'].unit) == 'arcsec':
+#     racs['e_ra'] /= 3600
+#     racs['e_ra'].unit = 'deg'
+# if str(racs['e_dec'].unit) == 'arcsec':
+#     racs['e_dec'] /= 3600
+#     racs['e_dec'].unit = 'deg'
+
 # racs_out = Table()
 # for col in racs.colnames:
 #     data = np.array(racs[col])  # strips Quantity/mixin type
@@ -139,6 +155,14 @@ import numpy as np
 # tgss['e_flux_jy'] *= 1e-3
 # tgss['flux_jy'].unit = 'Jy'
 # tgss['e_flux_jy'].unit = 'Jy'
+
+# if str(tgss['e_ra'].unit) == 'arcsec':
+#     tgss['e_ra'] /= 3600
+#     tgss['e_ra'].unit = 'deg'
+# if str(tgss['e_ra'].unit) == 'arcsec':
+#     tgss['e_dec'] /= 3600
+#     tgss['e_dec'].unit = 'deg'
+
 # tgss.write("tgss_clean.fits", overwrite=True)
 
 #### gleam ####
@@ -153,3 +177,33 @@ import numpy as np
 #     gleam[col].info.description = None
 
 # gleam.write("gleam_300_clean.fits", overwrite=True)
+
+#######################################
+#### ensurinig all catalogs are OK ####
+#######################################
+# racs      = Table.read(os.getcwd()+"/catalogs/racs/racs_clean.fits")
+# meerkat   = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.fits")
+# vlssr     = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.fits")
+# tgss      = Table.read(os.getcwd()+"/catalogs/tgss/tgss_clean.fits")
+# gleam     = Table.read(os.getcwd()+"/catalogs/gleam_300/gleam_300_clean.fits")
+# gleam_xgp = Table.read(os.getcwd()+"/catalogs/gleam_x_gp/gleam_x_gp_clean.fits")
+# lofar_dr3 = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits")
+# lofar = Table.read(os.getcwd()+'/catalogs/lofar/lofar_sources_pipeline.fits')
+# cats = [racs, meerkat, vlssr, tgss, gleam, gleam_xgp, lofar_dr3, lofar]
+# name = ['racs', 'meerkat', 'vlssr', 'tgss', 'gleam_300', 'gleam_xgp', 'lofar_dr3', 'lofar_pipe']
+
+# for i, cat in enumerate(cats):
+#     assert "flux_jy" in cat.colnames
+#     assert "e_flux_jy" in cat.colnames
+#     assert str(cat["flux_jy"].unit) == 'Jy'
+#     assert str(cat["e_flux_jy"].unit) == 'Jy'
+    
+#     assert "ra" in cat.colnames
+#     assert "dec" in cat.colnames
+#     assert "e_ra" in cat.colnames
+#     assert "e_dec" in cat.colnames
+    
+#     assert str(cat["e_ra"].unit) == 'deg' or str(cat["e_ra"].unit) == 'None'
+#     assert str(cat["e_dec"].unit) == 'deg' or str(cat["e_dec"].unit) == 'None'
+    
+#     print(f"PASSED {i+1} / {len(cats)}: {name[i]}")
