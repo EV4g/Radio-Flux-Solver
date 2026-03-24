@@ -165,9 +165,13 @@ def compute_flux_correction_factor(cats, debug=False, thres_arc=2, return_coord=
         return spectral_indices, snr, correction_factor, extrapolated_flux_fit, extrapolated_flux_fit_to_linear_ratio, catalog_weight_factor
 
 """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
-def calculate_weighted_correction_factor(spx, snr, catw, spx_ref=-0.7, spectral_damping_factor=10):
+def calculate_weighted_correction_factor(spx, snr, catw, spx_ref=-0.7, spectral_damping_factor=10, snr_lower_limit=7):
+    # downweight sources with spectral indices far away from -0.7
     spectral_difference_factor = np.exp(-spectral_damping_factor * (spx - spx_ref)**2)
+    
+    # discard low snr sources
     signal_to_noise_factor = snr
+    signal_to_noise_factor[signal_to_noise_factor < snr_lower_limit] = 0
 
     return spectral_difference_factor * signal_to_noise_factor * catw
 
