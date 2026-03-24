@@ -421,7 +421,38 @@ def radec_list_simple(cats):
     radec_list = []
     for cat in cats:
         radec_list.append((cat['ra'], cat['dec']))
-    return radec_list       
+    return radec_list
+
+"""Remove outliers at eitherside of the distribution"""
+def remove_outliers(var, clip_percentage):
+    clip_top = np.percentile(var, 100 - clip_percentage)
+    clip_bottom = np.percentile(var, clip_percentage)
+    return var[(var < clip_top) and (var > clip_bottom)]
+
+"""Remove outliers at eitherside of the distribution, consider two variables at once"""
+def remove_outliers_2D(var1, var2, clip_percentage):
+    v1_clip_top = np.percentile(var1, 100 - clip_percentage)
+    v1_clip_bottom = np.percentile(var1, clip_percentage)
+    v2_clip_top = np.percentile(var2, 100 - clip_percentage)
+    v2_clip_bottom = np.percentile(var2, clip_percentage)
+    
+    condition = (var1 > v1_clip_bottom) & (var1 < v1_clip_top) & (var2 > v2_clip_bottom) & (var2 < v2_clip_top)
+    
+    return var1[condition], var2[condition]
+
+"""Remove outliers at eitherside of the distribution, consider two variables at once, repeat n times"""
+def remove_outliers_2D_iterative(var1, var2, clip_percentage, n):
+    for _ in range(n):
+        v1_clip_top = np.percentile(var1, 100 - clip_percentage)
+        v1_clip_bottom = np.percentile(var1, clip_percentage)
+        v2_clip_top = np.percentile(var2, 100 - clip_percentage)
+        v2_clip_bottom = np.percentile(var2, clip_percentage)
+        
+        condition = (var1 > v1_clip_bottom) & (var1 < v1_clip_top) & (var2 > v2_clip_bottom) & (var2 < v2_clip_top)
+        var1 = var1[condition]
+        var2 = var2[condition]
+        
+    return var1, var2
 
 # """Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""
 # def get_triplet_combinations(frequencies, catalogs, required_index=None, skip_index=None):
