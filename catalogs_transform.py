@@ -1,17 +1,18 @@
 import os
-from astropy.table import Table
+from astropy.table import Table, Column
 import bdsf
 import glob
+import numpy as np
 
 # get calagogs
 # racs      = Table.read(os.getcwd()+"/catalogs/racs/RACS_DR1_Sources_GalacticRegion_v2021_08.xml")
-# meerkat   = Table.read(os.getcwd()+"/catalogs/meerkat/smgps_moment0_5beam_5sigma_510599row_compact_source_catalogue.csv")
+# meerkat   = Table.read(os.getcwd()+"/catalogs/meerkat/smgps_moment0_5beam_5sigma_510599row_compact_source_catalogue.fits")
 # vlssr     = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_full.csv")
 # tgss      = Table.read(os.getcwd()+"/catalogs/tgss/TGSSADR1_7sigma_catalog.fits")
 # gleam     = Table.read(os.getcwd()+"/catalogs/gleam_300/GLEAM300_source_catalogue.fits")
 # gleam_xgp = Table.read(os.getcwd()+"/catalogs/gleam_x_gp/gleam_x_gp.fit")
-#lofar_dr3  = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl.fits")
-
+# lofar_dr3 = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl.fits")
+# lofar = Table.read(os.getcwd()+'/catalogs/lofar/lofar_sources_pipeline.fits')
 
 #### lofar-dr3 ####
 # lofar_dr3.rename_column("RA", "ra")
@@ -46,6 +47,8 @@ import glob
 
 # lofar.rename_column("RA", "ra")
 # lofar.rename_column("DEC", "dec")
+# lofar.rename_column("E_RA", "e_ra")
+# lofar.rename_column("E_DEC", "e_dec")
 # lofar.rename_column('Total_flux', 'flux_jy')
 # lofar.rename_column('E_Total_flux', 'e_flux_jy')
 
@@ -83,16 +86,27 @@ import glob
 # racs['e_flux_jy'].unit = 'Jy'
 # racs.rename_column("RA", "ra")
 # racs.rename_column("Dec", "dec")
-# racs_out = racs["Source_Name", "ra", "dec", "flux_jy", "e_flux_jy"]
+# racs.rename_column("E_RA", "e_ra")
+# racs.rename_column("E_Dec", "e_dec")
+
+# racs_out = Table()
+# for col in racs.colnames:
+#     data = np.array(racs[col])  # strips Quantity/mixin type
+#     unit = str(racs[col].unit) if racs[col].unit else None
+#     racs_out[col] = Column(data, unit=unit)
+
 # racs_out.write("racs_clean.fits", overwrite=True)
 
 #### meerkat ####
-# meerkat['flux_jy'] = meerkat['int_flux'] * 1e-3
-# meerkat['e_flux_jy'] = meerkat['err_int_flux'] * 1e-3
+# meerkat['flux_jy'] = meerkat['Fint'] * 1e-3
+# meerkat['e_flux_jy'] = meerkat['e_Fint'] * 1e-3
 # meerkat['flux_jy'].unit = 'Jy'
 # meerkat['e_flux_jy'].unit = 'Jy'
-# meerkat_out = meerkat["csc_id", "ra", "dec", "snr", "flux_jy", "e_flux_jy"]
-# meerkat_out.write("meerkat_clean.fits", overwrite=True)
+# meerkat.rename_column("e_GLON", "e_ra")
+# meerkat.rename_column("e_GLAT", "e_dec")
+# meerkat.rename_column("RAJ2000", "ra")
+# meerkat.rename_column("DEJ2000", "dec")
+# meerkat.write("meerkat_clean.fits", overwrite=True)
 
 #### vlssr ####
 # DEG_TO_ARCSEC = 3600.0
@@ -103,18 +117,21 @@ import glob
 
 # vlssr['flux_jy'] = vlssr["Sp"] * (src_maj * src_min) / (VLSSR_BEAM_ARCSEC ** 2)
 # vlssr['e_flux_jy'] = vlssr["e_Sp"] * (src_maj * src_min) / (VLSSR_BEAM_ARCSEC ** 2)
-# vlssr_full['flux_jy'].unit = 'Jy'
-# vlssr_full['e_flux_jy'].unit = 'Jy'
+# vlssr['flux_jy'].unit = 'Jy'
+# vlssr['e_flux_jy'].unit = 'Jy'
 
 # vlssr.rename_column("ra_deg", "ra")
 # vlssr.rename_column("dec_deg", "dec")
+# vlssr['e_ra'] = np.ones_like(vlssr['ra']) * 3.5 / DEG_TO_ARCSEC
+# vlssr['e_dec'] = np.ones_like(vlssr['dec']) * 3.5 / DEG_TO_ARCSEC
 
-# vlssr_out = vlssr["ra", "dec", "flux_jy", 'e_flux_jy']
-# vlssr_out.write("vlssr_clean.fits", overwrite=True)
+# vlssr.write("vlssr_clean.fits", overwrite=True)
 
 #### tgss ####
 # tgss.rename_column('RA', 'ra')
 # tgss.rename_column('DEC', 'dec')
+# tgss.rename_column('E_RA', 'e_ra')
+# tgss.rename_column('E_DEC', 'e_dec')
 # tgss.rename_column('Total_flux', 'flux_jy')
 # tgss.rename_column('E_Total_flux', 'e_flux_jy')
 
@@ -127,6 +144,8 @@ import glob
 #### gleam ####
 # gleam.rename_column("RAJ2000", "ra")
 # gleam.rename_column("DEJ2000", "dec")
+# gleam.rename_column("err_RAJ2000", "e_ra")
+# gleam.rename_column("err_DEJ2000", "e_dec")
 # gleam.rename_column("int_flux", 'flux_jy')
 # gleam.rename_column("err_int_flux", 'e_flux_jy')
 
