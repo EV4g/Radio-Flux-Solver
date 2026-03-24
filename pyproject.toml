@@ -1,0 +1,20 @@
+[project]
+name = "lofar-and-meerkat"
+version = "0.1.0"
+description = "Code to combine LOFAR and MeerKAT for the purposes of SNR analysis and flux calibration"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "astropy>=7.2.0",
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.3",
+    "reproject>=0.19.0",
+    "scipy>=1.17.1",
+    "tqdm>=4.67.3",
+]
+
+[tool.ty.rules]
+unresolved-attribute = "ignore"
+
+[tool.ruff.lint]
+ignore = ["E701","E702","E722"]

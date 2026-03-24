@@ -8,4 +8,3 @@ catalogs/vlssr/VLSSR.CATALOG.FIT
 *.fit
 uv.lock
 .python-version
-pyproject.toml
