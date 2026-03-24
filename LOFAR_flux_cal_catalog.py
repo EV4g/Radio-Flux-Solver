@@ -65,7 +65,7 @@ def get_catalog_matched_flux(cat1, cat2, thres_arc=2):
 """Load two catalogs and plot their relative fluxes, according to a powerlaw"""
 def quick_compare_catalog(cat1, cat2, thres_arc=2, spectral_index_theory=-0.7):
     flux1, flux2, _, _ = get_catalog_matched_flux(cat1, cat2, thres_arc=thres_arc)
-    spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor = compute_fluxcal_statistics(cat1.freq, cat2.freq, cat1.flux, cat2.flux, spectral_index_theory)
+    spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor = compute_fluxcal_statistics(cat1.freq, cat2.freq, flux1, flux2, spectral_index_theory)
 
     fig, ax = plt.subplots(1, 2, figsize=(8, 4))
     ax[0].scatter(flux2, flux1, s=10, alpha=0.7)
