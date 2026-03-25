@@ -291,7 +291,7 @@ def _project_radec(ra_deg, dec_deg, ra0_deg, dec0_deg):
 If e_ra / e_dec are stored on the object they are combined as
   sigma_1d = sqrt((e_ra^2 + e_dec^2) / 2).
 If neither is available, returns a constant array of `fallback` deg."""
-def get_pos_err_arcsec(cat, fallback=2.0/3600):
+def get_pos_err(cat, fallback=2.0/3600):
     if cat.e_ra is not None and cat.e_dec is not None:
         return np.sqrt((cat.e_ra ** 2 + cat.e_dec ** 2) / 2.0)
     return np.full(len(cat.ra), fallback)
@@ -353,7 +353,7 @@ def match_catalogs_2D(cat_list, thres_arc=2, pos_err_arcsec=None, nsigma=3.0, cr
     else:
         has_any = any(c.e_ra is not None for c in cat_list)
         if has_any:
-            errs = [np.deg2rad(get_pos_err_arcsec(cat))
+            errs = [np.deg2rad(get_pos_err(cat))
             for cat in cat_list]
         else:
             errs = None

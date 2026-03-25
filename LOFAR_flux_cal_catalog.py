@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import glob
 import os
 import copy
-from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics, get_triplet_combinations, get_pos_err_arcsec
+from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics, get_triplet_combinations, get_pos_err
 from astropy.table import Table
 from scipy.stats import chi2
 
@@ -31,6 +31,8 @@ class catalog:
         try:
             self.e_ra   = np.array(catalog['e_ra'])
             self.e_dec  = np.array(catalog['e_dec'])
+            self.e_ra[np.where(np.isnan(self.e_ra))] = 0   # sanitize NaNs
+            self.e_dec[np.where(np.isnan(self.e_dec))] = 0 # sanitize NaNs
         except:
             self.e_ra   = None
             self.e_dec  = None
@@ -53,12 +55,13 @@ class catalog:
 
 # wrapper class for passable parameters
 class config:
-    def __init__(self, thres_arc, spectral_damping_factor, snr_lower_limit, spectral_index_theory=-0.7, minimum_points=2):
+    def __init__(self, thres_arc, spectral_damping_factor, snr_lower_limit, spectral_index_theory=-0.7, minimum_points=2, nsigma=3):
         self.thres_arc = thres_arc
         self.spectral_damping_factor = spectral_damping_factor
         self.snr_lower_limit = snr_lower_limit
         self.minimum_points = minimum_points
         self.spectral_index_theory = spectral_index_theory
+        self.nsigma = nsigma
 
 """Given arrays of RA/Dec (degrees) and a FITS file, return a boolean array of which sources fall within the image footprint."""
 def sources_in_fits(ra_deg, dec_deg, fn):
@@ -113,7 +116,7 @@ def quick_compare_catalog(cat1, cat2, config):
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
 def compute_flux_correction_factor(cats, config, debug=False):
-    (i0, i1, i2), quality =  match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True)
+    (i0, i1, i2), quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma)
 
     # if there are no sources, return
     if len(i0) <= 1:
@@ -139,7 +142,7 @@ def compute_flux_correction_factor(cats, config, debug=False):
     max_sep = np.maximum(sep_01, np.maximum(sep_02, sep_12))
 
     # point probability weighting
-    sig = [get_pos_err_arcsec(cat) for cat in cats]   # arcsec, per-source
+    sig = [get_pos_err(cat)*3600 for cat in cats]   # arcsec per-source
     p01 = 1.0 - chi2.cdf((sep_01 / np.hypot(sig[0], sig[1])) ** 2, df=2)
     p02 = 1.0 - chi2.cdf((sep_02 / np.hypot(sig[0], sig[2])) ** 2, df=2)
     p12 = 1.0 - chi2.cdf((sep_12 / np.hypot(sig[1], sig[2])) ** 2, df=2)
@@ -216,7 +219,7 @@ def calculate_weighted_correction_factor(spx, snr, catw, max_sep, config):
     signal_to_noise_factor[signal_to_noise_factor < config.snr_lower_limit] = 0
 
     # weighting based on separation between points
-    separation_weight = 1#np.exp(-(max_sep / config.thres_arc) ** 2)
+    separation_weight = np.exp(-(max_sep / config.thres_arc) ** 2)
 
     return spectral_difference_factor * signal_to_noise_factor * catw * separation_weight
 
@@ -261,8 +264,8 @@ catalogs_full = [racs_full, meerkat_full, vlssr_full, tgss_full, gleam_300_full,
 
 #### Parameters
 debug = True
-default_config = config(thres_arc=2, spectral_damping_factor=10, snr_lower_limit=7)
-vlssr_config   = config(thres_arc=10, spectral_damping_factor=10, snr_lower_limit=7)
+default_config = config(thres_arc=2, spectral_damping_factor=5, snr_lower_limit=7)
+vlssr_config   = config(thres_arc=10, spectral_damping_factor=5, snr_lower_limit=7)
 
 if debug:
     # full catalog plot
