@@ -116,7 +116,7 @@ def quick_compare_catalog(cat1, cat2, config):
 
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
-def compute_flux_correction_factor(cats, config, debug=False):
+def compute_flux_correction_factor(cats, config, anchor_catalog=None, debug=False):
     indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma)
 
     # if there are too few sources, return None
@@ -148,17 +148,39 @@ def compute_flux_correction_factor(cats, config, debug=False):
 
     max_sep = np.maximum.reduce(list(pair_seps.values()))
 
-    # flux and flux error
-    uncorrected_flux = cats[0].flux
-    uncorrected_flux_error = cats[0].e_flux
+    # figure out for which catalog the correction factor should be calculated
+    # if cat is given, match that, otherwise assume the first index
+    other_index = [i for i in range(len(cats))]
+    if anchor_catalog is None:
+        anchor_index = 0
+    else:
+        try:
+            anchor_index = cats.index(anchor_catalog)
+        except:
+            print("Anchor catalog missing from inputs")
+            return None
+    other_index.remove(anchor_index)
 
-    # calculate two-point spectral index
-    spectral_indices = get_spectral_index(cats[1].flux, cats[2].flux, cats[1].freq, cats[2].freq)
+    # flux and flux error
+    uncorrected_flux = cats[anchor_index].flux
+    uncorrected_flux_error = cats[anchor_index].e_flux
+
+    # calculate spectral indices based on available data
+    # w.i.p. for case n=4, where curvature can be estimated
+    match len(cats):
+        case 2:
+            spectral_indices = np.ones_like(cats[0].flux) * config.spectral_index_theory
+        case 3:
+            spectral_indices = get_spectral_index(cats[other_index[0]].flux, cats[other_index[1]].flux, cats[other_index[0]].freq, cats[other_index[1]].freq)
+        case _:
+            print("Not yet implemented")
+            return None
 
     # fit is based on measuring between two points, linear is average between assuming theoretical extragalactic value for both
-    extrapolated_flux_fit = get_flux_from_index(spectral_indices, cats[1].flux, cats[0].freq, cats[1].freq)
-    extrapolated_flux_linear = 0.5 * (get_flux_from_index(config.spectral_index_theory, cats[1].flux, cats[0].freq, cats[1].freq)
-                                    + get_flux_from_index(config.spectral_index_theory, cats[2].flux, cats[0].freq, cats[2].freq))
+    extrapolated_flux_fit = get_flux_from_index(spectral_indices, cats[other_index[0]].flux, cats[anchor_index].freq, cats[other_index[0]].freq)
+    
+    # calculate the linear theoretical flux at anchor_index based on all the other catalogs, and average the result
+    extrapolated_flux_linear = np.mean([get_flux_from_index(config.spectral_index_theory, cats[index].flux, cats[anchor_index].freq, cats[index].freq) for index in other_index], axis=0)
 
     if debug:
         for flux in np.array([cat.flux for cat in cats]).T:
@@ -168,7 +190,8 @@ def compute_flux_correction_factor(cats, config, debug=False):
         plt.ylabel(r"log$_{10}$(Jy)")
         plt.xlabel("Frequency (MHz)")
         plt.show()
-
+        
+    # correction factor is the factor to multiply the anchor_catalog flux by to get what it should be, based on the other catalogs
     correction_factor = extrapolated_flux_fit / uncorrected_flux
     snr = uncorrected_flux / uncorrected_flux_error
     
