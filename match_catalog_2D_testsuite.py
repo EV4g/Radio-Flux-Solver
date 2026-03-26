@@ -101,7 +101,7 @@ def test_match_catalogs_2D(verbose=True):
     ca4 = _MockCat(np.array([10.0, 20.0]), np.array([0.0, 0.0]))
     cb4 = _MockCat(np.array([10.0, 20.0 + known_sep/3600.0]),
                    np.array([0.0, 0.0]))
-    i0, i1, q4 = match_catalogs_2D([ca4, cb4], thres_arc=2, return_quality=True)
+    (i0, i1), q4 = match_catalogs_2D([ca4, cb4], thres_arc=2, return_quality=True)
     seps = q4['sep_arcsec'][(0, 1)]
     _check("sep_arcsec length == match count", len(seps) == len(i0))
     if len(i0) == 2:
@@ -128,10 +128,10 @@ def test_match_catalogs_2D(verbose=True):
     # ----------------------------------------------------------------
     _section("6. Match probability (chi-squared test)")
     # e_ra=e_dec=0.5" → sigma=0.5" → combined=0.707" → 5σ=3.54" → both within threshold
-    ca6 = _MockCat(np.array([10.0, 20.0]), np.array([0.0, 0.0]), e_ra=0.5, e_dec=0.5)
+    ca6 = _MockCat(np.array([10.0, 20.0]), np.array([0.0, 0.0]), e_ra=0.5/3600, e_dec=0.5/3600)
     cb6 = _MockCat(np.array([10.0 + 0.1/3600.0, 20.0 + 2.0/3600.0]),
-                   np.array([0.0, 0.0]), e_ra=0.5, e_dec=0.5)
-    i0, i1, q6 = match_catalogs_2D([ca6, cb6], nsigma=5.0, return_quality=True)
+                   np.array([0.0, 0.0]), e_ra=0.5/3600, e_dec=0.5/3600)
+    (i0, i1), q6 = match_catalogs_2D([ca6, cb6], nsigma=5.0, return_quality=True)
     p    = q6['p_match'][(0, 1)]
     seps = q6['sep_arcsec'][(0, 1)]
     _check("p_match populated for both sources", len(p) == 2)
@@ -148,7 +148,7 @@ def test_match_catalogs_2D(verbose=True):
     ra_c  = np.array([10.0, 10.0 + 10/3600.0, 10.0 + 20/3600.0, 50.0])
     dec_c = np.zeros(4)
     cc    = _MockCat(ra_c, dec_c)
-    _, _, q7 = match_catalogs_2D([cc, cc], thres_arc=0.001,
+    (_, _), q7 = match_catalogs_2D([cc, cc], thres_arc=0.001,
                                   crowd_radius_arc=60, return_quality=True)
     nc = q7['n_crowd'][0]
     _check("n_crowd length == 4",              len(nc) == 4)
