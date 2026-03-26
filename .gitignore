@@ -9,3 +9,4 @@ catalogs/vlssr/VLSSR.CATALOG.FIT
 uv.lock
 .python-version
 *.FIT
+*.log
