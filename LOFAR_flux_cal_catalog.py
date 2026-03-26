@@ -10,6 +10,7 @@ import copy
 from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics, get_combinations, get_pos_err_deg
 from astropy.table import Table
 from scipy.stats import chi2
+from itertools import combinations
 
 # wrapper class for incoming Table data
 class catalog:
@@ -120,7 +121,7 @@ def compute_flux_correction_factor(cats, config, debug=False):
 
     # if there are too few sources, return None
     if len(indices[0]) <= config.minimum_points:
-        if debug: print(f"Error: no source-matches found between {cats[0].name}, {cats[1].name}, {cats[2].name}")
+        if debug: print(f"Error: no source-matches found between [{', '.join(f'{cat.name}' for cat in cats)}]")
         return None
 
     # if crowding parameter is available, remove overcrowded points; else skip
@@ -131,22 +132,21 @@ def compute_flux_correction_factor(cats, config, debug=False):
             if nc is not None and len(nc): crowd_ok &= (nc[match_idx] == 0)
         indices = [index[crowd_ok] for index in indices]
 
-    # create subsets of all catalogs, such that we can ignore (i0,i1,i2) afterwards
+    # create subsets of all catalogs, such that we can ignore (i0,i1,...) afterwards
     for index, cat in enumerate(cats): cats[index] = cat.create_subset(indices[index])
 
-    # per source maximum separation
+    # all pairwise separations, then take per-source maximum
     coords = [SkyCoord(ra=cat.ra * u.deg, dec=cat.dec * u.deg) for cat in cats]
-    sep_01  = coords[0].separation(coords[1]).arcsec
-    sep_02  = coords[0].separation(coords[2]).arcsec
-    sep_12  = coords[1].separation(coords[2]).arcsec
-    max_sep = np.maximum(sep_01, np.maximum(sep_02, sep_12))
+    sig    = [get_pos_err_deg(cat) * 3600 for cat in cats]   # arcsec per-source
 
-    # point probability weighting
-    sig = [get_pos_err_deg(cat)*3600 for cat in cats]   # arcsec per-source
-    p01 = 1.0 - chi2.cdf((sep_01 / np.hypot(sig[0], sig[1])) ** 2, df=2)
-    p02 = 1.0 - chi2.cdf((sep_02 / np.hypot(sig[0], sig[2])) ** 2, df=2)
-    p12 = 1.0 - chi2.cdf((sep_12 / np.hypot(sig[1], sig[2])) ** 2, df=2)
-    p_weight = p01 * p02 * p12
+    pair_seps = {}
+    p_weight  = np.ones(len(cats[0].ra))
+    for a, b in combinations(range(len(cats)), 2):
+        sep = coords[a].separation(coords[b]).arcsec
+        pair_seps[(a, b)] = sep
+        p_weight *= 1.0 - chi2.cdf((sep / np.hypot(sig[a], sig[b])) ** 2, df=2)
+
+    max_sep = np.maximum.reduce(list(pair_seps.values()))
 
     # flux and flux error
     uncorrected_flux = cats[0].flux
@@ -161,8 +161,8 @@ def compute_flux_correction_factor(cats, config, debug=False):
                                     + get_flux_from_index(config.spectral_index_theory, cats[2].flux, cats[0].freq, cats[2].freq))
 
     if debug:
-        for flux in zip(cats[0].flux, cats[1].flux, cats[2].flux):
-            plt.plot(np.array([cats[0].freq, cats[1].freq, cats[2].freq])*1e-6, flux)
+        for flux in np.array([cat.flux for cat in cats]).T:
+            plt.plot(np.array([cat.freq for cat in cats])*1e-6, flux)
 
         plt.yscale('log')
         plt.ylabel(r"log$_{10}$(Jy)")
@@ -171,7 +171,9 @@ def compute_flux_correction_factor(cats, config, debug=False):
 
     correction_factor = extrapolated_flux_fit / uncorrected_flux
     snr = uncorrected_flux / uncorrected_flux_error
-
+    
+    # apply weighting factor per catalog, downweighting uncertain ones. To be depracated in favour
+    # of a proper flux extrapolator and proper catalog uncertainty values.
     catalog_weight_factor = np.ones_like(snr)
     for cat in cats:
         if cat.name.lower() == "tgss": catalog_weight_factor *= 0.5
@@ -205,7 +207,7 @@ def compute_flux_correction_factor(cats, config, debug=False):
         plt.title("Flux correction as function of spectral index")
         plt.show()
 
-    print(f"Completed set [{cats[0].name:9}, {cats[1].name:9}, {cats[2].name:9}]", round(catalog_weight_factor[0],2) if debug else "")
+    print(f"Completed set [{', '.join(f'{cat.name:9}' for cat in cats)}]", round(catalog_weight_factor[0], 2) if debug else "")
 
     return (spectral_indices, snr, correction_factor, extrapolated_flux_fit, catalog_weight_factor, max_sep, p_weight, cats[0].ra, cats[0].dec)
 
