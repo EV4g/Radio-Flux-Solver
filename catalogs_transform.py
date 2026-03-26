@@ -11,8 +11,28 @@ import numpy as np
 # tgss      = Table.read(os.getcwd()+"/catalogs/tgss/TGSSADR1_7sigma_catalog.fits")
 # gleam     = Table.read(os.getcwd()+"/catalogs/gleam_300/GLEAM300_source_catalogue.fits")
 # gleam_xgp = Table.read(os.getcwd()+"/catalogs/gleam_x_gp/gleam_x_gp.fit")
+# nvss      = Table.read(os.getcwd()+"/catalogs/nvss/NVSS.fits")
+# wenss     = Table.read(os.getcwd()+"/catalogs/wenss/WENSS.fits")
 # lofar_dr3 = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl.fits")
-# lofar = Table.read(os.getcwd()+'/catalogs/lofar/lofar_sources_pipeline.fits')
+# lofar     = Table.read(os.getcwd()+'/catalogs/lofar/lofar_sources_pipeline.fits')
+
+# cygnus = Table.read(os.getcwd()+'/catalogs/other/cygnus_sources.fits')
+
+#### cygnus ####
+# cygnus.rename_column("RA", "ra")
+# cygnus.rename_column("DEC", "dec")
+# cygnus.rename_column("E_RA", "e_ra")
+# cygnus.rename_column("E_DEC", "e_dec")
+# cygnus.rename_column('Total_flux', 'flux_jy')
+# cygnus.rename_column('E_Total_flux', 'e_flux_jy')
+
+# if str(cygnus['flux_jy'].unit) == 'mJy':
+#     cygnus['flux_jy'] *= 1e-3
+#     cygnus['e_flux_jy'] *= 1e-3
+#     cygnus['flux_jy'].unit = 'Jy'
+#     cygnus['e_flux_jy'].unit = 'Jy'
+
+# cygnus.write("cygnus_clean.fits", overwrite=True)
 
 #### lofar-dr3 ####
 # lofar_dr3.rename_column("RA", "ra")
@@ -45,7 +65,7 @@ import numpy as np
 # vlssr.write("vlssr_full.csv", format="ascii.csv", overwrite=True)
 
 #### lofar ####
-#lofar_files = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0]
+# lofar_files = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0]
 # img = bdsf.process_image(
 #     lofar_files,
 #     thresh_isl=3.0,       # island threshold (sigma)
@@ -159,7 +179,7 @@ import numpy as np
 # if str(tgss['e_ra'].unit) == 'arcsec':
 #     tgss['e_ra'] /= 3600
 #     tgss['e_ra'].unit = 'deg'
-# if str(tgss['e_ra'].unit) == 'arcsec':
+# if str(tgss['e_dec'].unit) == 'arcsec':
 #     tgss['e_dec'] /= 3600
 #     tgss['e_dec'].unit = 'deg'
 
@@ -178,19 +198,75 @@ import numpy as np
 
 # gleam.write("gleam_300_clean.fits", overwrite=True)
 
-#######################################
-#### ensurinig all catalogs are OK ####
-#######################################
+#### nvss ####
+# nvss.rename_column('RAJ2000', 'ra')
+# nvss.rename_column('DEJ2000', 'dec')
+# nvss.rename_column('e_RAJ2000', 'e_ra')
+# nvss.rename_column('e_DEJ2000', 'e_dec')
+# nvss.rename_column('S1_4', 'flux_jy')
+# nvss.rename_column('e_S1_4', 'e_flux_jy')
+
+# nvss['flux_jy'] *= 1e-3
+# nvss['e_flux_jy'] *= 1e-3
+# nvss['flux_jy'].unit = 'Jy'
+# nvss['e_flux_jy'].unit = 'Jy'
+
+# # nvss has weird units
+# if str(nvss['e_ra'].unit) == 's':
+#     nvss['e_ra'] *= 15/3600
+#     nvss['e_ra'].unit = 'deg'
+# if str(nvss['e_dec'].unit) == 'arcsec':
+#     nvss['e_dec'] /= 3600
+#     nvss['e_dec'].unit = 'deg'
+
+# nvss.write("nvss_clean.fits", overwrite=True)
+
+
+#### wenss ####
+# wenss.rename_column('RAJ2000', 'ra')
+# wenss.rename_column('DEJ2000', 'dec')
+# wenss.rename_column('Sint', 'flux_jy')
+# wenss['flux_jy'] = np.array(wenss['flux_jy'], dtype=float) * 1e-3 # WHY is the flux stored as int32?
+# wenss['flux_jy'].unit = 'Jy'
+
+# wenss = wenss[wenss['flux_jy'] > 0]
+
+# wenss['e_ra'] = np.ones_like(wenss['ra'], dtype=float) * 2/3600   # roughly 2" error
+# wenss['e_dec'] = np.ones_like(wenss['dec'], dtype=float) * 2/3600 # roughly 2" error
+# wenss['e_ra'].unit = 'deg'
+# wenss['e_dec'].unit = 'deg'
+
+# wenss['e_flux_jy'] = np.ones_like(wenss['Nse'], dtype=float)
+
+# for i, val in enumerate(wenss['e_flux_jy']):
+#     beam_area = float(wenss['MajAxis'][i]) * float(wenss['MinAxis'][i])
+#     if beam_area > 0: 
+#         wenss['Nse'][i] /= beam_area
+    
+# wenss['e_flux_jy'] = np.sqrt(wenss['Nse']**2 + (0.05 * wenss['flux_jy'])**2)
+
+# wenss['e_flux_jy'].unit = 'Jy'
+# wenss['Nse'].unit = 'Jy'
+
+# wenss.write("wenss_clean.fits", overwrite=True)
+
+###############################################
+#### ensurinig all cleaned catalogs are OK ####
+###############################################
 # racs      = Table.read(os.getcwd()+"/catalogs/racs/racs_clean.fits")
 # meerkat   = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.fits")
 # vlssr     = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.fits")
 # tgss      = Table.read(os.getcwd()+"/catalogs/tgss/tgss_clean.fits")
 # gleam     = Table.read(os.getcwd()+"/catalogs/gleam_300/gleam_300_clean.fits")
 # gleam_xgp = Table.read(os.getcwd()+"/catalogs/gleam_x_gp/gleam_x_gp_clean.fits")
+# nvss      = Table.read(os.getcwd()+"/catalogs/nvss/nvss_clean.fits")
+# wenss     = Table.read(os.getcwd()+"/catalogs/wenss/wenss_clean.fits")
 # lofar_dr3 = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits")
 # lofar = Table.read(os.getcwd()+'/catalogs/lofar/lofar_sources_pipeline.fits')
-# cats = [racs, meerkat, vlssr, tgss, gleam, gleam_xgp, lofar_dr3, lofar]
-# name = ['racs', 'meerkat', 'vlssr', 'tgss', 'gleam_300', 'gleam_xgp', 'lofar_dr3', 'lofar_pipe']
+# cygnus = Table.read(os.getcwd()+'/catalogs/other/cygnus_clean.fits')
+
+# cats = [racs, meerkat, vlssr, tgss, gleam, gleam_xgp, nvss, wenss, lofar_dr3, lofar, cygnus]
+# name = ['racs', 'meerkat', 'vlssr', 'tgss', 'gleam_300', 'gleam_xgp', 'nvss', 'wenss', 'lofar_dr3', 'lofar_pipe', 'cygnus']
 
 # for i, cat in enumerate(cats):
 #     assert "flux_jy" in cat.colnames
