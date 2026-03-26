@@ -267,8 +267,11 @@ vlssr_full     = catalog("/catalogs/vlssr/vlssr_clean.fits",               73.8e
 tgss_full      = catalog("/catalogs/tgss/tgss_clean.fits",                 150e6,      "tgss")
 gleam_300_full = catalog("/catalogs/gleam_300/gleam_300_clean.fits",       300e6,      "gleam_300")
 gleam_xgp_full = catalog("/catalogs/gleam_x_gp/gleam_x_gp_clean.fits",     200e6,      "gleam_xgp")
+nvss_full      = catalog("/catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss")
+wenss_full     = catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss")
 lofar_full     = catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar")
-#lofar_full    = catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",   144.6e6,    "lofar")
+lofar_dr3_full = catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3")
+cygnus_full    = catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus")
 
 # check for sources in current file
 racs_valid      = sources_in_fits(racs_full.ra,      racs_full.dec,       lofar_files)
@@ -277,7 +280,11 @@ vlssr_valid     = sources_in_fits(vlssr_full.ra,     vlssr_full.dec,      lofar_
 tgss_valid      = sources_in_fits(tgss_full.ra,      tgss_full.dec,       lofar_files)
 gleam_300_valid = sources_in_fits(gleam_300_full.ra, gleam_300_full.dec,  lofar_files)
 gleam_xgp_valid = sources_in_fits(gleam_xgp_full.ra, gleam_xgp_full.dec,  lofar_files)
+nvss_valid      = sources_in_fits(nvss_full.ra,      nvss_full.dec,       lofar_files)
+wenss_valid     = sources_in_fits(wenss_full.ra,     wenss_full.dec,      lofar_files)
 lofar_valid     = sources_in_fits(lofar_full.ra,     lofar_full.dec,      lofar_files)
+lofar_dr3_valid = sources_in_fits(lofar_dr3_full.ra, lofar_dr3_full.dec,  lofar_files)
+cygnus_valid    = sources_in_fits(cygnus_full.ra,    cygnus_full.dec,     lofar_files)
 
 # remove all non-valid points to reduce syntax clutter
 racs      = racs_full.create_subset(racs_valid)
@@ -286,25 +293,31 @@ vlssr     = vlssr_full.create_subset(vlssr_valid)
 tgss      = tgss_full.create_subset(tgss_valid)
 gleam_300 = gleam_300_full.create_subset(gleam_300_valid)
 gleam_xgp = gleam_xgp_full.create_subset(gleam_xgp_valid)
+nvss      = nvss_full.create_subset(nvss_valid)
+wenss     = wenss_full.create_subset(wenss_valid)
 lofar     = lofar_full.create_subset(lofar_valid)
+lofar_dr3 = lofar_dr3_full.create_subset(lofar_dr3_valid)
+cygnus    = cygnus_full.create_subset(cygnus_valid)
 
 catalogs      = [racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, lofar]
 catalogs_full = [racs_full, meerkat_full, vlssr_full, tgss_full, gleam_300_full, gleam_xgp_full, lofar_full]
 
 #### Parameters
 debug = True
-default_config = config(thres_arc=2, spectral_damping_factor=5, snr_lower_limit=7, nsigma=2.5)
+anchor_index = catalogs.index(lofar) # the catalog which shall be compared and calibrated against the rest
+
+default_config = config(thres_arc=2, spectral_damping_factor=5, snr_lower_limit=7, nsigma=2, minimum_points=10)
 vlssr_config   = config(thres_arc=10, spectral_damping_factor=5, snr_lower_limit=7)
 
 if debug:
-    # full catalog plot
-    for cat in catalogs_full:
-        plt.hist(np.log10(cat.flux), alpha=0.6, bins=75, label=cat.name)
-    plt.xlabel("log10(flux/Jy)")
-    plt.ylabel("count")
-    plt.yscale('log')
-    plt.legend()
-    plt.show()
+    # # full catalog plot
+    # for cat in catalogs_full:
+    #     plt.hist(np.log10(cat.flux), alpha=0.6, bins=75, label=cat.name)
+    # plt.xlabel("log10(flux/Jy)")
+    # plt.ylabel("count")
+    # plt.yscale('log')
+    # plt.legend()
+    # plt.show()
 
     # cutdown catalog plot
     for cat in catalogs:
@@ -435,14 +448,14 @@ print(f"Spectral index: {round(px,3)}, correction factor: {round(py,3)}")
 # plt.show()
 
 #### variables
-ras, decs = [], []              # positional coordinates
-correction_factor_global = []   # ratio between read-out catalog0 flux and computed
-spectral_index_global = []      # per-source two-point spectral index
-fitted_flux = []                # catalog0 flux based on two-point spectral index extrapolation
-signal_to_noise = []            # signal-to-noise (flux_jy / e_flux_jy)
-catalog_weight_factor = []      # weighting factor based on systematic catalog uncertainty; to be deprecated
-max_separation = []             # maximum per-source separation between all three matched catalog positions
-point_probability = []          # probability of points matching
+# ras, decs = [], []              # positional coordinates
+# correction_factor_global = []   # ratio between read-out catalog0 flux and computed
+# spectral_index_global = []      # per-source two-point spectral index
+# fitted_flux = []                # catalog0 flux based on two-point spectral index extrapolation
+# signal_to_noise = []            # signal-to-noise (flux_jy / e_flux_jy)
+# catalog_weight_factor = []      # weighting factor based on systematic catalog uncertainty; to be deprecated
+# max_separation = []             # maximum per-source separation between all three matched catalog positions
+# point_probability = []          # probability of points matching
 
 ###################################################
 #### catalog four-way combination auto-looper ####
