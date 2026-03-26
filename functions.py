@@ -291,10 +291,10 @@ def _project_radec(ra_deg, dec_deg, ra0_deg, dec0_deg):
 If e_ra / e_dec are stored on the object they are combined as
   sigma_1d = sqrt((e_ra^2 + e_dec^2) / 2).
 If neither is available, returns a constant array of `fallback` deg."""
-def get_pos_err(cat, fallback=2.0/3600):
+def get_pos_err_deg(cat, fallback_arcsec=2):
     if cat.e_ra is not None and cat.e_dec is not None:
-        return np.sqrt((cat.e_ra ** 2 + cat.e_dec ** 2) / 2.0)
-    return np.full(len(cat.ra), fallback)
+        return np.sqrt((cat.e_ra ** 2 + cat.e_dec ** 2) / 2.0) # degrees
+    return np.full(len(cat.ra), fallback_arcsec / 3600)
 
 def match_catalogs_2D(cat_list, thres_arc=2, pos_err_arcsec=None, nsigma=3.0, crowd_radius_arc=None, anchor_index=0, return_quality=False):    
     """Fast n-catalogue cross-matcher with adaptive positional uncertainties,
@@ -353,7 +353,7 @@ def match_catalogs_2D(cat_list, thres_arc=2, pos_err_arcsec=None, nsigma=3.0, cr
     else:
         has_any = any(c.e_ra is not None for c in cat_list)
         if has_any:
-            errs = [np.deg2rad(get_pos_err(cat))
+            errs = [np.deg2rad(get_pos_err_deg(cat))
             for cat in cat_list]
         else:
             errs = None
@@ -593,7 +593,7 @@ def radec_list_simple(cats):
 def remove_outliers(var, clip_percentage):
     clip_top = np.percentile(var, 100 - clip_percentage)
     clip_bottom = np.percentile(var, clip_percentage)
-    return var[(var < clip_top) and (var > clip_bottom)]
+    return var[(var < clip_top) & (var > clip_bottom)]
 
 """Remove outliers at eitherside of the distribution, consider two variables at once"""
 def remove_outliers_2D(var1, var2, clip_percentage):

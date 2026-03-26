@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import glob
 import os
 import copy
-from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics, get_triplet_combinations, get_pos_err
+from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics, get_combinations, get_pos_err_deg
 from astropy.table import Table
 from scipy.stats import chi2
 
@@ -142,7 +142,7 @@ def compute_flux_correction_factor(cats, config, debug=False):
     max_sep = np.maximum(sep_01, np.maximum(sep_02, sep_12))
 
     # point probability weighting
-    sig = [get_pos_err(cat)*3600 for cat in cats]   # arcsec per-source
+    sig = [get_pos_err_deg(cat)*3600 for cat in cats]   # arcsec per-source
     p01 = 1.0 - chi2.cdf((sep_01 / np.hypot(sig[0], sig[1])) ** 2, df=2)
     p02 = 1.0 - chi2.cdf((sep_02 / np.hypot(sig[0], sig[2])) ** 2, df=2)
     p12 = 1.0 - chi2.cdf((sep_12 / np.hypot(sig[1], sig[2])) ** 2, df=2)
@@ -264,7 +264,7 @@ catalogs_full = [racs_full, meerkat_full, vlssr_full, tgss_full, gleam_300_full,
 
 #### Parameters
 debug = True
-default_config = config(thres_arc=2, spectral_damping_factor=5, snr_lower_limit=7)
+default_config = config(thres_arc=2, spectral_damping_factor=5, snr_lower_limit=7, nsigma=2.5)
 vlssr_config   = config(thres_arc=10, spectral_damping_factor=5, snr_lower_limit=7)
 
 if debug:
