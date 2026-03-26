@@ -337,15 +337,6 @@ if debug:
     plt.legend()
     plt.show()
 
-    """
-    #### analysis
-    quick_compare_catalog(lofar, meerkat, default_config)
-    quick_compare_catalog(lofar, racs,    default_config)
-    quick_compare_catalog(lofar, tgss,    default_config)
-    quick_compare_catalog(lofar, vlssr,   vlssr_config)
-    quick_compare_catalog(racs,  meerkat, default_config)
-    """
-
 #### variables
 ras, decs = [], []              # positional coordinates
 correction_factor_global = []   # ratio between read-out catalog0 flux and computed
