@@ -179,7 +179,11 @@ def compute_flux_correction_factor(cats, config, debug=False):
         if cat.name.lower() == "tgss": catalog_weight_factor *= 0.5
         if cat.name.lower() == "gleam_300": catalog_weight_factor *= 0.7
         if cat.name.lower() == "gleam_xgp": catalog_weight_factor *= 0.8
-
+    
+    # calculate average position over all catalogs instead of using the first catalog
+    ra = np.average([cat.ra for cat in cats], axis=0)
+    dec = np.average([cat.dec for cat in cats], axis=0)
+    
     if debug:
         # compare -0.7 assumption versus fitted spectral indices
         mn, mx = min(np.min(extrapolated_flux_fit), np.min(extrapolated_flux_linear)), max(np.max(extrapolated_flux_fit), np.max(extrapolated_flux_linear))
@@ -209,7 +213,7 @@ def compute_flux_correction_factor(cats, config, debug=False):
 
     print(f"Completed set [{', '.join(f'{cat.name:9}' for cat in cats)}]", round(catalog_weight_factor[0], 2) if debug else "")
 
-    return (spectral_indices, snr, correction_factor, extrapolated_flux_fit, catalog_weight_factor, max_sep, p_weight, cats[0].ra, cats[0].dec)
+    return (spectral_indices, snr, correction_factor, extrapolated_flux_fit, catalog_weight_factor, max_sep, p_weight, ra, dec)
 
 """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
 def calculate_weighted_correction_factor(spx, snr, catw, max_sep, config):
@@ -290,7 +294,7 @@ if debug:
 
     # catalog as function of position
     for cat in catalogs:
-        plt.scatter(cat.ra, cat.dec, s=1, label=cat.name)
+        if len(cat.ra) > 0: plt.scatter(cat.ra, cat.dec, s=1, label=cat.name)
     plt.gca().set_box_aspect(1)
     plt.xlabel("RA")
     plt.ylabel("Dec")
