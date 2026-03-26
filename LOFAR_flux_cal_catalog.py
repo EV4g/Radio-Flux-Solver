@@ -218,9 +218,9 @@ def compute_flux_correction_factor(cats, config, anchor_catalog=None, debug=Fals
         plt.gca().set_box_aspect(1)
         plt.plot((mn, mx), (mn, mx), c='k', ls='--')
         plt.colorbar(label = r"Spectral index $\alpha$")
-        plt.xlabel(f"{cats[0].name} linear flux (Jy)")
-        plt.ylabel(f"{cats[0].name} fitted flux (Jy)")
-        plt.title(f"{cats[0].name} "+r"flux, $\alpha$=-0.7 vs fitted")
+        plt.xlabel(f"{cats[anchor_index].name} linear flux (Jy)")
+        plt.ylabel(f"{cats[anchor_index].name} fitted flux (Jy)")
+        plt.title(f"{cats[anchor_index].name} "+r"flux, $\alpha$=-0.7 vs fitted")
         plt.show()
 
         # compare fitted spectral index with correction factor
