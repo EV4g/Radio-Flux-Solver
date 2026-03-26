@@ -24,10 +24,10 @@ class catalog:
         self.flux       = np.array(catalog['flux_jy'])
         self.e_flux     = np.array(catalog['e_flux_jy'])
         self.flux_unit  = str(catalog['flux_jy'].unit)
-        
+
         self.ra         = np.array(catalog['ra'])
         self.dec        = np.array(catalog['dec'])
-        
+
         try:
             self.e_ra   = np.array(catalog['e_ra'])
             self.e_dec  = np.array(catalog['e_dec'])
@@ -36,7 +36,7 @@ class catalog:
         except:
             self.e_ra   = None
             self.e_dec  = None
-        
+
         self.freq       = freq_hz
         self.freq_unit  = 'Hz'
         self.name       = name
@@ -122,7 +122,7 @@ def compute_flux_correction_factor(cats, config, debug=False):
     if len(i0) <= 1:
         if debug: print(f"Error: no source-matches found between {cats[0].name}, {cats[1].name}, {cats[2].name}")
         return None
-    
+
     # if crowding parameter is available, remove overcrowded points; else skip
     if quality['n_crowd']:
         crowd_ok = np.ones(len(i0), dtype=bool)
@@ -133,7 +133,7 @@ def compute_flux_correction_factor(cats, config, debug=False):
 
     # create subsets of all catalogs, such that we can ignore (i0,i1,i2) afterwards
     for index, cat in enumerate(cats): cats[index] = cat.create_subset([i0, i1, i2][index])
-    
+
     # per source maximum separation
     coords = [SkyCoord(ra=cat.ra * u.deg, dec=cat.dec * u.deg) for cat in cats]
     sep_01  = coords[0].separation(coords[1]).arcsec
@@ -147,7 +147,7 @@ def compute_flux_correction_factor(cats, config, debug=False):
     p02 = 1.0 - chi2.cdf((sep_02 / np.hypot(sig[0], sig[2])) ** 2, df=2)
     p12 = 1.0 - chi2.cdf((sep_12 / np.hypot(sig[1], sig[2])) ** 2, df=2)
     p_weight = p01 * p02 * p12
-    
+
     # flux and flux error
     uncorrected_flux = cats[0].flux
     uncorrected_flux_error = cats[0].e_flux
@@ -157,7 +157,7 @@ def compute_flux_correction_factor(cats, config, debug=False):
 
     # fit is based on measuring between two points, linear is average between assuming theoretical extragalactic value for both
     extrapolated_flux_fit = get_flux_from_index(spectral_indices, cats[1].flux, cats[0].freq, cats[1].freq)
-    extrapolated_flux_linear = 0.5 * (get_flux_from_index(config.spectral_index_theory, cats[1].flux, cats[0].freq, cats[1].freq) 
+    extrapolated_flux_linear = 0.5 * (get_flux_from_index(config.spectral_index_theory, cats[1].flux, cats[0].freq, cats[1].freq)
                                     + get_flux_from_index(config.spectral_index_theory, cats[2].flux, cats[0].freq, cats[2].freq))
 
     if debug:
@@ -213,7 +213,7 @@ def compute_flux_correction_factor(cats, config, debug=False):
 def calculate_weighted_correction_factor(spx, snr, catw, max_sep, config):
     # downweight sources with spectral indices far away from -0.7
     spectral_difference_factor = np.exp(-config.spectral_damping_factor * (spx - config.spectral_index_theory)**2)
-    
+
     # discard low snr sources
     signal_to_noise_factor = snr
     signal_to_noise_factor[signal_to_noise_factor < config.snr_lower_limit] = 0
@@ -276,7 +276,7 @@ if debug:
     plt.yscale('log')
     plt.legend()
     plt.show()
-    
+
     # cutdown catalog plot
     for cat in catalogs:
         plt.hist(np.log10(cat.flux), alpha=0.6, bins=25, label=cat.name)
@@ -285,7 +285,7 @@ if debug:
     plt.yscale('log')
     plt.legend()
     plt.show()
-    
+
     # catalog as function of position
     for cat in catalogs:
         plt.scatter(cat.ra, cat.dec, s=1, label=cat.name)
