@@ -116,23 +116,23 @@ def quick_compare_catalog(cat1, cat2, config):
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
 def compute_flux_correction_factor(cats, config, debug=False):
-    (i0, i1, i2), quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma)
+    indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma)
 
-    # if there are no sources, return
-    if len(i0) <= 1:
+    # if there are too few sources, return None
+    if len(indices[0]) <= config.minimum_points:
         if debug: print(f"Error: no source-matches found between {cats[0].name}, {cats[1].name}, {cats[2].name}")
         return None
 
     # if crowding parameter is available, remove overcrowded points; else skip
     if quality['n_crowd']:
-        crowd_ok = np.ones(len(i0), dtype=bool)
-        for cat_idx, match_idx in zip([0, 1, 2], [i0, i1, i2]):
+        crowd_ok = np.ones(len(indices[0]), dtype=bool)
+        for cat_idx, match_idx in enumerate(indices):
             nc = quality['n_crowd'].get(cat_idx)
             if nc is not None and len(nc): crowd_ok &= (nc[match_idx] == 0)
-        i0, i1, i2 = i0[crowd_ok], i1[crowd_ok], i2[crowd_ok]
+        indices = (indices[i][crowd_ok] for i in range(len(indices)))
 
     # create subsets of all catalogs, such that we can ignore (i0,i1,i2) afterwards
-    for index, cat in enumerate(cats): cats[index] = cat.create_subset([i0, i1, i2][index])
+    for index, cat in enumerate(cats): cats[index] = cat.create_subset(indices[index])
 
     # per source maximum separation
     coords = [SkyCoord(ra=cat.ra * u.deg, dec=cat.dec * u.deg) for cat in cats]
@@ -317,8 +317,8 @@ point_probability = []          # probability of points matching
 ###################################################
 #### catalog three-way combination auto-looper ####
 ###################################################
-for combination in get_triplet_combinations(catalogs, required_index=6, skip_index=2):
-    local_cats  = [catalogs[combination[0]], catalogs[combination[1]], catalogs[combination[2]]]
+for combination in get_combinations(catalogs, size=3, required_index=6, skip_index=2):
+    local_cats = [catalogs[i] for i in combination]
 
     output = compute_flux_correction_factor(local_cats, default_config, debug=debug)
 
@@ -405,80 +405,32 @@ print(f"Spectral index: {round(px,3)}, correction factor: {round(py,3)}")
 # plt.xlabel("RA (deg)")
 # plt.show()
 
-#### Quad matchings below
+#### variables
+ras, decs = [], []              # positional coordinates
+correction_factor_global = []   # ratio between read-out catalog0 flux and computed
+spectral_index_global = []      # per-source two-point spectral index
+fitted_flux = []                # catalog0 flux based on two-point spectral index extrapolation
+signal_to_noise = []            # signal-to-noise (flux_jy / e_flux_jy)
+catalog_weight_factor = []      # weighting factor based on systematic catalog uncertainty; to be deprecated
+max_separation = []             # maximum per-source separation between all three matched catalog positions
+point_probability = []          # probability of points matching
 
-#################################
-# lofar + tgss + racs + meerkat #
-#################################
-# i1, i2, i3, i4 =  match_catalogs_2D((lofar, tgss, racs, meerkat))
-# freqs = np.array([lofar_freq, tgss_freq, racs_freq, meerkat_freq]) * 1e-6
-# spectral_indices = []             # fitted spectral index based on racs, meerkat
-# extrapolated_flux_linear = []     # extrapolated flux when assuming a simple -0.7
-# extrapolated_flux_fit = []        # extrapolated flux when fitting the fluxes from racs and meerkat
-# lofar_uncorrected_flux = []       # current lofar flux, no corrections
-# lofar_uncorrected_flux_error = [] # current lofar flux error, no corrections
+###################################################
+#### catalog four-way combination auto-looper ####
+###################################################
+# for combination in get_combinations(catalogs, size=4, required_index=6, skip_index=2):
+#     local_cats = [catalogs[i] for i in combination]
 
-# for i, (lofar_i, tgss_i, racs_i, meerkat_i) in enumerate(zip(i1, i2, i3, i4)):
-#     lofar_F, tgss_F, racs_F, meerkat_F = lofar['flux_jy'][lofar_i], tgss['flux_jy'][tgss_i], racs['flux_jy'][racs_i], meerkat['flux_jy'][meerkat_i]
-#     #spectral_index = get_spectral_index(tgss_F, racs_F, freqs[1], freqs[2])
-#     #spectral_indices.append(spectral_index)
+#     output = compute_flux_correction_factor(local_cats, default_config, debug=debug)
 
-#     lofar_uncorrected_flux.append(lofar_F)
-#     lofar_uncorrected_flux_error.append(lofar['e_flux_jy'][lofar_i])
+#     if output is not None:
+#         spx, snr, cor, flux, catw, max_sep, p_weight, ra, dec = output
 
-#     # lofar flux when using racs flux and extrapolating back to lofar freq
-#     #extrapolated_flux_fit.append(get_flux_from_index(spectral_index, tgss_F, freqs[0], freqs[1]))
-#     #extrapolated_flux_linear.append(0.5 * (get_flux_from_index(-0.7, tgss_F, freqs[0], freqs[1]) + get_flux_from_index(-0.7, racs_F, freqs[0], freqs[2])))
-
-
-#     plt.plot(freqs, [lofar_F, tgss_F, racs_F, meerkat_F])
-
-# plt.yscale('log')
-# plt.ylabel(r"log$_{10}$(Jy)")
-# plt.xlabel("Frequency (MHz)")
-# plt.show()
-
-# extrapolated_flux_fit = np.array(extrapolated_flux_fit)
-# lofar_uncorrected_flux = np.array(lofar_uncorrected_flux)
-# lofar_uncorrected_flux_error = np.array(lofar_uncorrected_flux_error)
-# spectral_indices = np.array(spectral_indices)
-
-# valid_factor = (spectral_indices > -1) & (spectral_indices < 0)
-# correction_factor = extrapolated_flux_fit / lofar_uncorrected_flux
-
-
-# # compare -0.7 assumption versus fitted spectral indices
-# mn, mx = min(np.min(extrapolated_flux_fit), np.min(extrapolated_flux_linear)), max(np.max(extrapolated_flux_fit), np.max(extrapolated_flux_linear))
-# plt.scatter(extrapolated_flux_linear, extrapolated_flux_fit, c=spectral_indices)
-# plt.yscale('log')
-# plt.xscale('log')
-# plt.xlim(mn, mx)
-# plt.ylim(mn, mx)
-# plt.gca().set_box_aspect(1)
-# plt.plot((mn, mx), (mn, mx), c='k', ls='--')
-# plt.colorbar(label = r"Spectral index $\alpha$")
-# plt.xlabel("Lofar linear flux (Jy)")
-# plt.ylabel("Lofar fitted flux (Jy)")
-# plt.title(r"Lofar flux, $\alpha$=-0.7 vs fitted")
-# plt.show()
-
-# # compare fitted spectral index with correction factor
-# plt.scatter(spectral_indices, correction_factor, c=lofar_uncorrected_flux, norm='log')
-# plt.yscale('log')
-# plt.axvline(-0.7, ls='--', c='k')
-# plt.axhline(1, ls='--', c='k')
-# plt.colorbar(label='Flux (Jy)')
-# plt.ylabel("Flux correction factor")
-# plt.xlabel(r"Spectral index $\alpha$")
-# plt.title("Flux correction as function of spectral index")
-# plt.show()
-
-# # signal to noise
-# snr = lofar_uncorrected_flux / lofar_uncorrected_flux_error
-
-# # distance of spectral index to alpha = -0.7
-# spectral_difference = np.abs(spectral_indices + 0.7)
-# spectral_difference_factor = (1 - (spectral_difference / np.max(spectral_difference)))**2
-
-# # logarithmic weighted mean of the flux correction factor
-# weighted_mean_correction = 10**(np.mean(snr * spectral_difference_factor * np.log10(correction_factor)) / np.mean(snr * spectral_difference_factor))
+#         ras += [ra]; decs += [dec]
+#         correction_factor_global += [cor]
+#         spectral_index_global += [spx]
+#         fitted_flux += [flux]
+#         signal_to_noise += [snr]
+#         catalog_weight_factor += [catw]
+#         max_separation += [max_sep]
+#         point_probability += [p_weight]

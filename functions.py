@@ -620,6 +620,23 @@ def remove_outliers_2D_iterative(var1, var2, clip_percentage, n):
 
     return var1, var2
 
+"""Return indices of catalog of all unique, non-double, <size> combinations with the condition f[i] < f[i+1]"""
+def get_combinations(cats, size=3, required_index=None, skip_index=None):
+    freqs = [cat.freq for cat in cats]
+    indexed = sorted(enumerate(zip(freqs, cats)), key=lambda x: x[1][0])
+
+    result = []
+    for combo in combinations(indexed, size):
+        indices = tuple(i for i, (f, _) in combo)
+        freqs_c = [f for _, (f, _) in combo]
+
+        if freqs_c != sorted(freqs_c):                                          continue
+        if required_index is not None and required_index not in indices:        continue
+        if skip_index     is not None and skip_index     in  indices:           continue
+
+        result.append(indices)
+    return result
+
 """Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""
 def get_triplet_combinations(cats, required_index=None, skip_index=None):
     freqs = []
