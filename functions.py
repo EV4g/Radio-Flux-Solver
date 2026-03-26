@@ -489,8 +489,8 @@ def match_catalogs_2D(cat_list, thres_arc=2, pos_err_arcsec=None, nsigma=3.0, cr
         i0 = np.array(matched_results[(0, 1)][0])
         i1 = np.array(matched_results[(0, 1)][1])
         if return_quality:
-            return i0, i1, quality
-        return i0, i1
+            return (i0, i1), quality
+        return (i0, i1)
 
     # If more than 2 catalogs: coalescence anchored on anchor_index
     match_dict = {i: {} for i in range(n)}
@@ -624,15 +624,18 @@ def remove_outliers_2D_iterative(var1, var2, clip_percentage, n):
 def get_combinations(cats, size=3, required_index=None, skip_index=None):
     freqs = [cat.freq for cat in cats]
     indexed = sorted(enumerate(zip(freqs, cats)), key=lambda x: x[1][0])
-
+    
+    skip     = {skip_index}     if isinstance(skip_index,     int) else set(skip_index)     if skip_index     is not None else set()
+    required = {required_index} if isinstance(required_index, int) else set(required_index) if required_index is not None else set()
+    
     result = []
     for combo in combinations(indexed, size):
         indices = tuple(i for i, (f, _) in combo)
         freqs_c = [f for _, (f, _) in combo]
 
         if freqs_c != sorted(freqs_c):                                          continue
-        if required_index is not None and required_index not in indices:        continue
-        if skip_index     is not None and skip_index     in  indices:           continue
+        if required and not required.issubset(indices):                         continue
+        if skip     and any(i in skip for i in indices):                        continue
 
         result.append(indices)
     return result
