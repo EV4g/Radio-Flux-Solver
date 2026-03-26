@@ -129,7 +129,7 @@ def compute_flux_correction_factor(cats, config, debug=False):
         for cat_idx, match_idx in enumerate(indices):
             nc = quality['n_crowd'].get(cat_idx)
             if nc is not None and len(nc): crowd_ok &= (nc[match_idx] == 0)
-        indices = (indices[i][crowd_ok] for i in range(len(indices)))
+        indices = [index[crowd_ok] for index in indices]
 
     # create subsets of all catalogs, such that we can ignore (i0,i1,i2) afterwards
     for index, cat in enumerate(cats): cats[index] = cat.create_subset(indices[index])
