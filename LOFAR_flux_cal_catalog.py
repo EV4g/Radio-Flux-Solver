@@ -431,12 +431,81 @@ plt.show()
 print("------------------------------------------------")
 print(f"Spectral index: {round(px,3)}, correction factor: {round(py,3)}")
 
+
+##########################
+#### inspection plots ####
+##########################
+
 #### position dependant correction factor
-# plt.scatter(ras[o], decs[o], c=correction_factor_global[o], norm='log')
-# plt.colorbar()
-# plt.ylabel("DEC (deg)")
-# plt.xlabel("RA (deg)")
-# plt.show()
+o = np.argsort(correction_factor_global)
+f = (correction_factor_global[o] > 1e-2) & (correction_factor_global[o] < 1e2)
+plt.scatter(ras[o][f], decs[o][f], c=correction_factor_global[o][f], s=0.1, norm='log')
+plt.colorbar(label='Correction factor')
+plt.ylabel("DEC (deg)")
+plt.xlabel("RA (deg)")
+plt.show()
+
+#### correction factor as function of total weighting factor
+c = (total_weighting_factor > 25) & (correction_factor_global < 7)
+plt.scatter(total_weighting_factor[c], correction_factor_global[c], s=1.5, alpha=0.2)
+plt.yscale('log')
+plt.xscale('log')
+plt.axhline(1, ls='--', color='black', alpha=0.5)
+plt.ylabel("Correction factor")
+plt.xlabel("Total weighting factor")
+plt.show()
+
+#### correction factor as function of ra and dec separately
+mask = (correction_factor_global < 10) & (correction_factor_global > 0.1)
+
+cmean = np.average(correction_factor_global[mask], weights=total_weighting_factor[mask])
+cstd = np.std(correction_factor_global[mask])
+cmin, cmax = max(0, cmean - 3 * cstd), cmean + 3 * cstd
+mask &= (correction_factor_global > cmin) & (correction_factor_global < cmax)
+
+dec_c, dec_mn, dec_std = weighted_bin_stats(decs[mask], correction_factor_global[mask], total_weighting_factor[mask], n_bins=100)
+ra_c,  ra_mn,  ra_std  = weighted_bin_stats(ras[mask],  correction_factor_global[mask], total_weighting_factor[mask], n_bins=100)
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+ax1.plot(dec_c, dec_mn, color='steelblue', lw=2, label='Weighted mean')
+ax1.fill_between(dec_c, dec_mn - dec_std, dec_mn + dec_std, alpha=0.25, color='steelblue', label='±1σ (weighted)')
+ax1.set_xlabel('Dec (deg)')
+ax1.set_ylabel('Correction factor')
+ax1.legend()
+ax2.plot(ra_c, ra_mn, color='tomato', lw=2, label='Weighted mean')
+ax2.fill_between(ra_c, ra_mn - ra_std, ra_mn + ra_std, alpha=0.25, color='tomato', label='±1σ (weighted)')
+ax2.set_xlabel('RA (deg)')
+ax2.legend()
+fig.suptitle('Weighted correction factor')
+plt.tight_layout()
+plt.show()
+
+#### correction factor as function of [ra, dec] in 2D
+ra_c2, dec_c2, wmean_2d, wstd_2d = weighted_bin_stats_2d(
+    ras[mask], decs[mask],
+    correction_factor_global[mask],
+    total_weighting_factor[mask],
+    n_bins=100, m_bins=100
+)
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+
+im1 = ax1.pcolormesh(ra_c2, dec_c2, wmean_2d.T, cmap='RdYlGn_r', shading='auto')
+fig.colorbar(im1, ax=ax1, label='Correction factor')
+ax1.set_xlabel('RA (deg)')
+ax1.set_ylabel('Dec (deg)')
+ax1.set_title('Weighted mean')
+
+im2 = ax2.pcolormesh(ra_c2, dec_c2, wstd_2d.T, cmap='plasma', shading='auto')
+fig.colorbar(im2, ax=ax2, label='Std')
+ax2.set_xlabel('RA (deg)')
+ax2.set_ylabel('Dec (deg)')
+ax2.set_title('Weighted ±1σ')
+
+fig.suptitle('Correction factor map')
+plt.tight_layout()
+plt.show()
+
 
 #### variables
 # ras, decs = [], []              # positional coordinates
