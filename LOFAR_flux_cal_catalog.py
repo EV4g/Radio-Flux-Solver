@@ -6,75 +6,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import glob
 import os
-import copy
-from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics, get_combinations, get_pos_err_deg, weighted_bin_stats, weighted_bin_stats_2d
+from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics, get_combinations, get_pos_err_deg, weighted_bin_stats, weighted_bin_stats_2d, sources_in_fits
 from astropy.table import Table
 from scipy.stats import chi2
 from itertools import combinations
 
-# wrapper class for incoming Table data
-class catalog:
-    def __init__(self, catalog, freq_hz=None, name=None, store_raw=False):
-        # if a string is given, try to read it as Path
-        if isinstance(catalog, str):
-            try:
-                catalog = Table.read(os.getcwd()+catalog)
-            except Exception as e:
-                raise FileNotFoundError(f"Could not read catalog: {e}")
-
-        self.flux       = np.array(catalog['flux_jy'])
-        self.e_flux     = np.array(catalog['e_flux_jy'])
-        self.flux_unit  = str(catalog['flux_jy'].unit)
-
-        self.ra         = np.array(catalog['ra']) % 360 # modulo hot fix, get proper looping separations later
-        self.dec        = np.array(catalog['dec'])
-
-        try:
-            self.e_ra   = np.array(catalog['e_ra'])
-            self.e_dec  = np.array(catalog['e_dec'])
-            self.e_ra[np.where(np.isnan(self.e_ra))] = 0   # sanitize NaNs
-            self.e_dec[np.where(np.isnan(self.e_dec))] = 0 # sanitize NaNs
-        except:
-            self.e_ra   = None
-            self.e_dec  = None
-
-        self.freq       = freq_hz
-        self.freq_unit  = 'Hz'
-        self.name       = name
-
-        self.raw = catalog if store_raw else None
-
-    def create_subset(self, valid):
-        subset = copy.deepcopy(self)
-        subset.flux   = self.flux[valid]
-        subset.e_flux = self.e_flux[valid]
-        subset.ra     = self.ra[valid]
-        subset.dec    = self.dec[valid]
-        if self.e_ra is not None:  subset.e_ra  = self.e_ra[valid]
-        if self.e_dec is not None: subset.e_dec = self.e_dec[valid]
-        return subset
-
-# wrapper class for passable parameters
-class config:
-    def __init__(self, thres_arc, spectral_damping_factor, snr_lower_limit, spectral_index_theory=-0.7, minimum_points=2, nsigma=3):
-        self.thres_arc = thres_arc
-        self.spectral_damping_factor = spectral_damping_factor
-        self.snr_lower_limit = snr_lower_limit
-        self.minimum_points = minimum_points
-        self.spectral_index_theory = spectral_index_theory
-        self.nsigma = nsigma
-
-"""Given arrays of RA/Dec (degrees) and a FITS file, return a boolean array of which sources fall within the image footprint."""
-def sources_in_fits(ra_deg, dec_deg, fn):
-    with fits.open(fn) as hdul:
-        w  = WCS(hdul[0].header).celestial
-        nx = hdul[0].header["NAXIS1"]
-        ny = hdul[0].header["NAXIS2"]
-
-    coords = SkyCoord(ra=ra_deg, dec=dec_deg, unit=u.deg, frame="icrs")
-    x, y   = w.world_to_pixel(coords)
-
-    return (x >= 0) & (x < nx) & (y >= 0) & (y < ny)
+from catalog_manager import catalog, config, catalog_set
 
 """Get two catalogs and return flux and snr (flux / e_flux)"""
 def get_catalog_matched_flux(cat1, cat2, thres_arc=2):
@@ -101,7 +38,7 @@ def quick_compare_catalog(cat1, cat2, config):
     ax[0].set_xscale('log'); ax[0].set_yscale('log')
     ax[0].set_xlabel(f"{cat1.name} flux [Jy]"); ax[0].set_ylabel(f"{cat2.name} flux [Jy]")
     ax[0].legend()
-
+    
     # Log-ratio histogram
     ax[1].hist(log_ratio, bins=30, edgecolor='k')
     ax[1].axvline(scale_factor, color='red', ls='--', label=f'Median = {scale_factor:.3f}')
@@ -116,7 +53,7 @@ def quick_compare_catalog(cat1, cat2, config):
 
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
-def compute_flux_correction_factor(cats, config, anchor_catalog=None, debug=False):
+def compute_flux_correction_factor(cats, config, debug=False):
     indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma)
 
     # if there are too few sources, return None
@@ -127,11 +64,11 @@ def compute_flux_correction_factor(cats, config, anchor_catalog=None, debug=Fals
     # figure out for which catalog the correction factor should be calculated
     # if cat is given, match that, otherwise assume the first index
     other_index = [i for i in range(len(cats))]
-    if anchor_catalog is None:
+    if config.anchor_catalog is None:
         anchor_index = 0
     else:
         try:
-            anchor_index = cats.index(anchor_catalog)
+            anchor_index = cats.index(config.anchor_catalog)
         except:
             print("Anchor catalog missing from inputs")
             return None
@@ -185,7 +122,7 @@ def compute_flux_correction_factor(cats, config, anchor_catalog=None, debug=Fals
     if debug:
         for flux in np.array([cat.flux for cat in cats]).T:
             plt.plot(np.array([cat.freq for cat in cats])*1e-6, flux)
-
+        
         plt.yscale('log')
         plt.ylabel(r"log$_{10}$(Jy)")
         plt.xlabel("Frequency (MHz)")
@@ -222,7 +159,7 @@ def compute_flux_correction_factor(cats, config, anchor_catalog=None, debug=Fals
         plt.ylabel(f"{cats[anchor_index].name} fitted flux (Jy)")
         plt.title(f"{cats[anchor_index].name} "+r"flux, $\alpha$=-0.7 vs fitted")
         plt.show()
-
+        
         # compare fitted spectral index with correction factor
         plt.scatter(spectral_indices, correction_factor, c=uncorrected_flux, norm='log')
         plt.yscale('log')
@@ -242,94 +179,81 @@ def compute_flux_correction_factor(cats, config, anchor_catalog=None, debug=Fals
 def calculate_weighted_correction_factor(spx, snr, catw, max_sep, config):
     # downweight sources with spectral indices far away from -0.7
     spectral_difference_factor = np.exp(-config.spectral_damping_factor * (spx - config.spectral_index_theory)**2)
-
+    
     # discard low snr sources
     signal_to_noise_factor = snr
     signal_to_noise_factor[signal_to_noise_factor < config.snr_lower_limit] = 0
-
+    
     # weighting based on separation between points
     separation_weight = np.exp(-(max_sep / config.thres_arc) ** 2)
-
+    
     return spectral_difference_factor * signal_to_noise_factor * catw * separation_weight
 
 """Extrapolate flux based on two frequencies, one flux, and a spectral index"""
 def get_flux_from_index(spectral_index, reference_flux, current_frequency, reference_frequency):
     return reference_flux * (current_frequency / reference_frequency) ** spectral_index
 
-# lofar fits file
-lofar_files = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0]
+#### all available catalogs
+all_catalogs = catalog_set([
+    catalog("/catalogs/racs/racs_clean.fits",                 887.5e6,    "racs"),
+    catalog("/catalogs/meerkat/meerkat_clean.fits",           1359.7e6,   "meerkat"),
+    catalog("/catalogs/vlssr/vlssr_clean.fits",               73.8e6,     "vlssr"),
+    catalog("/catalogs/tgss/tgss_clean.fits",                 150e6,      "tgss"),
+    catalog("/catalogs/gleam_300/gleam_300_clean.fits",       300e6,      "gleam_300"),
+    catalog("/catalogs/gleam_x_gp/gleam_x_gp_clean.fits",     200e6,      "gleam_xgp"),
+    catalog("/catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss"),
+    catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss"),
+    catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar"),
+    catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3"),
+    catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus"),
+    ])
 
+racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar, lofar_dr3, cygnus = all_catalogs.catalogs
 
-# load catalogs, names in order of acquisition, lofar last
-racs_full      = catalog("/catalogs/racs/racs_clean.fits",                 887.5e6,    "racs")
-meerkat_full   = catalog("/catalogs/meerkat/meerkat_clean.fits",           1359.7e6,   "meerkat")
-vlssr_full     = catalog("/catalogs/vlssr/vlssr_clean.fits",               73.8e6,     "vlssr")
-tgss_full      = catalog("/catalogs/tgss/tgss_clean.fits",                 150e6,      "tgss")
-gleam_300_full = catalog("/catalogs/gleam_300/gleam_300_clean.fits",       300e6,      "gleam_300")
-gleam_xgp_full = catalog("/catalogs/gleam_x_gp/gleam_x_gp_clean.fits",     200e6,      "gleam_xgp")
-nvss_full      = catalog("/catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss")
-wenss_full     = catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss")
-lofar_full     = catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar")
-lofar_dr3_full = catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3")
-cygnus_full    = catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus")
+#### available configurations
+default_config = config(thres_arc = 2, 
+                        spectral_damping_factor = 5, 
+                        snr_lower_limit = 7, 
+                        nsigma = 3, 
+                        minimum_points = 3,
+                        crowd_radius_arc = None,
+                        minimum_frequency_spacing = None,
+                        catalogs = [racs, meerkat, tgss, gleam_300, gleam_xgp, wenss, lofar],
+                        reference_file = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0],
+                        anchor_catalog = lofar,                        
+                        )
 
-# check for sources in current file
-racs_valid      = sources_in_fits(racs_full.ra,      racs_full.dec,       lofar_files)
-meerkat_valid   = sources_in_fits(meerkat_full.ra,   meerkat_full.dec,    lofar_files)
-vlssr_valid     = sources_in_fits(vlssr_full.ra,     vlssr_full.dec,      lofar_files)
-tgss_valid      = sources_in_fits(tgss_full.ra,      tgss_full.dec,       lofar_files)
-gleam_300_valid = sources_in_fits(gleam_300_full.ra, gleam_300_full.dec,  lofar_files)
-gleam_xgp_valid = sources_in_fits(gleam_xgp_full.ra, gleam_xgp_full.dec,  lofar_files)
-nvss_valid      = sources_in_fits(nvss_full.ra,      nvss_full.dec,       lofar_files)
-wenss_valid     = sources_in_fits(wenss_full.ra,     wenss_full.dec,      lofar_files)
-lofar_valid     = sources_in_fits(lofar_full.ra,     lofar_full.dec,      lofar_files)
-lofar_dr3_valid = sources_in_fits(lofar_dr3_full.ra, lofar_dr3_full.dec,  lofar_files)
-cygnus_valid    = sources_in_fits(cygnus_full.ra,    cygnus_full.dec,     lofar_files)
-
-# remove all non-valid points to reduce syntax clutter
-racs      = racs_full.create_subset(racs_valid)
-meerkat   = meerkat_full.create_subset(meerkat_valid)
-vlssr     = vlssr_full.create_subset(vlssr_valid)
-tgss      = tgss_full.create_subset(tgss_valid)
-gleam_300 = gleam_300_full.create_subset(gleam_300_valid)
-gleam_xgp = gleam_xgp_full.create_subset(gleam_xgp_valid)
-nvss      = nvss_full.create_subset(nvss_valid)
-wenss     = wenss_full.create_subset(wenss_valid)
-lofar     = lofar_full.create_subset(lofar_valid)
-lofar_dr3 = lofar_dr3_full.create_subset(lofar_dr3_valid)
-cygnus    = cygnus_full.create_subset(cygnus_valid)
-
-catalogs      = [racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, lofar]
-catalogs_full = [racs_full, meerkat_full, vlssr_full, tgss_full, gleam_300_full, gleam_xgp_full, lofar_full]
+cygnus_config = config(thres_arc = 2, 
+                        spectral_damping_factor = 5, 
+                        snr_lower_limit = 7, 
+                        nsigma = 3, 
+                        minimum_points = 3,
+                        crowd_radius_arc = None,
+                        minimum_frequency_spacing = None,
+                        catalogs = [vlssr, tgss, gleam_300, nvss, wenss, lofar_dr3, cygnus],
+                        reference_file = np.sort(glob.glob(os.getcwd()+"/data/other/*.fits"))[0],
+                        anchor_catalog = cygnus,
+                        )
 
 #### Parameters
 debug = True
-anchor_index = catalogs.index(lofar) # the catalog which shall be compared and calibrated against the rest
+config = default_config
+# config = cygnus_config
 
-default_config = config(thres_arc=2, spectral_damping_factor=5, snr_lower_limit=7, nsigma=2, minimum_points=10)
-vlssr_config   = config(thres_arc=10, spectral_damping_factor=5, snr_lower_limit=7)
+config.setup()
 
-if debug:
-    # # full catalog plot
-    # for cat in catalogs_full:
-    #     plt.hist(np.log10(cat.flux), alpha=0.6, bins=75, label=cat.name)
-    # plt.xlabel("log10(flux/Jy)")
-    # plt.ylabel("count")
-    # plt.yscale('log')
-    # plt.legend()
-    # plt.show()
-
+if debug:    
     # cutdown catalog plot
-    for cat in catalogs:
+    for cat in config.catalogs:
         plt.hist(np.log10(cat.flux), alpha=0.6, bins=25, label=cat.name)
     plt.xlabel("log10(flux/Jy)")
     plt.ylabel("count")
     plt.yscale('log')
     plt.legend()
     plt.show()
-
+    
     # catalog as function of position
-    for cat in catalogs:
+    for cat in config.catalogs:
         if len(cat.ra) > 0: plt.scatter(cat.ra, cat.dec, s=1, label=cat.name)
     plt.gca().set_box_aspect(1)
     plt.xlabel("RA")
@@ -350,10 +274,11 @@ point_probability = []          # probability of points matching
 ###################################################
 #### catalog three-way combination auto-looper ####
 ###################################################
-for combination in get_combinations(catalogs, size=3, required_index=6, skip_index=2):
-    local_cats = [catalogs[i] for i in combination]
-
-    output = compute_flux_correction_factor(local_cats, default_config, debug=debug)
+for combination in get_combinations(config.catalogs, size=3, required_index=config.anchor_catalog_index):
+    local_cats = [config.catalogs[i] for i in combination]
+    local_catalog_anchor = local_cats.index(config.anchor_catalog)
+    
+    output = compute_flux_correction_factor(local_cats, config, debug=debug)
 
     if output is not None:
         spx, snr, cor, flux, catw, max_sep, p_weight, ra, dec = output
@@ -404,18 +329,18 @@ catalog_weight_factor = np.concatenate(catalog_weight_factor)
 max_separation = np.concatenate(max_separation)
 
 total_weighting_factor = calculate_weighted_correction_factor(spectral_index_global, signal_to_noise, catalog_weight_factor, max_separation, default_config)
-weighting_filter = (total_weighting_factor > 10)
+# weighting_filter = (total_weighting_factor > 10)
 
-ras = ras[weighting_filter]
-decs = decs[weighting_filter]
-correction_factor_global = correction_factor_global[weighting_filter]
-spectral_index_global = spectral_index_global[weighting_filter]
-fitted_flux = fitted_flux[weighting_filter]
-signal_to_noise = signal_to_noise[weighting_filter]
-catalog_weight_factor = catalog_weight_factor[weighting_filter]
-max_separation = max_separation[weighting_filter]
+# ras = ras[weighting_filter]
+# decs = decs[weighting_filter]
+# correction_factor_global = correction_factor_global[weighting_filter]
+# spectral_index_global = spectral_index_global[weighting_filter]
+# fitted_flux = fitted_flux[weighting_filter]
+# signal_to_noise = signal_to_noise[weighting_filter]
+# catalog_weight_factor = catalog_weight_factor[weighting_filter]
+# max_separation = max_separation[weighting_filter]
 
-total_weighting_factor = total_weighting_factor[weighting_filter]
+# total_weighting_factor = total_weighting_factor[weighting_filter]
 
 ############################################################################
 #### plotting correction factor based on all previous catalog matchings ####
@@ -473,8 +398,8 @@ mask = (correction_factor_global < 10) & (correction_factor_global > 0.1)
 
 cmean = np.average(correction_factor_global[mask], weights=total_weighting_factor[mask])
 cstd = np.std(correction_factor_global[mask])
-cmin, cmax = max(0, cmean - 3 * cstd), cmean + 3 * cstd
-mask &= (correction_factor_global > cmin) & (correction_factor_global < cmax)
+cmin, cmax = max(0.1, cmean - 3 * cstd), cmean + 3 * cstd
+mask &= (correction_factor_global > cmin) & (correction_factor_global < cmax) & (total_weighting_factor > 0)
 
 dec_c, dec_mn, dec_std = weighted_bin_stats(decs[mask], correction_factor_global[mask], total_weighting_factor[mask], n_bins=100)
 ra_c,  ra_mn,  ra_std  = weighted_bin_stats(ras[mask],  correction_factor_global[mask], total_weighting_factor[mask], n_bins=100)
@@ -498,7 +423,7 @@ ra_c2, dec_c2, wmean_2d, wstd_2d = weighted_bin_stats_2d(
     ras[mask], decs[mask],
     correction_factor_global[mask],
     total_weighting_factor[mask],
-    n_bins=100, m_bins=100
+    n_bins=40, m_bins=40
 )
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
