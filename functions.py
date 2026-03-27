@@ -659,19 +659,18 @@ def radec_list(cats):
 def weighted_bin_stats(x, y, w, n_bins=200):
     edges = np.linspace(x.min(), x.max(), n_bins + 1)
     centers = 0.5 * (edges[:-1] + edges[1:])
-
     mn  = np.full(n_bins, np.nan)
     std = np.full(n_bins, np.nan)
 
     for i in range(n_bins):
         in_bin = (x >= edges[i]) & (x < edges[i + 1])
-        if in_bin.sum() > 2:
-            y_b, w_b = y[in_bin], w[in_bin]
-            w_sum    = w_b.sum()
-            wmean    = np.dot(w_b, y_b) / w_sum
-            wvar     = np.dot(w_b, (y_b - wmean) ** 2) / w_sum
-            mn[i]    = wmean
-            std[i]   = np.sqrt(wvar)
+        if in_bin.sum() <= 2: continue
+        y_b, w_b = y[in_bin], w[in_bin]
+        w_sum = w_b.sum()
+        if w_sum == 0: continue
+        wmean    = np.dot(w_b, y_b) / w_sum
+        mn[i]    = wmean
+        std[i]   = np.sqrt(np.dot(w_b, (y_b - wmean) ** 2) / w_sum)
 
     ok = ~np.isnan(mn)
     return centers[ok], mn[ok], std[ok]
@@ -701,3 +700,15 @@ def weighted_bin_stats_2d(x, y, z, w, n_bins=50, m_bins=50):
     x_centers = 0.5 * (xe[:-1] + xe[1:])
     y_centers = 0.5 * (ye[:-1] + ye[1:])
     return x_centers, y_centers, wmean, wstd
+
+"""Given arrays of RA/Dec (degrees) and a FITS file, return a boolean array of which sources fall within the image footprint."""
+def sources_in_fits(ra_deg, dec_deg, fn):
+    with fits.open(fn) as hdul:
+        w  = WCS(hdul[0].header).celestial
+        nx = hdul[0].header["NAXIS1"]
+        ny = hdul[0].header["NAXIS2"]
+
+    coords = SkyCoord(ra=ra_deg, dec=dec_deg, unit=u.deg, frame="icrs")
+    x, y   = w.world_to_pixel(coords)
+
+    return (x >= 0) & (x < nx) & (y >= 0) & (y < ny)
