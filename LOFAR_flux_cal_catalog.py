@@ -370,29 +370,29 @@ for combination in get_combinations(catalogs, size=3, required_index=6, skip_ind
 ###########################################################
 #### plotting correction factor for each catalog combo ####
 ###########################################################
-for spx, snr, cor, catw, max_sep in zip(spectral_index_global, signal_to_noise, correction_factor_global, catalog_weight_factor, max_separation):
-    total_weighting_factor = calculate_weighted_correction_factor(spx, snr, catw, max_sep, default_config)
-    Xi, Yi, Zi, px, py = calculate_contour_statistics(spx, cor, total_weighting_factor, logy=True)
+# for spx, snr, cor, catw, max_sep in zip(spectral_index_global, signal_to_noise, correction_factor_global, catalog_weight_factor, max_separation):
+#     total_weighting_factor = calculate_weighted_correction_factor(spx, snr, catw, max_sep, default_config)
+#     Xi, Yi, Zi, px, py = calculate_contour_statistics(spx, cor, total_weighting_factor, logy=True)
 
-    o = np.argsort(total_weighting_factor)
+#     o = np.argsort(total_weighting_factor)
 
-    fig, ax = plt.subplots()
-    sc = ax.scatter(spx[o], cor[o], c=total_weighting_factor[o])
-    ax.contour(Xi, Yi, Zi, levels=6, colors='red', alpha=0.7, linewidths=0.8)
-    plt.colorbar(sc, label="Combined weighting factor")
-    plt.yscale('log')
+#     fig, ax = plt.subplots()
+#     sc = ax.scatter(spx[o], cor[o], c=total_weighting_factor[o])
+#     ax.contour(Xi, Yi, Zi, levels=6, colors='red', alpha=0.7, linewidths=0.8)
+#     plt.colorbar(sc, label="Combined weighting factor")
+#     plt.yscale('log')
 
-    plt.axhline(py, ls="--", color="gray")
-    plt.axvline(px, ls="--", color="gray")
+#     plt.axhline(py, ls="--", color="gray")
+#     plt.axvline(px, ls="--", color="gray")
 
-    plt.xlim(np.percentile(spx, 1), np.percentile(spx, 99))
-    plt.ylim(np.percentile(cor, 1), np.percentile(cor, 99))
-    plt.ylabel("Correction factor")
-    plt.xlabel(r"Fitted spectral index $\alpha$")
-    plt.title("Correction factor as function of fitted spectral index")
-    plt.show()
+#     plt.xlim(np.percentile(spx, 1), np.percentile(spx, 99))
+#     plt.ylim(np.percentile(cor, 1), np.percentile(cor, 99))
+#     plt.ylabel("Correction factor")
+#     plt.xlabel(r"Fitted spectral index $\alpha$")
+#     plt.title("Correction factor as function of fitted spectral index")
+#     plt.show()
 
-    print(f"Spectral index: {round(px,3)}, correction factor: {round(py,3)}")
+#     print(f"Spectral index: {round(px,3)}, correction factor: {round(py,3)}")
 
 ras = np.concatenate(ras)
 decs = np.concatenate(decs)
@@ -403,12 +403,25 @@ signal_to_noise = np.concatenate(signal_to_noise)
 catalog_weight_factor = np.concatenate(catalog_weight_factor)
 max_separation = np.concatenate(max_separation)
 
+total_weighting_factor = calculate_weighted_correction_factor(spectral_index_global, signal_to_noise, catalog_weight_factor, max_separation, default_config)
+weighting_filter = (total_weighting_factor > 10)
+
+ras = ras[weighting_filter]
+decs = decs[weighting_filter]
+correction_factor_global = correction_factor_global[weighting_filter]
+spectral_index_global = spectral_index_global[weighting_filter]
+fitted_flux = fitted_flux[weighting_filter]
+signal_to_noise = signal_to_noise[weighting_filter]
+catalog_weight_factor = catalog_weight_factor[weighting_filter]
+max_separation = max_separation[weighting_filter]
+
+total_weighting_factor = total_weighting_factor[weighting_filter]
 
 ############################################################################
 #### plotting correction factor based on all previous catalog matchings ####
 ############################################################################
-total_weighting_factor = calculate_weighted_correction_factor(spectral_index_global, signal_to_noise, catalog_weight_factor, max_separation, default_config)
-Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index_global, correction_factor_global, total_weighting_factor, logy=True)
+
+Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index_global, correction_factor_global, total_weighting_factor, logy=True, n=200)
 
 o = np.argsort(total_weighting_factor)
 
