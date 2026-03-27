@@ -124,6 +124,19 @@ def compute_flux_correction_factor(cats, config, anchor_catalog=None, debug=Fals
         if debug: print(f"Error: no source-matches found between [{', '.join(f'{cat.name}' for cat in cats)}]")
         return None
 
+    # figure out for which catalog the correction factor should be calculated
+    # if cat is given, match that, otherwise assume the first index
+    other_index = [i for i in range(len(cats))]
+    if anchor_catalog is None:
+        anchor_index = 0
+    else:
+        try:
+            anchor_index = cats.index(anchor_catalog)
+        except:
+            print("Anchor catalog missing from inputs")
+            return None
+    other_index.remove(anchor_index)
+
     # if crowding parameter is available, remove overcrowded points; else skip
     if quality['n_crowd']:
         crowd_ok = np.ones(len(indices[0]), dtype=bool)
@@ -147,19 +160,6 @@ def compute_flux_correction_factor(cats, config, anchor_catalog=None, debug=Fals
         p_weight *= 1.0 - chi2.cdf((sep / np.hypot(sig[a], sig[b])) ** 2, df=2)
 
     max_sep = np.maximum.reduce(list(pair_seps.values()))
-
-    # figure out for which catalog the correction factor should be calculated
-    # if cat is given, match that, otherwise assume the first index
-    other_index = [i for i in range(len(cats))]
-    if anchor_catalog is None:
-        anchor_index = 0
-    else:
-        try:
-            anchor_index = cats.index(anchor_catalog)
-        except:
-            print("Anchor catalog missing from inputs")
-            return None
-    other_index.remove(anchor_index)
 
     # flux and flux error
     uncorrected_flux = cats[anchor_index].flux
