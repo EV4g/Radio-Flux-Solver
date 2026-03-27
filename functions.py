@@ -16,7 +16,7 @@ from scipy.stats import gaussian_kde
 import matplotlib.pyplot as plt
 #import matplotlib.colors as mcolors
 from itertools import combinations
-from scipy.stats import chi2 as _chi2_dist
+from scipy.stats import chi2 as _chi2_dist, binned_statistic_2d
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
@@ -655,8 +655,49 @@ def radec_list(cats):
         radec_list.append((cat.ra, cat.dec))
     return radec_list
 
-# """Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""
-# def get_triplet_combinations(frequencies, catalogs, required_index=None, skip_index=None):
-#     indexed = sorted(enumerate(zip(frequencies, catalogs)), key=lambda x: x[1][0])
-#     return [(i1, i2, i3) for (i1, (f1, _)), (i2, (f2, _)), (i3, (f3, _)) in combinations(indexed, 3) if f1 < f2 < f3
-#         and (required_index is None or required_index in (i1, i2, i3)) and (skip_index is None or skip_index not in (i1, i2, i3))]
+""""""
+def weighted_bin_stats(x, y, w, n_bins=200):
+    edges = np.linspace(x.min(), x.max(), n_bins + 1)
+    centers = 0.5 * (edges[:-1] + edges[1:])
+
+    mn  = np.full(n_bins, np.nan)
+    std = np.full(n_bins, np.nan)
+
+    for i in range(n_bins):
+        in_bin = (x >= edges[i]) & (x < edges[i + 1])
+        if in_bin.sum() > 2:
+            y_b, w_b = y[in_bin], w[in_bin]
+            w_sum    = w_b.sum()
+            wmean    = np.dot(w_b, y_b) / w_sum
+            wvar     = np.dot(w_b, (y_b - wmean) ** 2) / w_sum
+            mn[i]    = wmean
+            std[i]   = np.sqrt(wvar)
+
+    ok = ~np.isnan(mn)
+    return centers[ok], mn[ok], std[ok]
+
+""""""
+def weighted_bin_stats_2d(x, y, z, w, n_bins=50, m_bins=50):
+    x_edges = np.linspace(x.min(), x.max(), n_bins + 1)
+    y_edges = np.linspace(y.min(), y.max(), m_bins + 1)
+
+    # Weighted sum of z and weights per bin
+    wz, xe, ye, _ = binned_statistic_2d(x, y, z * w, statistic='sum', bins=[x_edges, y_edges])
+    w_sum, _, _, _ = binned_statistic_2d(x, y, w,     statistic='sum', bins=[x_edges, y_edges])
+
+    wmean = np.where(w_sum > 0, wz / w_sum, np.nan)
+
+    # Weighted std: need E[w*(z-mean)^2] / sum(w)
+    # Compute per-point residual, then bin again
+    bin_x = np.digitize(x, x_edges[:-1]) - 1
+    bin_y = np.digitize(y, y_edges[:-1]) - 1
+    bin_x = np.clip(bin_x, 0, n_bins - 1)
+    bin_y = np.clip(bin_y, 0, m_bins - 1)
+
+    residuals = (z - wmean[bin_x, bin_y]) ** 2
+    wres, _, _, _ = binned_statistic_2d(x, y, residuals * w, statistic='sum', bins=[x_edges, y_edges])
+    wstd = np.where(w_sum > 0, np.sqrt(wres / w_sum), np.nan)
+
+    x_centers = 0.5 * (xe[:-1] + xe[1:])
+    y_centers = 0.5 * (ye[:-1] + ye[1:])
+    return x_centers, y_centers, wmean, wstd
