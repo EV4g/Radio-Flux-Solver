@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import glob
 import os
 import copy
-from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics, get_combinations, get_pos_err_deg
+from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics, get_combinations, get_pos_err_deg, weighted_bin_stats, weighted_bin_stats_2d
 from astropy.table import Table
 from scipy.stats import chi2
 from itertools import combinations
@@ -26,7 +26,7 @@ class catalog:
         self.e_flux     = np.array(catalog['e_flux_jy'])
         self.flux_unit  = str(catalog['flux_jy'].unit)
 
-        self.ra         = np.array(catalog['ra'])
+        self.ra         = np.array(catalog['ra']) % 360 # modulo hot fix, get proper looping separations later
         self.dec        = np.array(catalog['dec'])
 
         try:
