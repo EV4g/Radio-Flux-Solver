@@ -10,6 +10,7 @@ from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectra
 from astropy.table import Table
 from scipy.stats import chi2
 from itertools import combinations
+from time import perf_counter
 
 from catalog_manager import catalog, config, catalog_set
 
@@ -53,12 +54,12 @@ def quick_compare_catalog(cat1, cat2, config):
 
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
-def compute_flux_correction_factor(cats, config, debug=False):
-    indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma)
+def compute_flux_correction_factor(cats, config, debug=False, internal_output=False):
+    indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma, thres_arc_override=config.thres_arc_override)
 
     # if there are too few sources, return None
     if len(indices[0]) <= config.minimum_points:
-        if debug: print(f"Error: no source-matches found between [{', '.join(f'{cat.name}' for cat in cats)}]")
+        if internal_output: print(f"Error: no source-matches found between [{', '.join(f'{cat.name}' for cat in cats)}]")
         return None
 
     # figure out for which catalog the correction factor should be calculated
@@ -81,6 +82,11 @@ def compute_flux_correction_factor(cats, config, debug=False):
             nc = quality['n_crowd'].get(cat_idx)
             if nc is not None and len(nc): crowd_ok &= (nc[match_idx] == 0)
         indices = [index[crowd_ok] for index in indices]
+    
+    # re-check after crowding
+    if len(indices[0]) <= config.minimum_points:
+        if internal_output: print(f"Error: no source-matches found between [{', '.join(f'{cat.name}' for cat in cats)}] after crowding check")
+        return None
 
     # create subsets of all catalogs, such that we can ignore (i0,i1,...) afterwards
     for index, cat in enumerate(cats): cats[index] = cat.create_subset(indices[index])
@@ -170,9 +176,9 @@ def compute_flux_correction_factor(cats, config, debug=False):
         plt.xlabel(r"Spectral index $\alpha$")
         plt.title("Flux correction as function of spectral index")
         plt.show()
-
-    print(f"Completed set [{', '.join(f'{cat.name:9}' for cat in cats)}]", round(catalog_weight_factor[0], 2) if debug else "")
-
+        
+    if internal_output: print(f"Completed set [{', '.join(f'{cat.name:9}' for cat in cats)}]", f"Matches: {len(indices[0])}")    
+    
     return (spectral_indices, snr, correction_factor, extrapolated_flux_fit, catalog_weight_factor, max_sep, p_weight, ra, dec)
 
 """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
@@ -181,7 +187,7 @@ def calculate_weighted_correction_factor(spx, snr, catw, max_sep, config):
     spectral_difference_factor = np.exp(-config.spectral_damping_factor * (spx - config.spectral_index_theory)**2)
     
     # discard low snr sources
-    signal_to_noise_factor = snr
+    signal_to_noise_factor = snr.copy()
     signal_to_noise_factor[signal_to_noise_factor < config.snr_lower_limit] = 0
     
     # weighting based on separation between points
@@ -192,6 +198,8 @@ def calculate_weighted_correction_factor(spx, snr, catw, max_sep, config):
 """Extrapolate flux based on two frequencies, one flux, and a spectral index"""
 def get_flux_from_index(spectral_index, reference_flux, current_frequency, reference_frequency):
     return reference_flux * (current_frequency / reference_frequency) ** spectral_index
+
+start = perf_counter()
 
 #### all available catalogs
 all_catalogs = catalog_set([
@@ -211,8 +219,18 @@ all_catalogs = catalog_set([
 racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar, lofar_dr3, cygnus = all_catalogs.catalogs
 
 #### available configurations
-default_config = config(thres_arc = 2, 
-                        spectral_damping_factor = 5, 
+lofar_dr3_config = config(spectral_damping_factor = 5,
+                          snr_lower_limit = 7, 
+                          nsigma = 3, 
+                          minimum_points = 3,
+                          crowd_radius_arc = None,
+                          minimum_frequency_spacing = None,
+                          catalogs = [racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3],
+                          reference_file = None,
+                          anchor_catalog = lofar_dr3,                        
+                          )
+
+default_config = config(spectral_damping_factor = 5, 
                         snr_lower_limit = 7, 
                         nsigma = 3, 
                         minimum_points = 3,
@@ -223,24 +241,26 @@ default_config = config(thres_arc = 2,
                         anchor_catalog = lofar,                        
                         )
 
-cygnus_config = config(thres_arc = 2, 
-                        spectral_damping_factor = 5, 
-                        snr_lower_limit = 7, 
-                        nsigma = 3, 
-                        minimum_points = 3,
-                        crowd_radius_arc = None,
-                        minimum_frequency_spacing = None,
-                        catalogs = [vlssr, tgss, gleam_300, nvss, wenss, lofar_dr3, cygnus],
-                        reference_file = np.sort(glob.glob(os.getcwd()+"/data/other/*.fits"))[0],
-                        anchor_catalog = cygnus,
-                        )
+cygnus_config = config(spectral_damping_factor = 5, 
+                       snr_lower_limit = 7, 
+                       nsigma = 3, 
+                       minimum_points = 3,
+                       crowd_radius_arc = None,
+                       minimum_frequency_spacing = None,
+                       catalogs = [vlssr, tgss, gleam_300, nvss, wenss, lofar_dr3, cygnus],
+                       reference_file = np.sort(glob.glob(os.getcwd()+"/data/other/*.fits"))[0],
+                       anchor_catalog = cygnus,
+                       )
 
 #### Parameters
-debug = True
-config = default_config
-# config = cygnus_config
+debug = False
+config = lofar_dr3_config
+#config = default_config
+#config = cygnus_config
 
 config.setup()
+
+print(f"Setup done at: {perf_counter() - start} s")
 
 if debug:    
     # cutdown catalog plot
@@ -258,7 +278,7 @@ if debug:
     plt.gca().set_box_aspect(1)
     plt.xlabel("RA")
     plt.ylabel("Dec")
-    plt.legend()
+    plt.legend(loc='lower left')
     plt.show()
 
 #### variables
@@ -274,15 +294,17 @@ point_probability = []          # probability of points matching
 ###################################################
 #### catalog three-way combination auto-looper ####
 ###################################################
-for combination in get_combinations(config.catalogs, size=3, required_index=config.anchor_catalog_index):
-    local_cats = [config.catalogs[i] for i in combination]
-    local_catalog_anchor = local_cats.index(config.anchor_catalog)
-    
+all_combinations = get_combinations(config.catalogs, size=3, required_index=config.anchor_catalog_index)
+output_width = len(str(len(all_combinations)))
+for i, combination in enumerate(all_combinations):
+    local_cats = [config.catalogs[j] for j in combination]
     output = compute_flux_correction_factor(local_cats, config, debug=debug)
-
+    
     if output is not None:
+        
         spx, snr, cor, flux, catw, max_sep, p_weight, ra, dec = output
-
+        print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(spx)}")
+        
         ras += [ra]; decs += [dec]
         correction_factor_global += [cor]
         spectral_index_global += [spx]
@@ -291,6 +313,10 @@ for combination in get_combinations(config.catalogs, size=3, required_index=conf
         catalog_weight_factor += [catw]
         max_separation += [max_sep]
         point_probability += [p_weight]
+    else:
+        print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", "Matches: None")
+
+print(f"Calculations done at: {perf_counter() - start} s")
 
 ###########################################################
 #### plotting correction factor for each catalog combo ####
@@ -443,6 +469,7 @@ fig.suptitle('Correction factor map')
 plt.tight_layout()
 plt.show()
 
+print(f"Done at: {perf_counter() - start} s")
 
 #### variables
 # ras, decs = [], []              # positional coordinates
