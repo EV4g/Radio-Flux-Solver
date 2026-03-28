@@ -291,12 +291,10 @@ def _project_radec(ra_deg, dec_deg, ra0_deg, dec0_deg):
 If e_ra / e_dec are stored on the object they are combined as
   sigma_1d = sqrt((e_ra^2 + e_dec^2) / 2).
 If neither is available, returns a constant array of `fallback` deg."""
-def get_pos_err_deg(cat, fallback_arcsec=2):
-    if cat.e_ra is not None and cat.e_dec is not None:
-        return np.sqrt((cat.e_ra ** 2 + cat.e_dec ** 2) / 2.0) # degrees
-    return np.full(len(cat.ra), fallback_arcsec / 3600)
+def get_pos_err_deg(cat):
+    return np.sqrt((cat.e_ra ** 2 + cat.e_dec ** 2) / 2.0) # degrees
 
-def match_catalogs_2D(cat_list, thres_arc=2, pos_err_arcsec=None, nsigma=3.0, crowd_radius_arc=None, anchor_index=0, return_quality=False):    
+def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, thres_arc_override=False, crowd_radius_arc=None, anchor_index=0, return_quality=False):    
     """Fast n-catalogue cross-matcher with adaptive positional uncertainties,
     crowding detection, and per-pair quality metrics.
 
@@ -304,13 +302,7 @@ def match_catalogs_2D(cat_list, thres_arc=2, pos_err_arcsec=None, nsigma=3.0, cr
     ----------
     cat_list         : list of catalogue objects exposing .ra and .dec (degrees),
                        .flux, and .e_flux.
-    thres_arc        : fallback fixed match radius in arcsec. Used only when
-                       pos_err_arcsec is None.
-    pos_err_arcsec   : per-catalogue 1-D positional RMS in arcsec.  Each entry
-                       may be a scalar (applied to all sources in that catalogue)
-                       or an array of length len(cat). When given, the match radius
-                       for each pair becomes nsigma * sqrt(sigma_a^2 + sigma_b^2),
-                       evaluated per-source after an initial coarse query.
+    thres_arc        : fallback fixed match radius in arcsec.
     nsigma           : number of combined sigmas used as the acceptance radius
                        when pos_err_arcsec is given (default 3).
     crowd_radius_arc : if given, count same-catalogue neighbours within this
@@ -342,24 +334,14 @@ def match_catalogs_2D(cat_list, thres_arc=2, pos_err_arcsec=None, nsigma=3.0, cr
     """
     n = len(cat_list)
 
-    # Build per-catalogue positional-uncertainty arrays  (radians)
-    if pos_err_arcsec is not None:
-        errs = []
-        for i, cat in enumerate(cat_list):
-            e = np.asarray(pos_err_arcsec[i], dtype=float)
-            if e.ndim == 0 or e.size == 1:
-                e = np.full(len(cat.ra), float(e))
-            errs.append(np.deg2rad(e))
+    # Build per-catalogue positional-uncertainty arrays [radians]
+    if thres_arc_override:
+        errs = None
     else:
-        has_any = any(c.e_ra is not None for c in cat_list)
-        if has_any:
-            errs = [np.deg2rad(get_pos_err_deg(cat))
-            for cat in cat_list]
-        else:
-            errs = None
+        errs = [cat.err_rad for cat in cat_list]
 
     # For each source, counts how many other sources in the same catalogue lie within 
-    # crowd_radius_arc arcsec. Sources near others are unreliable
+    # crowd_radius_arc [arcsec]. Sources near many others are unreliable
     crowd_counts = {}
     if crowd_radius_arc is not None:
         crowd_r_rad = np.deg2rad(crowd_radius_arc / 3600.0)
@@ -384,7 +366,7 @@ def match_catalogs_2D(cat_list, thres_arc=2, pos_err_arcsec=None, nsigma=3.0, cr
             ra_a, dec_a = np.array(cat_list[a].ra),  np.array(cat_list[a].dec)
             ra_b, dec_b = np.array(cat_list[b].ra),  np.array(cat_list[b].dec)
 
-            # Guard for empty catalogues
+            # Empty catalogue check
             if len(ra_a) == 0 or len(ra_b) == 0:
                 matched_results[(a, b)] = ([], [])
                 sep_results[(a, b)]     = np.array([])
@@ -402,7 +384,7 @@ def match_catalogs_2D(cat_list, thres_arc=2, pos_err_arcsec=None, nsigma=3.0, cr
                 err_sup = errs[b] if errs is not None else None
                 err_sub = errs[a] if errs is not None else None
 
-            # tangent-plane projection so that KD-tree distances are more accurate
+            # Tangent-plane projection such that KD-tree distances are more accurate
             ra0  = 0.5 * (np.mean(sup_ra) + np.mean(sub_ra))
             dec0 = 0.5 * (np.mean(sup_dec) + np.mean(sub_dec))
             sup_x, sup_y = _project_radec(sup_ra, sup_dec, ra0, dec0)
@@ -437,19 +419,18 @@ def match_catalogs_2D(cat_list, thres_arc=2, pos_err_arcsec=None, nsigma=3.0, cr
             matched_dists = dists[valid]   # radians
 
             # Keep only the closest sub for each sup
-            if len(matched_sup) != len(np.unique(matched_sup)):
-                unique_sup, counts = np.unique(matched_sup, return_counts=True)
-                dupes = unique_sup[counts > 1]
-                keep  = np.ones(len(matched_sub), dtype=bool)
-                for dup in dupes:
-                    dup_mask       = matched_sup == dup
-                    best           = np.argmin(matched_dists[dup_mask])
-                    dup_positions  = np.where(dup_mask)[0]
-                    keep[dup_positions]       = False
-                    keep[dup_positions[best]] = True
-                matched_sub   = matched_sub[keep]
-                matched_sup   = matched_sup[keep]
-                matched_dists = matched_dists[keep]
+            order = np.lexsort((matched_dists, matched_sup))
+            matched_sup_sorted   = matched_sup[order]
+            matched_sub_sorted   = matched_sub[order]
+            matched_dists_sorted = matched_dists[order]
+            
+            # Keep first occurrence of each sup index
+            first = np.ones(len(matched_sup_sorted), dtype=bool)
+            first[1:] = matched_sup_sorted[1:] != matched_sup_sorted[:-1]
+            
+            matched_sup   = matched_sup_sorted[first]
+            matched_sub   = matched_sub_sorted[first]
+            matched_dists = matched_dists_sorted[first]
 
             # Convert radian KD-tree distances to arcsec separations
             sep_arcsec = np.rad2deg(matched_dists) * 3600.0
@@ -477,7 +458,7 @@ def match_catalogs_2D(cat_list, thres_arc=2, pos_err_arcsec=None, nsigma=3.0, cr
             pair_maps[(a, b)] = dict(zip(idx_b_list, idx_a_list))   # idx_b -> idx_a
             pair_maps[(b, a)] = dict(zip(idx_a_list, idx_b_list))   # idx_a -> idx_b
 
-    # Quality assessment
+    # Quality assessors
     quality = {
         'sep_arcsec': sep_results,
         'p_match':    prob_results if errs is not None else {},
