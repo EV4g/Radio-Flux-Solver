@@ -2,7 +2,7 @@ import numpy as np
 from astropy.table import Table
 import copy
 import os
-from functions import sources_in_fits
+from functions import sources_in_fits, get_pos_err_deg
 
 # wrapper class for incoming Table data
 class catalog:
@@ -14,6 +14,7 @@ class catalog:
         # data is None until load() is called
         self.flux = self.e_flux = self.flux_unit = None
         self.ra = self.dec = self.e_ra = self.e_dec = None
+        self.err_rad = None
     
     def load(self):
         if self.ra is not None:
@@ -26,14 +27,15 @@ class catalog:
         self.flux_unit  = str(catalog['flux_jy'].unit)
         self.ra         = np.array(catalog['ra']) % 360
         self.dec        = np.array(catalog['dec'])
-
+        
         try:
             self.e_ra   = np.array(catalog['e_ra'])
             self.e_dec  = np.array(catalog['e_dec'])
             self.e_ra[np.where(np.isnan(self.e_ra))] = 0   # sanitize NaNs
             self.e_dec[np.where(np.isnan(self.e_dec))] = 0 # sanitize NaNs
+            self.err_rad = np.deg2rad(get_pos_err_deg(self))
         except Exception:
-            self.e_ra = self.e_dec = None
+            self.e_ra = self.e_dec = self.err_rad = None
     
     def create_subset(self, valid):
         subset = copy.deepcopy(self)
@@ -41,6 +43,7 @@ class catalog:
             setattr(subset, attribute, getattr(self, attribute)[valid])
         if self.e_ra  is not None: subset.e_ra  = self.e_ra[valid]
         if self.e_dec is not None: subset.e_dec = self.e_dec[valid]
+        if self.err_rad is not None: subset.err_rad = self.err_rad[valid]
         return subset
 
 class catalog_set:
@@ -63,17 +66,18 @@ class catalog_set:
 
 # wrapper class for passable parameters
 class config:
-    def __init__(self, thres_arc, 
-                 spectral_damping_factor,
-                 snr_lower_limit,
-                 spectral_index_theory      = -0.7,
-                 minimum_points             = 2,
-                 nsigma                     = 3,
-                 crowd_radius_arc           = None,
-                 minimum_frequency_spacing  = None,
-                 catalogs                   = None,
-                 reference_file             = None,
-                 anchor_catalog             = None):
+    def __init__(self, spectral_damping_factor = 5,
+                 snr_lower_limit               = 7,
+                 spectral_index_theory         = -0.7,
+                 minimum_points                = 2,
+                 nsigma                        = 3,
+                 crowd_radius_arc              = None,
+                 minimum_frequency_spacing     = None,
+                 catalogs                      = None,
+                 reference_file                = None,
+                 anchor_catalog                = None,
+                 thres_arc                     = 2,
+                 thres_arc_override            = False):
         
         self.thres_arc                  = thres_arc
         self.spectral_damping_factor    = spectral_damping_factor
@@ -88,6 +92,7 @@ class config:
         self.reference_file             = reference_file
         self.anchor_catalog             = anchor_catalog
         self.anchor_catalog_index       = self.catalogs.index(anchor_catalog) if catalogs is not None else None
+        self.thres_arc_override         = thres_arc_override
         
     def setup(self):
         # load the data per catalog
