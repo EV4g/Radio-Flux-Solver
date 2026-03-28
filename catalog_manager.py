@@ -1,13 +1,15 @@
 import numpy as np
 from astropy.table import Table
 import copy
-import os
 from functions import sources_in_fits, get_pos_err_deg
+from pathlib import Path
+
+base_path = Path(__file__).resolve().parent
 
 # wrapper class for incoming Table data
 class catalog:
     def __init__(self, path=None, freq_hz=None, name=None):
-        self.path      = os.getcwd() + path
+        self.path      = base_path / path.lstrip("/")
         self.freq      = freq_hz
         self.freq_unit = 'Hz'
         self.name      = name
