@@ -680,26 +680,27 @@ def weighted_bin_stats_2d(x, y, z, w, n_bins=50, m_bins=50):
     x_edges = np.linspace(x.min(), x.max(), n_bins + 1)
     y_edges = np.linspace(y.min(), y.max(), m_bins + 1)
 
-    # Weighted sum of z and weights per bin
-    wz, xe, ye, _ = binned_statistic_2d(x, y, z * w, statistic='sum', bins=[x_edges, y_edges])
-    w_sum, _, _, _ = binned_statistic_2d(x, y, w,     statistic='sum', bins=[x_edges, y_edges])
+    wz,    xe, ye, _ = binned_statistic_2d(x, y, z * w, statistic='sum', bins=[x_edges, y_edges])
+    w_sum, _,  _,  _ = binned_statistic_2d(x, y, w,     statistic='sum', bins=[x_edges, y_edges])
 
-    wmean = np.where(w_sum > 0, wz / w_sum, np.nan)
+    wmean = np.full_like(wz, np.nan)
+    np.divide(wz, w_sum, out=wmean, where=w_sum > 0)
 
-    # Weighted std: need E[w*(z-mean)^2] / sum(w)
-    # Compute per-point residual, then bin again
-    bin_x = np.digitize(x, x_edges[:-1]) - 1
-    bin_y = np.digitize(y, y_edges[:-1]) - 1
-    bin_x = np.clip(bin_x, 0, n_bins - 1)
-    bin_y = np.clip(bin_y, 0, m_bins - 1)
+    bin_x = np.clip(np.digitize(x, x_edges[:-1]) - 1, 0, n_bins - 1)
+    bin_y = np.clip(np.digitize(y, y_edges[:-1]) - 1, 0, m_bins - 1)
 
-    residuals = (z - wmean[bin_x, bin_y]) ** 2
+    bin_mean  = wmean[bin_x, bin_y]
+    valid_pts = ~np.isnan(bin_mean)          # ← skip points in empty bins
+
+    residuals = np.zeros_like(z)
+    residuals[valid_pts] = (z[valid_pts] - bin_mean[valid_pts]) ** 2
+
     wres, _, _, _ = binned_statistic_2d(x, y, residuals * w, statistic='sum', bins=[x_edges, y_edges])
-    wstd = np.where(w_sum > 0, np.sqrt(wres / w_sum), np.nan)
+    wstd = np.full_like(wres, np.nan)
+    np.divide(wres, w_sum, out=wstd, where=w_sum > 0)
+    wstd = np.sqrt(wstd) 
 
-    x_centers = 0.5 * (xe[:-1] + xe[1:])
-    y_centers = 0.5 * (ye[:-1] + ye[1:])
-    return x_centers, y_centers, wmean, wstd
+    return 0.5*(xe[:-1]+xe[1:]), 0.5*(ye[:-1]+ye[1:]), wmean, wstd
 
 """Given arrays of RA/Dec (degrees) and a FITS file, return a boolean array of which sources fall within the image footprint."""
 def sources_in_fits(ra_deg, dec_deg, fn):

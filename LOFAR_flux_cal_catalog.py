@@ -377,15 +377,14 @@ print(f"Spectral index: {round(px,3)}, correction factor: {round(py,3)}")
 #### position dependant correction factor
 o = np.argsort(correction_factor_global)
 f = (correction_factor_global[o] > 1e-2) & (correction_factor_global[o] < 1e2)
-plt.scatter(ras[o][f], decs[o][f], c=correction_factor_global[o][f], s=0.1, norm='log')
+plt.scatter(ras[o][f], decs[o][f], c=correction_factor_global[o][f], s=2, norm='log')
 plt.colorbar(label='Correction factor')
 plt.ylabel("DEC (deg)")
 plt.xlabel("RA (deg)")
 plt.show()
 
 #### correction factor as function of total weighting factor
-c = (total_weighting_factor > 25) & (correction_factor_global < 7)
-plt.scatter(total_weighting_factor[c], correction_factor_global[c], s=1.5, alpha=0.2)
+plt.scatter(total_weighting_factor, correction_factor_global, s=1.5, alpha=0.2)
 plt.yscale('log')
 plt.xscale('log')
 plt.axhline(1, ls='--', color='black', alpha=0.5)
@@ -401,8 +400,8 @@ cstd = np.std(correction_factor_global[mask])
 cmin, cmax = max(0.1, cmean - 3 * cstd), cmean + 3 * cstd
 mask &= (correction_factor_global > cmin) & (correction_factor_global < cmax) & (total_weighting_factor > 0)
 
-dec_c, dec_mn, dec_std = weighted_bin_stats(decs[mask], correction_factor_global[mask], total_weighting_factor[mask], n_bins=100)
-ra_c,  ra_mn,  ra_std  = weighted_bin_stats(ras[mask],  correction_factor_global[mask], total_weighting_factor[mask], n_bins=100)
+dec_c, dec_mn, dec_std = weighted_bin_stats(decs[mask], correction_factor_global[mask], total_weighting_factor[mask], n_bins=50)
+ra_c,  ra_mn,  ra_std  = weighted_bin_stats(ras[mask],  correction_factor_global[mask], total_weighting_factor[mask], n_bins=50)
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 ax1.plot(dec_c, dec_mn, color='steelblue', lw=2, label='Weighted mean')
@@ -426,7 +425,7 @@ ra_c2, dec_c2, wmean_2d, wstd_2d = weighted_bin_stats_2d(
     n_bins=40, m_bins=40
 )
 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
 im1 = ax1.pcolormesh(ra_c2, dec_c2, wmean_2d.T, cmap='RdYlGn_r', shading='auto')
 fig.colorbar(im1, ax=ax1, label='Correction factor')
