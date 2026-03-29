@@ -252,11 +252,23 @@ cygnus_config = config(spectral_damping_factor = 5,
                        anchor_catalog = cygnus,
                        )
 
+small_config = config(spectral_damping_factor = 5, 
+                       snr_lower_limit = 7, 
+                       nsigma = 3, 
+                       minimum_points = 3,
+                       crowd_radius_arc = None,
+                       minimum_frequency_spacing = None,
+                       catalogs = [lofar_dr3, nvss, racs],
+                       reference_file = None,
+                       anchor_catalog = racs,
+                       )
+
 #### Parameters
 debug = False
 #config = lofar_dr3_config
-config = default_config
+#config = default_config
 #config = cygnus_config
+config = small_config
 
 config.setup()
 
