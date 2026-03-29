@@ -93,7 +93,7 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
 
     # all pairwise separations, then take per-source maximum
     coords = [SkyCoord(ra=cat.ra * u.deg, dec=cat.dec * u.deg) for cat in cats]
-    sig    = [get_pos_err_deg(cat) * 3600 for cat in cats]   # arcsec per-source
+    sig    = [np.rad2deg(cat.err_rad) * 3600 for cat in cats]   # arcsec per-source
 
     pair_seps = {}
     p_weight  = np.ones(len(cats[0].ra))
@@ -254,8 +254,8 @@ cygnus_config = config(spectral_damping_factor = 5,
 
 #### Parameters
 debug = False
-config = lofar_dr3_config
-#config = default_config
+#config = lofar_dr3_config
+config = default_config
 #config = cygnus_config
 
 config.setup()
@@ -322,7 +322,7 @@ print(f"Calculations done at: {perf_counter() - start} s")
 #### plotting correction factor for each catalog combo ####
 ###########################################################
 # for spx, snr, cor, catw, max_sep in zip(spectral_index_global, signal_to_noise, correction_factor_global, catalog_weight_factor, max_separation):
-#     total_weighting_factor = calculate_weighted_correction_factor(spx, snr, catw, max_sep, default_config)
+#     total_weighting_factor = calculate_weighted_correction_factor(spx, snr, catw, max_sep, config)
 #     Xi, Yi, Zi, px, py = calculate_contour_statistics(spx, cor, total_weighting_factor, logy=True)
 
 #     o = np.argsort(total_weighting_factor)
@@ -354,7 +354,7 @@ signal_to_noise = np.concatenate(signal_to_noise)
 catalog_weight_factor = np.concatenate(catalog_weight_factor)
 max_separation = np.concatenate(max_separation)
 
-total_weighting_factor = calculate_weighted_correction_factor(spectral_index_global, signal_to_noise, catalog_weight_factor, max_separation, default_config)
+total_weighting_factor = calculate_weighted_correction_factor(spectral_index_global, signal_to_noise, catalog_weight_factor, max_separation, config)
 # weighting_filter = (total_weighting_factor > 10)
 
 # ras = ras[weighting_filter]
@@ -372,7 +372,7 @@ total_weighting_factor = calculate_weighted_correction_factor(spectral_index_glo
 #### plotting correction factor based on all previous catalog matchings ####
 ############################################################################
 
-Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index_global, correction_factor_global, total_weighting_factor, logy=True, n=200)
+Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index_global, correction_factor_global, total_weighting_factor, logy=True, n=1000)
 
 o = np.argsort(total_weighting_factor)
 
@@ -487,7 +487,7 @@ print(f"Done at: {perf_counter() - start} s")
 # for combination in get_combinations(catalogs, size=4, required_index=6, skip_index=2):
 #     local_cats = [catalogs[i] for i in combination]
 
-#     output = compute_flux_correction_factor(local_cats, default_config, debug=debug)
+#     output = compute_flux_correction_factor(local_cats, config, debug=debug)
 
 #     if output is not None:
 #         spx, snr, cor, flux, catw, max_sep, p_weight, ra, dec = output
