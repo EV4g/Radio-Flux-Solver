@@ -193,7 +193,7 @@ def calculate_correction_factor_weight(spx, snr, catw, max_sep, p_match, n_crowd
     # weighting based on separation between points
     separation_weight = np.exp(-(max_sep / config.thres_arc) ** 2)
     
-    return spectral_difference_factor * signal_to_noise_factor * catw * separation_weight
+    return spectral_difference_factor * signal_to_noise_factor * catw * separation_weight * p_match
 
 """Extrapolate flux based on two frequencies, one flux, and a spectral index"""
 def get_flux_from_index(spectral_index, reference_flux, current_frequency, reference_frequency):
@@ -203,7 +203,8 @@ start = perf_counter()
 
 #### all available catalogs
 all_catalogs = catalog_set([
-    catalog("/catalogs/racs/racs_clean.fits",                 887.5e6,    "racs"),
+    catalog("/catalogs/racs/racs_gal_clean.fits",             887.5e6,    "racs_gal"),  # the galactic portion of the racs survey
+    catalog("/catalogs/racs/racs_full_clean.fits",            887.5e6,    "racs"),      # the rest of the racs survey
     catalog("/catalogs/meerkat/meerkat_clean.fits",           1359.7e6,   "meerkat"),
     catalog("/catalogs/vlssr/vlssr_clean.fits",               73.8e6,     "vlssr"),
     catalog("/catalogs/tgss/tgss_clean.fits",                 150e6,      "tgss"),
@@ -211,12 +212,12 @@ all_catalogs = catalog_set([
     catalog("/catalogs/gleam_x_gp/gleam_x_gp_clean.fits",     200e6,      "gleam_xgp"),
     catalog("/catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss"),
     catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss"),
-    catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar"),
+    catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar"),     # LOFAR P282+00
     catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3"),
-    catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus"),
+    catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus"),    # vla cygnus region
     ])
 
-racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar, lofar_dr3, cygnus = all_catalogs.catalogs
+racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar, lofar_dr3, cygnus = all_catalogs.catalogs
 
 #### available configurations
 lofar_dr3_config = config(spectral_damping_factor = 5,
@@ -225,7 +226,7 @@ lofar_dr3_config = config(spectral_damping_factor = 5,
                           minimum_points = 3,
                           crowd_radius_arc = 10,
                           minimum_frequency_spacing = None,
-                          catalogs = [racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3],
+                          catalogs = [racs, racs_gal, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3],
                           reference_file = None,
                           anchor_catalog = lofar_dr3,                        
                           )
@@ -236,7 +237,7 @@ default_config = config(spectral_damping_factor = 5,
                         minimum_points = 3,
                         crowd_radius_arc = None,
                         minimum_frequency_spacing = None,
-                        catalogs = [racs, meerkat, tgss, gleam_300, gleam_xgp, wenss, lofar],
+                        catalogs = [racs_gal, meerkat, tgss, gleam_300, gleam_xgp, wenss, lofar],
                         reference_file = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0],
                         anchor_catalog = lofar,                        
                         )
@@ -247,7 +248,7 @@ cygnus_config = config(spectral_damping_factor = 5,
                        minimum_points = 3,
                        crowd_radius_arc = None,
                        minimum_frequency_spacing = None,
-                       catalogs = [vlssr, tgss, gleam_300, nvss, wenss, lofar_dr3, cygnus],
+                       catalogs = [racs, vlssr, tgss, gleam_300, nvss, wenss, lofar_dr3, cygnus],
                        reference_file = np.sort(glob.glob(os.getcwd()+"/data/other/*.fits"))[0],
                        anchor_catalog = cygnus,
                        )
@@ -265,10 +266,10 @@ small_config = config(spectral_damping_factor = 5,
 
 #### Parameters
 debug = False
-#config = lofar_dr3_config
+config = lofar_dr3_config
 #config = default_config
 #config = cygnus_config
-config = small_config
+#config = small_config
 
 config.setup()
 
@@ -422,9 +423,11 @@ plt.show()
 plt.scatter(total_weighting_factor, correction_factor_global, s=1.5, alpha=0.2)
 plt.yscale('log')
 plt.xscale('log')
-plt.axhline(1, ls='--', color='black', alpha=0.5)
+plt.axhline(1, ls='--', color='black', alpha=0.5, label='1')
+plt.axhline(py, ls='--', color='tomato', label='Fit')
 plt.ylabel("Correction factor")
 plt.xlabel("Total weighting factor")
+plt.legend()
 plt.show()
 
 #### correction factor as function of ra and dec separately
@@ -479,6 +482,12 @@ plt.tight_layout()
 plt.show()
 
 print(f"Done at: {perf_counter() - start} s")
+
+#### plot point densities per catalog
+# for cat in config.catalogs:
+#     plt.hist2d(-cat.ra, cat.dec, bins=(400, 100))
+#     plt.title(cat.name)
+#     plt.show()
 
 #### variables
 # ras, decs = [], []              # positional coordinates
