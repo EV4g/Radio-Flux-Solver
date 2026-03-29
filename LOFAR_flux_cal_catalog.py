@@ -221,30 +221,30 @@ racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar, 
 
 #### available configurations
 lofar_dr3_config = config(spectral_damping_factor = 5,
-                          snr_lower_limit = 7, 
-                          nsigma = 2, 
+                          snr_lower_limit = 7,
+                          nsigma = 2,
                           minimum_points = 3,
                           crowd_radius_arc = 10,
                           minimum_frequency_spacing = None,
                           catalogs = [racs, racs_gal, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3],
                           reference_file = None,
-                          anchor_catalog = lofar_dr3,                        
+                          anchor_catalog = lofar_dr3,
                           )
 
-default_config = config(spectral_damping_factor = 5, 
-                        snr_lower_limit = 7, 
-                        nsigma = 3, 
+default_config = config(spectral_damping_factor = 5,
+                        snr_lower_limit = 7,
+                        nsigma = 3,
                         minimum_points = 3,
                         crowd_radius_arc = None,
                         minimum_frequency_spacing = None,
                         catalogs = [racs_gal, meerkat, tgss, gleam_300, gleam_xgp, wenss, lofar],
                         reference_file = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0],
-                        anchor_catalog = lofar,                        
+                        anchor_catalog = lofar,
                         )
 
-cygnus_config = config(spectral_damping_factor = 5, 
-                       snr_lower_limit = 7, 
-                       nsigma = 3, 
+cygnus_config = config(spectral_damping_factor = 5,
+                       snr_lower_limit = 7,
+                       nsigma = 3,
                        minimum_points = 3,
                        crowd_radius_arc = None,
                        minimum_frequency_spacing = None,
@@ -253,9 +253,9 @@ cygnus_config = config(spectral_damping_factor = 5,
                        anchor_catalog = cygnus,
                        )
 
-small_config = config(spectral_damping_factor = 5, 
-                       snr_lower_limit = 7, 
-                       nsigma = 3, 
+small_config = config(spectral_damping_factor = 5,
+                       snr_lower_limit = 7,
+                       nsigma = 3,
                        minimum_points = 3,
                        crowd_radius_arc = None,
                        minimum_frequency_spacing = None,
@@ -266,8 +266,8 @@ small_config = config(spectral_damping_factor = 5,
 
 #### Parameters
 debug = False
-config = lofar_dr3_config
-#config = default_config
+#config = lofar_dr3_config
+config = default_config
 #config = cygnus_config
 #config = small_config
 
