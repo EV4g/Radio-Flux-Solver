@@ -5,7 +5,8 @@ import glob
 import numpy as np
 
 # get calagogs
-# racs      = Table.read(os.getcwd()+"/catalogs/racs/RACS_DR1_Sources_GalacticRegion_v2021_08.xml")
+# racs_full = Table.read(os.getcwd()+"/catalogs/racs/racs.fits")
+# racs_gal  = Table.read(os.getcwd()+"/catalogs/racs/RACS_DR1_Sources_GalacticRegion_v2021_08.xml")
 # meerkat   = Table.read(os.getcwd()+"/catalogs/meerkat/smgps_moment0_5beam_5sigma_510599row_compact_source_catalogue.fits")
 # vlssr     = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_full.csv")
 # tgss      = Table.read(os.getcwd()+"/catalogs/tgss/TGSSADR1_7sigma_catalog.fits")
@@ -108,30 +109,51 @@ import numpy as np
 
 # gleam_xgp.write("gleam_x_gp_clean.fits")
 
-#### racs ####
-# racs['flux_jy'] = racs['Total_flux_Source'] * 1e-3
-# racs['e_flux_jy'] = racs['E_Total_flux_Source'] * 1e-3
-# racs['flux_jy'].unit = 'Jy'
-# racs['e_flux_jy'].unit = 'Jy'
-# racs.rename_column("RA", "ra")
-# racs.rename_column("Dec", "dec")
-# racs.rename_column("E_RA", "e_ra")
-# racs.rename_column("E_Dec", "e_dec")
+#### racs_gal ####
+# racs_gal['flux_jy'] = racs_gal['Total_flux_Source'] * 1e-3
+# racs_gal['e_flux_jy'] = racs_gal['E_Total_flux_Source'] * 1e-3
+# racs_gal['flux_jy'].unit = 'Jy'
+# racs_gal['e_flux_jy'].unit = 'Jy'
+# racs_gal.rename_column("RA", "ra")
+# racs_gal.rename_column("Dec", "dec")
+# racs_gal.rename_column("E_RA", "e_ra")
+# racs_gal.rename_column("E_Dec", "e_dec")
 
-# if str(racs['e_ra'].unit) == 'arcsec':
-#     racs['e_ra'] /= 3600
-#     racs['e_ra'].unit = 'deg'
-# if str(racs['e_dec'].unit) == 'arcsec':
-#     racs['e_dec'] /= 3600
-#     racs['e_dec'].unit = 'deg'
+# if str(racs_gal['e_ra'].unit) == 'arcsec':
+#     racs_gal['e_ra'] /= 3600
+#     racs_gal['e_ra'].unit = 'deg'
+# if str(racs_gal['e_dec'].unit) == 'arcsec':
+#     racs_gal['e_dec'] /= 3600
+#     racs_gal['e_dec'].unit = 'deg'
 
-# racs_out = Table()
-# for col in racs.colnames:
-#     data = np.array(racs[col])  # strips Quantity/mixin type
-#     unit = str(racs[col].unit) if racs[col].unit else None
-#     racs_out[col] = Column(data, unit=unit)
+# racs_gal_out = Table()
+# for col in racs_gal.colnames:
+#     data = np.array(racs_gal[col])  # strips Quantity/mixin type
+#     unit = str(racs_gal[col].unit) if racs_gal[col].unit else None
+#     racs_gal_out[col] = Column(data, unit=unit)
 
-# racs_out.write("racs_clean.fits", overwrite=True)
+# racs_gal_out.write("racs_gal_clean.fits", overwrite=True)
+
+#### racs full ####
+# racs_full['flux_jy'] = racs_full['Ftot'] * 1e-3
+# racs_full['e_flux_jy'] = racs_full['s_Ftot'] * 1e-3
+# racs_full['flux_jy'].unit = 'Jy'
+# racs_full['e_flux_jy'].unit = 'Jy'
+# racs_full.rename_column("RAJ2000", "ra")
+# racs_full.rename_column("DEJ2000", "dec")
+# racs_full.rename_column("e_RAJ2000", "e_ra")
+# racs_full.rename_column("e_DEJ2000", "e_dec")
+
+# if str(racs_full['e_ra'].unit) == 'arcsec':
+#     racs_full['e_ra'] /= 3600
+#     racs_full['e_ra'].unit = 'deg'
+# if str(racs_full['e_dec'].unit) == 'arcsec':
+#     racs_full['e_dec'] /= 3600
+#     racs_full['e_dec'].unit = 'deg'
+
+# racs_full.write("racs_full_clean.fits", overwrite=True)
+
+
 
 #### meerkat ####
 # meerkat['flux_jy'] = meerkat['Fint'] * 1e-3
