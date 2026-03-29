@@ -373,7 +373,7 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
             else:
                 sub_xyz, sup_err, sub_err, tree_sup, normal = xyz_a, errs[b], errs[a], trees[b], False
 
-            # Coarse search radius in 3D (≈ radians for small angles)
+            # Coarse search
             if use_errs:
                 sigma_pair   = np.hypot(np.median(sup_err), np.median(sub_err))
                 query_radius = 2.0 * np.sin(nsigma * sigma_pair / 2.0)
@@ -382,7 +382,7 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
 
             dists, idxs = tree_sup.query(sub_xyz, k=1, distance_upper_bound=query_radius, workers=-1)
 
-            # Per-source sigma refinement
+            # Per-source refinement
             if use_errs:
                 prelim = dists < query_radius
                 accept = np.zeros(len(sub_xyz), dtype=bool)
@@ -399,7 +399,7 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
             matched_sup   = idxs[valid]
             matched_dists = dists[valid]
 
-            # Vectorized deduplication: keep closest sub per sup
+            # Deduplication: keep closest sub per sup
             if len(matched_sup) != len(np.unique(matched_sup)):
                 order             = np.lexsort((matched_dists, matched_sup))
                 matched_sup       = matched_sup[order]
@@ -412,10 +412,10 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
                 matched_sub       = matched_sub[first]
                 matched_dists     = matched_dists[first]
 
-            # Convert 3D distance → arcsec: θ = 2*arcsin(d/2)
+            # Convert distance to arcsec
             sep_arcsec = np.rad2deg(2.0 * np.arcsin(matched_dists / 2.0)) * 3600.0
 
-            # Match probability via chi² on angular separation
+            # Match probability via chi_sq on angular separation
             if use_errs:
                 sep_rad        = np.deg2rad(sep_arcsec / 3600.0)
                 combined_sig_f = np.hypot(sub_err[matched_sub], sup_err[matched_sup])
