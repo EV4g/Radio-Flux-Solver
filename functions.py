@@ -338,7 +338,7 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
     # Prebuild one KD-tree per catalog
     trees = [cKDTree(xyz) if len(xyz) > 0 else None for xyz in xyz_all]
 
-    # Crowding in 3D (no projection needed)
+    # Crowding
     crowd_counts = {}
     if crowd_radius_arc is not None:
         crowd_r_3d = 2.0 * np.sin(np.deg2rad(crowd_radius_arc / 3600.0) / 2.0)
