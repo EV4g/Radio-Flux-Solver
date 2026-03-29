@@ -55,7 +55,7 @@ def quick_compare_catalog(cat1, cat2, config):
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
 def compute_flux_correction_factor(cats, config, debug=False, internal_output=False):
-    indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma, thres_arc_override=config.thres_arc_override)
+    indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma, thres_arc_override=config.thres_arc_override, crowd_radius_arc=config.crowd_radius_arc)
 
     # if there are too few sources, return None
     if len(indices[0]) <= config.minimum_points:
@@ -75,13 +75,13 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
             return None
     other_index.remove(anchor_index)
 
-    # if crowding parameter is available, remove overcrowded points; else skip
+    # if crowding parameter is available, store max neighbour (withing crowding_radius) count per source
+    n_crowd = np.zeros(len(indices[0]), dtype=int)
     if quality['n_crowd']:
-        crowd_ok = np.ones(len(indices[0]), dtype=bool)
         for cat_idx, match_idx in enumerate(indices):
             nc = quality['n_crowd'].get(cat_idx)
-            if nc is not None and len(nc): crowd_ok &= (nc[match_idx] == 0)
-        indices = [index[crowd_ok] for index in indices]
+            if nc is not None and len(nc):
+                n_crowd = np.maximum(n_crowd, nc[match_idx])
     
     # re-check after crowding
     if len(indices[0]) <= config.minimum_points:
@@ -179,10 +179,10 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
         
     if internal_output: print(f"Completed set [{', '.join(f'{cat.name:9}' for cat in cats)}]", f"Matches: {len(indices[0])}")    
     
-    return (spectral_indices, snr, correction_factor, extrapolated_flux_fit, catalog_weight_factor, max_sep, p_weight, ra, dec)
+    return (spectral_indices, snr, correction_factor, extrapolated_flux_fit, catalog_weight_factor, max_sep, p_weight, n_crowd, ra, dec)
 
 """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
-def calculate_weighted_correction_factor(spx, snr, catw, max_sep, config):
+def calculate_correction_factor_weight(spx, snr, catw, max_sep, p_match, n_crowd, config):
     # downweight sources with spectral indices far away from -0.7
     spectral_difference_factor = np.exp(-config.spectral_damping_factor * (spx - config.spectral_index_theory)**2)
     
@@ -221,9 +221,9 @@ racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar, lofar_dr3,
 #### available configurations
 lofar_dr3_config = config(spectral_damping_factor = 5,
                           snr_lower_limit = 7, 
-                          nsigma = 3, 
+                          nsigma = 2, 
                           minimum_points = 3,
-                          crowd_radius_arc = None,
+                          crowd_radius_arc = 10,
                           minimum_frequency_spacing = None,
                           catalogs = [racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3],
                           reference_file = None,
@@ -302,6 +302,7 @@ signal_to_noise = []            # signal-to-noise (flux_jy / e_flux_jy)
 catalog_weight_factor = []      # weighting factor based on systematic catalog uncertainty; to be deprecated
 max_separation = []             # maximum per-source separation between all three matched catalog positions
 point_probability = []          # probability of points matching
+crowding_parameter = []         # maximum number of neighbours per source within crowd_radius_arc
 
 ###################################################
 #### catalog three-way combination auto-looper ####
@@ -313,8 +314,7 @@ for i, combination in enumerate(all_combinations):
     output = compute_flux_correction_factor(local_cats, config, debug=debug)
     
     if output is not None:
-        
-        spx, snr, cor, flux, catw, max_sep, p_weight, ra, dec = output
+        spx, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(spx)}")
         
         ras += [ra]; decs += [dec]
@@ -325,6 +325,7 @@ for i, combination in enumerate(all_combinations):
         catalog_weight_factor += [catw]
         max_separation += [max_sep]
         point_probability += [p_weight]
+        crowding_parameter += [n_crowd]
     else:
         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", "Matches: None")
 
@@ -365,25 +366,21 @@ fitted_flux = np.concatenate(fitted_flux)
 signal_to_noise = np.concatenate(signal_to_noise)
 catalog_weight_factor = np.concatenate(catalog_weight_factor)
 max_separation = np.concatenate(max_separation)
+crowding_parameter = np.concatenate(crowding_parameter)
+point_probability = np.concatenate(point_probability)
 
-total_weighting_factor = calculate_weighted_correction_factor(spectral_index_global, signal_to_noise, catalog_weight_factor, max_separation, config)
-# weighting_filter = (total_weighting_factor > 10)
+total_weighting_factor = calculate_correction_factor_weight(spectral_index_global,
+                                                            signal_to_noise,
+                                                            catalog_weight_factor,
+                                                            max_separation,
+                                                            point_probability,
+                                                            crowding_parameter,
+                                                            config)
 
-# ras = ras[weighting_filter]
-# decs = decs[weighting_filter]
-# correction_factor_global = correction_factor_global[weighting_filter]
-# spectral_index_global = spectral_index_global[weighting_filter]
-# fitted_flux = fitted_flux[weighting_filter]
-# signal_to_noise = signal_to_noise[weighting_filter]
-# catalog_weight_factor = catalog_weight_factor[weighting_filter]
-# max_separation = max_separation[weighting_filter]
-
-# total_weighting_factor = total_weighting_factor[weighting_filter]
 
 ############################################################################
 #### plotting correction factor based on all previous catalog matchings ####
 ############################################################################
-
 Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index_global, correction_factor_global, total_weighting_factor, logy=True, n=1000)
 
 o = np.argsort(total_weighting_factor)
@@ -405,7 +402,7 @@ plt.title("Correction factor as function of fitted spectral index\nall catalogs"
 plt.show()
 
 print("------------------------------------------------")
-print(f"Spectral index: {round(px,3)}, correction factor: {round(py,3)}")
+print(f"Spectral index: {round(px,3)}, correction factor: {round(py,3)}, total matches: {len(correction_factor_global)}")
 
 
 ##########################
@@ -413,7 +410,7 @@ print(f"Spectral index: {round(px,3)}, correction factor: {round(py,3)}")
 ##########################
 
 #### position dependant correction factor
-o = np.argsort(correction_factor_global)
+#o = np.argsort(correction_factor_global)
 f = (correction_factor_global[o] > 1e-2) & (correction_factor_global[o] < 1e2)
 plt.scatter(ras[o][f], decs[o][f], c=correction_factor_global[o][f], s=2, norm='log')
 plt.colorbar(label='Correction factor')
