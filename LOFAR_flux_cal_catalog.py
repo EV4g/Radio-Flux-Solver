@@ -237,7 +237,7 @@ default_config = config(spectral_damping_factor = 5,
                         minimum_points = 3,
                         crowd_radius_arc = None,
                         minimum_frequency_spacing = None,
-                        catalogs = [racs_gal, meerkat, tgss, gleam_300, gleam_xgp, wenss, lofar],
+                        catalogs = [racs_gal, meerkat, tgss, gleam_300, gleam_xgp, lofar],
                         reference_file = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0],
                         anchor_catalog = lofar,
                         )
@@ -267,8 +267,8 @@ small_config = config(spectral_damping_factor = 5,
 #### Parameters
 debug = False
 #config = lofar_dr3_config
-config = default_config
-#config = cygnus_config
+#config = default_config
+config = cygnus_config
 #config = small_config
 
 config.setup()
