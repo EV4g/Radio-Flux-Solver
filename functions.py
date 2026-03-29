@@ -13,6 +13,7 @@ from reproject import reproject_interp
 from tqdm import tqdm
 from scipy.spatial import cKDTree
 from scipy.stats import gaussian_kde
+from scipy.ndimage import gaussian_filter
 import matplotlib.pyplot as plt
 #import matplotlib.colors as mcolors
 from itertools import combinations
@@ -279,95 +280,86 @@ def compute_fluxcal_statistics(freq1, freq2, flux1, flux2, spectral_index_theory
 
     return spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor
 
-""""""
-def _project_radec(ra_deg, dec_deg, ra0_deg, dec0_deg):
-    ra   = np.deg2rad(ra_deg);  dec  = np.deg2rad(dec_deg)
-    ra0  = np.deg2rad(ra0_deg); dec0 = np.deg2rad(dec0_deg)
-    x = (ra - ra0) * np.cos(dec0)
-    y = (dec - dec0)
-    return x, y
-
 """Return a per-source 1D positional RMS (deg) for a catalog.
-If e_ra / e_dec are stored on the object they are combined as
-  sigma_1d = sqrt((e_ra^2 + e_dec^2) / 2).
-If neither is available, returns a constant array of `fallback` deg."""
+e_ra / e_dec are combined as sigma_1d = sqrt((e_ra^2 + e_dec^2) / 2)."""
 def get_pos_err_deg(cat):
     return np.sqrt((cat.e_ra ** 2 + cat.e_dec ** 2) / 2.0) # degrees
 
-def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, thres_arc_override=False, crowd_radius_arc=None, anchor_index=0, return_quality=False):    
+def radec_to_xyz(ra_deg, dec_deg):
+    ra  = np.deg2rad(ra_deg)
+    dec = np.deg2rad(dec_deg)
+    cd  = np.cos(dec)
+    return np.column_stack([cd * np.cos(ra), cd * np.sin(ra), np.sin(dec)])
+
+def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, anchor_index=0, return_quality=False, thres_arc_override=False):
     """Fast n-catalogue cross-matcher with adaptive positional uncertainties,
     crowding detection, and per-pair quality metrics.
-
+    
     Parameters
     ----------
-    cat_list         : list of catalogue objects exposing .ra and .dec (degrees),
-                       .flux, and .e_flux.
-    thres_arc        : fallback fixed match radius in arcsec.
-    nsigma           : number of combined sigmas used as the acceptance radius
-                       when pos_err_arcsec is given (default 3).
-    crowd_radius_arc : if given, count same-catalogue neighbours within this
-                       radius (arcsec) per source and store in quality['n_crowd'].
-                       This implements the crowding / confusion filter discussed
-                       in the science review.
-    anchor_index     : catalogue index that anchors the multi-catalogue
-                       coalescence search (default 0, i.e. LOFAR).
-    return_quality   : if True, also return a quality dict (see below).
-
-    Returns  (n == 2)
-    -----------------
-        idx_0, idx_1  [, quality]
-
-    Returns  (n > 2)
+    cat_list           : list of catalogue objects for ra,dec [degrees] and flux, and .e_flux.
+    thres_arc          : fallback fixed match radius [arcsec]
+    nsigma             : n * sigmas used as the acceptance radius for point matching
+    crowd_radius_arc   : if given, count same-catalogue neighbours within this
+                         radius [arcsec] per source and store in quality['n_crowd']
+    anchor_index       : catalogue index that anchors the multi-catalogue search
+    return_quality     : if True, also return quality metrics
+    thres_arc_override : if True, forces matching to use thres_arc matching instead of 
+                         error-based nsigma * err_rad
+    
+    Returns
     ----------------
         [idx_0, ..., idx_{n-1}]  [, quality]
-
-    quality dict
+    
+    quality metrics
     ------------
         'sep_arcsec'  {(a,b): ndarray}  arcsec separation for each matched pair,
                       in the same order as the returned index arrays.
-        'p_match'     {(a,b): ndarray}  per-pair match probability from a 2-DOF
-                      chi-squared positional test.  Only populated when
-                      pos_err_arcsec is given; otherwise an empty dict.
+        'p_match'     {(a,b): ndarray}  per-pair match probability from a
+                      chi-squared positional test.
         'n_crowd'     {cat_index: ndarray}  number of same-catalogue neighbours
                       within crowd_radius_arc for each source.  Only populated
                       when crowd_radius_arc is given.
     """
+
     n = len(cat_list)
 
-    # Build per-catalogue positional-uncertainty arrays [radians]
-    if thres_arc_override:
-        errs = None
-    else:
-        errs = [cat.err_rad for cat in cat_list]
+    # Precompute vectors and errors per catalog
+    xyz_all  = []
+    errs     = []
+    for cat in cat_list:
+        xyz_all.append(radec_to_xyz(cat.ra, cat.dec))
+        if not thres_arc_override:
+            errs.append(cat.err_rad)
+        else:
+            errs.append(None)
+    use_errs = not thres_arc_override
 
-    # For each source, counts how many other sources in the same catalogue lie within 
-    # crowd_radius_arc [arcsec]. Sources near many others are unreliable
+    # Prebuild one KD-tree per catalog
+    trees = [cKDTree(xyz) if len(xyz) > 0 else None for xyz in xyz_all]
+
+    # Crowding in 3D (no projection needed)
     crowd_counts = {}
     if crowd_radius_arc is not None:
-        crowd_r_rad = np.deg2rad(crowd_radius_arc / 3600.0)
-        for i, cat in enumerate(cat_list):
-            if len(cat.ra) == 0:
+        crowd_r_3d = 2.0 * np.sin(np.deg2rad(crowd_radius_arc / 3600.0) / 2.0)
+        for i, (xyz, tree) in enumerate(zip(xyz_all, trees)):
+            if tree is None:
                 crowd_counts[i] = np.array([], dtype=int)
                 continue
-            ra0  = np.mean(cat.ra);  dec0 = np.mean(cat.dec)
-            cx, cy = _project_radec(cat.ra, cat.dec, ra0, dec0)
-            ct   = cKDTree(np.column_stack([cx, cy]))
-            nbrs = ct.query_ball_point(np.column_stack([cx, cy]), r=crowd_r_rad)
-            crowd_counts[i] = np.array([len(nb) - 1 for nb in nbrs])   # exclude self
+            nbrs = tree.query_ball_point(xyz, r=crowd_r_3d, workers=-1)
+            crowd_counts[i] = np.array([len(nb) - 1 for nb in nbrs])
 
-    # Pairwise matching
-    matched_results = {}   # (a,b) -> (list_idx_a, list_idx_b)
-    sep_results     = {}   # (a,b) -> arcsec separations
-    prob_results    = {}   # (a,b) -> chi2-based match probabilities
-    pair_maps       = {}   # (a,b) -> {idx_b: idx_a}
+    matched_results = {}
+    sep_results     = {}
+    prob_results    = {}
+    pair_maps       = {}
 
     for a in range(n):
         for b in range(a + 1, n):
-            ra_a, dec_a = np.array(cat_list[a].ra),  np.array(cat_list[a].dec)
-            ra_b, dec_b = np.array(cat_list[b].ra),  np.array(cat_list[b].dec)
+            xyz_a = xyz_all[a]
+            xyz_b = xyz_all[b]
 
-            # Empty catalogue check
-            if len(ra_a) == 0 or len(ra_b) == 0:
+            if len(xyz_a) == 0 or len(xyz_b) == 0:
                 matched_results[(a, b)] = ([], [])
                 sep_results[(a, b)]     = np.array([])
                 prob_results[(a, b)]    = np.array([])
@@ -375,75 +367,63 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, thres_arc_override=Fals
                 pair_maps[(b, a)]       = {}
                 continue
 
-            if len(ra_a) >= len(ra_b):
-                sup_ra, sup_dec, sub_ra, sub_dec, normal = ra_a, dec_a, ra_b, dec_b, True
-                err_sup = errs[a] if errs is not None else None
-                err_sub = errs[b] if errs is not None else None
+            # Always query smaller set against larger tree
+            if len(xyz_a) >= len(xyz_b):
+                sub_xyz, sup_err, sub_err, tree_sup, normal = xyz_b, errs[a], errs[b], trees[a], True
             else:
-                sup_ra, sup_dec, sub_ra, sub_dec, normal = ra_b, dec_b, ra_a, dec_a, False
-                err_sup = errs[b] if errs is not None else None
-                err_sub = errs[a] if errs is not None else None
+                sub_xyz, sup_err, sub_err, tree_sup, normal = xyz_a, errs[b], errs[a], trees[b], False
 
-            # Tangent-plane projection such that KD-tree distances are more accurate
-            ra0  = 0.5 * (np.mean(sup_ra) + np.mean(sub_ra))
-            dec0 = 0.5 * (np.mean(sup_dec) + np.mean(sub_dec))
-            sup_x, sup_y = _project_radec(sup_ra, sup_dec, ra0, dec0)
-            sub_x, sub_y = _project_radec(sub_ra, sub_dec, ra0, dec0)
-
-            # When per-source uncertainties are given, use nsigma * median(combined_sigma) 
-            # as the coarse KD-tree radius; otherwise fall back to the fixed thres_arc.
-            if errs is not None:
-                sigma_pair = np.hypot(np.median(err_sup), np.median(err_sub))
-                query_radius = nsigma * sigma_pair
+            # Coarse search radius in 3D (≈ radians for small angles)
+            if use_errs:
+                sigma_pair   = np.hypot(np.median(sup_err), np.median(sub_err))
+                query_radius = 2.0 * np.sin(nsigma * sigma_pair / 2.0)
             else:
-                query_radius = np.deg2rad(thres_arc / 3600.0)
+                query_radius = 2.0 * np.sin(np.deg2rad(thres_arc / 3600.0) / 2.0)
 
-            tree = cKDTree(np.column_stack([sup_x, sup_y]))
-            dists, idxs = tree.query(np.column_stack([sub_x, sub_y]), k=1, distance_upper_bound=query_radius)
+            dists, idxs = tree_sup.query(sub_xyz, k=1, distance_upper_bound=query_radius, workers=-1)
 
-            # After the coarse query, recompute the threshold for each candidate pair using its own
-            # combined sigma rather than the catalogue-wide median. This is important for SNR-dependent errors
-            if errs is not None:
+            # Per-source sigma refinement
+            if use_errs:
                 prelim = dists < query_radius
-                accept = np.zeros(len(sub_ra), dtype=bool)
+                accept = np.zeros(len(sub_xyz), dtype=bool)
                 pidx   = np.where(prelim)[0]
-                if len(pidx) > 0:
-                    combined_sig    = np.hypot(err_sub[pidx], err_sup[idxs[pidx]])
-                    accept[pidx]    = dists[pidx] < nsigma * combined_sig
+                if len(pidx):
+                    combined_sig = np.hypot(sub_err[pidx], sup_err[idxs[pidx]])
+                    thresh_3d    = 2.0 * np.sin(nsigma * combined_sig / 2.0)
+                    accept[pidx] = dists[pidx] < thresh_3d
                 valid = accept
             else:
                 valid = dists < query_radius
 
             matched_sub   = np.where(valid)[0]
             matched_sup   = idxs[valid]
-            matched_dists = dists[valid]   # radians
+            matched_dists = dists[valid]
 
-            # Keep only the closest sub for each sup
-            order = np.lexsort((matched_dists, matched_sup))
-            matched_sup_sorted   = matched_sup[order]
-            matched_sub_sorted   = matched_sub[order]
-            matched_dists_sorted = matched_dists[order]
-            
-            # Keep first occurrence of each sup index
-            first = np.ones(len(matched_sup_sorted), dtype=bool)
-            first[1:] = matched_sup_sorted[1:] != matched_sup_sorted[:-1]
-            
-            matched_sup   = matched_sup_sorted[first]
-            matched_sub   = matched_sub_sorted[first]
-            matched_dists = matched_dists_sorted[first]
+            # Vectorized deduplication: keep closest sub per sup
+            if len(matched_sup) != len(np.unique(matched_sup)):
+                order             = np.lexsort((matched_dists, matched_sup))
+                matched_sup       = matched_sup[order]
+                matched_sub       = matched_sub[order]
+                matched_dists     = matched_dists[order]
+                first             = np.empty(len(matched_sup), dtype=bool)
+                first[0]          = True
+                first[1:]         = matched_sup[1:] != matched_sup[:-1]
+                matched_sup       = matched_sup[first]
+                matched_sub       = matched_sub[first]
+                matched_dists     = matched_dists[first]
 
-            # Convert radian KD-tree distances to arcsec separations
-            sep_arcsec = np.rad2deg(matched_dists) * 3600.0
+            # Convert 3D distance → arcsec: θ = 2*arcsin(d/2)
+            sep_arcsec = np.rad2deg(2.0 * np.arcsin(matched_dists / 2.0)) * 3600.0
 
-            # Per-pair match probability via chi-squared test on the positional separation
-            if errs is not None:
-                combined_sig_f = np.hypot(err_sub[matched_sub], err_sup[matched_sup])
-                chi2_vals = (matched_dists / combined_sig_f) ** 2
-                p_match   = 1.0 - _chi2_dist.cdf(chi2_vals, df=2)
+            # Match probability via chi² on angular separation
+            if use_errs:
+                sep_rad        = np.deg2rad(sep_arcsec / 3600.0)
+                combined_sig_f = np.hypot(sub_err[matched_sub], sup_err[matched_sup])
+                chi2_vals      = (sep_rad / combined_sig_f) ** 2
+                p_match        = 1.0 - _chi2_dist.cdf(chi2_vals, df=2)
             else:
                 p_match = np.ones(len(matched_sub))
 
-            # Map back to original a/b catalogue orientations
             if normal:
                 idx_a_list = matched_sup.tolist()
                 idx_b_list = matched_sub.tolist()
@@ -454,14 +434,13 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, thres_arc_override=Fals
             matched_results[(a, b)] = (idx_a_list, idx_b_list)
             sep_results[(a, b)]     = sep_arcsec
             prob_results[(a, b)]    = p_match
-
-            pair_maps[(a, b)] = dict(zip(idx_b_list, idx_a_list))   # idx_b -> idx_a
-            pair_maps[(b, a)] = dict(zip(idx_a_list, idx_b_list))   # idx_a -> idx_b
+            pair_maps[(a, b)]       = dict(zip(idx_b_list, idx_a_list))
+            pair_maps[(b, a)]       = dict(zip(idx_a_list, idx_b_list))
 
     # Quality assessors
     quality = {
         'sep_arcsec': sep_results,
-        'p_match':    prob_results if errs is not None else {},
+        'p_match':    prob_results if use_errs else {},
         'n_crowd':    crowd_counts,
     }
 
@@ -526,7 +505,7 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, thres_arc_override=Fals
 """Add contours to scatterplot
 Takes x, y coordinated and a per-source weighting c. Can make the contour fitting work in logspace by using
 (logy, logx). n sets the 2D resolution of the mesh."""
-def calculate_contour_statistics(x, y, c, logx=False, logy=False, n=200):
+def calculate_contour_statistics(x, y, c, logx=False, logy=False, n=1000):
     if logx: x = np.log10(x)
     if logy: y = np.log10(y)
 
@@ -534,14 +513,20 @@ def calculate_contour_statistics(x, y, c, logx=False, logy=False, n=200):
     yi = np.linspace(y.min(), y.max(), n)
     Xi, Yi = np.meshgrid(xi, yi)
 
-    kde = gaussian_kde(np.vstack([x, y]), weights=c)
-    Zi = kde(np.vstack([Xi.ravel(), Yi.ravel()])).reshape(Xi.shape)
+    # Fast histogram mapping
+    H, _, _ = np.histogram2d(x, y, bins=n, weights=c, range=[[x.min(), x.max()], [y.min(), y.max()]])
+    n_data  = len(x)
+    sigma_x = (n_data**(-0.2) * np.std(x)) / ((x.max() - x.min()) / n)
+    sigma_y = (n_data**(-0.2) * np.std(y)) / ((y.max() - y.min()) / n)
+    Zi = gaussian_filter(H.T, sigma=(sigma_y, sigma_x))
 
-    peak_idx = np.argmax(Zi)
-    peak_x0 = Xi.ravel()[peak_idx]
-    peak_y0 = Yi.ravel()[peak_idx]
+    # Minimizer starting point
+    peak_idx         = np.argmax(Zi)
+    peak_x0, peak_y0 = Xi.ravel()[peak_idx], Yi.ravel()[peak_idx]
 
-    result = minimize(lambda p: -kde(p), x0=[peak_x0, peak_y0], method='Nelder-Mead')
+    # KDE on subset
+    kde    = gaussian_kde(np.vstack([x, y]), weights=c)
+    result = minimize(lambda p: -kde(p)[0], x0=[peak_x0, peak_y0], method='Nelder-Mead', options={'xatol': 1e-5, 'fatol': 1e-10})
     peak_x0, peak_y0 = result.x
 
     if logx: Xi = 10**Xi; peak_x0 = 10**peak_x0
