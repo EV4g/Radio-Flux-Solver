@@ -213,7 +213,6 @@ plt.show()
 print("------------------------------------------------")
 print(f"Spectral index: {round(px,3)}, correction factor: {round(py,3)}, total matches: {len(correction_factor_global)}")
 
-
 ##########################
 #### inspection plots ####
 ##########################

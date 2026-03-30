@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from functions import match_catalogs_2D, get_combinations, solve_flux_scales
+from functions import match_catalogs_2D, get_combinations, solve_flux_scales, calculate_contour_statistics
 from functions import compute_flux_correction_factor, calculate_correction_factor_weight, calculate_1d_peak, solve_flux_scales_band
 from time import perf_counter
 from catalog_manager import catalog, config, catalog_set
@@ -135,3 +135,127 @@ plt.legend()
 plt.xlabel("RA [deg]")
 plt.ylabel("Relative correction factor")
 plt.show()
+
+
+print(f"Calculations done at: {perf_counter() - start} s")
+
+
+#################################################
+#### System of equations flux-triplet solver ####
+#################################################
+
+N = len(config.catalogs)
+
+# Keep track
+log_ratio_sum  = np.zeros((N, N), dtype=float)
+weight_pair    = np.zeros((N, N), dtype=float)
+beta_slope_sum = np.zeros((N, N), dtype=float)
+beta_weight    = np.zeros((N, N), dtype=float)
+
+all_combinations = get_combinations(config.catalogs, size=3)
+output_width = len(str(len(all_combinations)))
+
+for ii, combination in enumerate(all_combinations):
+    local_cats = [config.catalogs[j] for j in combination]
+    
+    # Calculate flux correction w.r.t. the first catalog
+    output = compute_flux_correction_factor(local_cats, config, debug=False, anchor_override=0)
+
+    if output is None:
+        print(f"({ii+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", "Matches: None")
+        continue
+
+    spx, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
+    print(f"({ii+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",  f"Matches: {len(spx)}")
+
+    # Per-source weighting within this triplet
+    tot_wf = calculate_correction_factor_weight(spx, snr, catw, max_sep, p_weight, n_crowd, config)
+
+    valid = (tot_wf > 0)
+    if np.count_nonzero(valid) < 2:
+        continue
+
+    cor_local = cor[valid]
+    wf_local  = tot_wf[valid]
+    spx_local = spx[valid]
+    flux_local = flux[valid]
+    
+    #### old code
+    # # Calculate more likely spectral index (px) and correction factor (py)
+    # _, _, _, px, py = calculate_contour_statistics(spx_local, cor_local, wf_local, logy=True, n=1000)
+
+    # # Map back to global indices:
+    # # anchor_global = combination[0], ref_global = combination[1]
+    # anchor_global = combination[0]
+    # ref_global    = combination[1]
+
+    # i = anchor_global
+    # j = ref_global
+
+    # # ratio[i,j] = s_i / s_j = 1 / (s_j / s_i) = 1 / py
+    # log_r_ij = np.log(1.0 / py)
+    # w_ij     = np.sum(wf_local)
+
+    # # Add values
+    # log_ratio_sum[i, j] += w_ij * log_r_ij
+    # weight_pair[i, j]   += w_ij
+
+    #### new code
+    anchor_global = combination[0]
+    ref_global    = combination[1]
+
+    i = anchor_global
+    j = ref_global
+
+    # flux_local is extrapolated_flux_fit; anchor observed flux = flux_local / cor_local
+    log_flux = np.log10(flux_local / cor_local)
+    log_cor  = np.log10(cor_local)
+
+    # weighted linear fit: log_cor = b_ij + beta_ij * log_flux
+    coeffs   = np.polyfit(log_flux, log_cor, deg=1, w=wf_local)
+    beta_ij  = coeffs[0]   # flux-dependent slope
+    b_ij     = coeffs[1]   # global offset
+
+    w_ij = np.sum(wf_local)
+
+    log_ratio_sum[i, j]  += w_ij * (-b_ij)   # log(s_i / s_j)
+    weight_pair[i, j]    += w_ij
+
+    beta_slope_sum[i, j] += w_ij * beta_ij
+    beta_weight[i, j]    += w_ij
+
+# Build final pairwise ratio and weight matrices from accumulated sums
+cor_matrix    = np.zeros((N, N), dtype=float)
+weight_matrix = np.zeros((N, N), dtype=float)
+
+beta_cor_matrix    = np.zeros((N, N), dtype=float)
+beta_weight_matrix = np.zeros((N, N), dtype=float)
+
+for i in range(N):
+    for j in range(i + 1, N):
+        w_ij = weight_pair[i, j]
+        if w_ij > 0:
+            r_ij = np.exp(log_ratio_sum[i, j] / w_ij)
+            cor_matrix[i, j]    = r_ij
+            cor_matrix[j, i]    = 1.0 / r_ij
+            weight_matrix[i, j] = w_ij
+            weight_matrix[j, i] = w_ij
+
+        w_beta = beta_weight[i, j]
+        if w_beta > 0:
+            beta_ij = beta_slope_sum[i, j] / w_beta
+            beta_cor_matrix[i, j]    = 10 **  beta_ij
+            beta_cor_matrix[j, i]    = 10 ** -beta_ij
+            beta_weight_matrix[i, j] = w_beta
+            beta_weight_matrix[j, i] = w_beta
+
+scales    = solve_flux_scales(cor_matrix,      weight_matrix,      normalize=True)
+beta_s    = np.log10(solve_flux_scales(beta_cor_matrix, beta_weight_matrix, normalize=True))
+
+print(f"\n{'Catalog':9}  {'scale':>8}  {'beta':>8}  {'interpretation'}")
+print("-------------------------------------------------------")
+for scale, beta, cat in zip(scales, beta_s, config.catalogs):
+    interp = "faint-biased" if beta > 0.02 else ("bright-biased" if beta < -0.02 else "ok")
+    print(f"{cat.name:9}  {scale:8.5f}  {beta:8.4f}  {interp}")
+
+
