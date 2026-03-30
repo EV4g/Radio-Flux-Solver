@@ -86,55 +86,55 @@ print(f"Setup done at: {perf_counter() - start} s")
 #####################################################################
 #### System of equations flux-pair solver declination dependance ####
 #####################################################################
-bw = 10
-decs = np.arange(-90, 90+bw, bw)
+# bw = 10
+# decs = np.arange(-90, 90+bw, bw)
 
-cor_matrix = np.zeros((len(config.catalogs), len(config.catalogs), len(decs)))
-weight_matrix = np.zeros((len(config.catalogs), len(config.catalogs), len(decs)))
+# cor_matrix = np.zeros((len(config.catalogs), len(config.catalogs), len(decs)))
+# weight_matrix = np.zeros((len(config.catalogs), len(config.catalogs), len(decs)))
 
-all_combinations = get_combinations(config.catalogs, size=2)
-output_width = len(str(len(all_combinations)))
-for i, combination in enumerate(all_combinations):
-    local_cats = [config.catalogs[j] for j in combination]
-    output = compute_flux_correction_factor(local_cats, config, debug=False, anchor_override=0)
+# all_combinations = get_combinations(config.catalogs, size=2)
+# output_width = len(str(len(all_combinations)))
+# for i, combination in enumerate(all_combinations):
+#     local_cats = [config.catalogs[j] for j in combination]
+#     output = compute_flux_correction_factor(local_cats, config, debug=False, anchor_override=0)
     
-    if output is not None:
-        spx, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
-        print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(spx)}")
+#     if output is not None:
+#         spx, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
+#         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(spx)}")
         
-        for d, declination in enumerate(decs):
-            dec_bin = (dec >= declination) & (dec < declination + bw)
+#         for d, declination in enumerate(decs):
+#             dec_bin = (dec >= declination) & (dec < declination + bw)
             
-            tot_wf = calculate_correction_factor_weight(spx[dec_bin], snr[dec_bin], catw[dec_bin], max_sep[dec_bin], p_weight[dec_bin], n_crowd[dec_bin], config)
+#             tot_wf = calculate_correction_factor_weight(spx[dec_bin], snr[dec_bin], catw[dec_bin], max_sep[dec_bin], p_weight[dec_bin], n_crowd[dec_bin], config)
             
-            filter = tot_wf > 0
-            tot_wf = tot_wf[filter]
-            cor_local = cor[dec_bin][filter]
+#             filter = tot_wf > 0
+#             tot_wf = tot_wf[filter]
+#             cor_local = cor[dec_bin][filter]
             
-            if len(tot_wf) > 0:
-                _, _, py = calculate_1d_peak(cor_local, tot_wf, log=True)
+#             if len(tot_wf) > 0:
+#                 _, _, py = calculate_1d_peak(cor_local, tot_wf, log=True)
                 
-                y, x = combination
-                cor_matrix[x, y, d] = py
-                cor_matrix[y, x, d] = 1.0 / py
+#                 y, x = combination
+#                 cor_matrix[x, y, d] = py
+#                 cor_matrix[y, x, d] = 1.0 / py
                 
-                weight_matrix[y, x, d] = np.sum(tot_wf)
-                weight_matrix[x, y, d] = np.sum(tot_wf)
-    else:
-        print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", "Matches: None")
+#                 weight_matrix[y, x, d] = np.sum(tot_wf)
+#                 weight_matrix[x, y, d] = np.sum(tot_wf)
+#     else:
+#         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", "Matches: None")
 
-scales = []
-for d in range(len(decs)):
-    s_band = solve_flux_scales_band(cor_matrix[:, :, d], weight_matrix[:, :, d], normalize=True)
-    scales.append(s_band)
+# scales = []
+# for d in range(len(decs)):
+#     s_band = solve_flux_scales_band(cor_matrix[:, :, d], weight_matrix[:, :, d], normalize=True)
+#     scales.append(s_band)
 
-fig, ax = plt.subplots(figsize=(10, 6))
-for i, scale in enumerate(np.array(scales).T):
-    ax.plot(decs, scale, label=config.catalogs[i].name)
-plt.legend()
-plt.xlabel("RA [deg]")
-plt.ylabel("Relative correction factor")
-plt.show()
+# fig, ax = plt.subplots(figsize=(10, 6))
+# for i, scale in enumerate(np.array(scales).T):
+#     ax.plot(decs, scale, label=config.catalogs[i].name)
+# plt.legend()
+# plt.xlabel("RA [deg]")
+# plt.ylabel("Relative correction factor")
+# plt.show()
 
 
 print(f"Calculations done at: {perf_counter() - start} s")
@@ -204,8 +204,12 @@ for ii, combination in enumerate(all_combinations):
     anchor_global = combination[0]
     ref_global    = combination[1]
 
-    i = anchor_global
-    j = ref_global
+    if anchor_global < ref_global:
+        i, j = anchor_global, ref_global
+        sign = 1.0
+    else:
+        i, j = ref_global, anchor_global
+        sign = -1.0
 
     # flux_local is extrapolated_flux_fit; anchor observed flux = flux_local / cor_local
     log_flux = np.log10(flux_local / cor_local)
@@ -218,10 +222,9 @@ for ii, combination in enumerate(all_combinations):
 
     w_ij = np.sum(wf_local)
 
-    log_ratio_sum[i, j]  += w_ij * (-b_ij)   # log(s_i / s_j)
+    log_ratio_sum[i, j]  += w_ij * sign * (-b_ij)
     weight_pair[i, j]    += w_ij
-
-    beta_slope_sum[i, j] += w_ij * beta_ij
+    beta_slope_sum[i, j] += w_ij * sign * beta_ij
     beta_weight[i, j]    += w_ij
 
 # Build final pairwise ratio and weight matrices from accumulated sums
