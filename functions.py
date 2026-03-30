@@ -13,7 +13,7 @@ from reproject import reproject_interp
 from tqdm import tqdm
 from scipy.spatial import cKDTree
 from scipy.stats import gaussian_kde
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter, gaussian_filter1d
 import matplotlib.pyplot as plt
 #import matplotlib.colors as mcolors
 from itertools import combinations
@@ -606,14 +606,6 @@ def get_combinations(cats, size=3, required_index=None, skip_index=None):
         result.append(indices)
     return result
 
-"""Return indices of catalog (str) of all unique, non-double, threeway combinations with the condition f1 < f2 < f3"""
-def get_triplet_combinations(cats, required_index=None, skip_index=None):
-    freqs = []
-    for cat in cats: freqs += [cat.freq]
-    indexed = sorted(enumerate(zip(freqs, cats)), key=lambda x: x[1][0])
-    return [(i1, i2, i3) for (i1, (f1, _)), (i2, (f2, _)), (i3, (f3, _)) in combinations(indexed, 3) if f1 < f2 < f3
-        and (required_index is None or required_index in (i1, i2, i3)) and (skip_index is None or skip_index not in (i1, i2, i3))]
-
 """(cat1, cat2) --> [(ra1, dec1), (ra2, dec2)]"""
 def radec_list(cats):
     radec_list = []
@@ -679,3 +671,100 @@ def sources_in_fits(ra_deg, dec_deg, fn):
     x, y   = w.world_to_pixel(coords)
 
     return (x >= 0) & (x < nx) & (y >= 0) & (y < ny)
+
+def calculate_1d_peak(x, c, log=False, n=1000):    
+    if log: x = np.log10(x)
+
+    mask = np.isfinite(x) & np.isfinite(c) & (c > 0)
+    x, c = x[mask], c[mask]
+
+    if len(x) == 0:
+        raise ValueError("No finite data points remain after filtering.")
+
+    if x.max() == x.min():
+        peak_x0 = 10**x[0] if log else x[0]
+        return np.array([peak_x0]), np.array([1.0]), peak_x0
+    
+    xi = np.linspace(x.min(), x.max(), n)
+
+    H, edges = np.histogram(x, bins=n, weights=c, range=(x.min(), x.max()))
+    n_data  = len(x)
+    sigma_x = (n_data**(-0.2) * np.std(x)) / ((x.max() - x.min()) / n)
+    Zi      = gaussian_filter1d(H, sigma=sigma_x)
+
+    peak_x0 = xi[np.argmax(Zi)]
+
+    kde    = gaussian_kde(x, weights=c)
+    result = minimize(lambda p: -kde(p)[0], x0=[peak_x0], method='Nelder-Mead',
+                      options={'xatol': 1e-5, 'fatol': 1e-10})
+    peak_x0 = result.x[0]
+
+    if log: peak_x0 = 10**peak_x0
+
+    return xi if not log else 10**xi, Zi, peak_x0
+
+def solve_flux_scales(ratio, weight, ref=None, normalize=True):
+    """
+    ratio[i, j] : pairwise estimate of s_i / s_j
+    weight[i,j] : weight for that estimate
+    ref         : index of catalog to pin at x_ref = 0 for the solve.
+                  If None, 0 is used internally.
+    normalize   : if True, rescale s so that geometric mean(s) = 1.
+
+    Returns
+    -------
+    s : array of relative flux scales, length N.
+    """
+    N = ratio.shape[0]
+    rows = []
+    y = []
+    w = []
+
+    for i in range(N):
+        for j in range(i + 1, N):
+            wij = weight[i, j]
+            if not np.isfinite(wij) or wij <= 0:
+                continue
+            rij = ratio[i, j]
+            if not np.isfinite(rij) or rij <= 0:
+                continue
+            rows.append((i, j))
+            y.append(np.log(rij))
+            w.append(wij)
+
+    y = np.asarray(y)
+    w = np.asarray(w)
+    m = len(rows)
+    if m == 0:
+        raise ValueError("No valid pairwise ratios to solve for flux scales")
+
+    A = np.zeros((m, N), dtype=float)
+    for k, (i, j) in enumerate(rows):
+        A[k, i] = 1.0
+        A[k, j] = -1.0
+
+    Wsqrt = np.sqrt(w)
+    Aw = A * Wsqrt[:, None]
+    yw = y * Wsqrt
+
+    if ref is None:
+        ref = 0
+    if not (0 <= ref < N):
+        raise ValueError(f"ref must be in [0, {N-1}], got {ref}")
+
+    cols_mask = np.arange(N) != ref
+    Aw_red = Aw[:, cols_mask]
+
+    x_red, *_ = np.linalg.lstsq(Aw_red, yw, rcond=None)
+
+    x = np.zeros(N, dtype=float)
+    x[cols_mask] = x_red
+    x[ref] = 0.0
+
+    s = np.exp(x)
+
+    if normalize:
+        x0 = np.mean(np.log(s))
+        s = np.exp(np.log(s) - x0)
+
+    return s
