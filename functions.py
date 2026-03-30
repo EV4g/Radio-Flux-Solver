@@ -770,6 +770,27 @@ def solve_flux_scales(ratio, weight, ref=None, normalize=True):
 
     return s
 
+def solve_flux_scales_band(ratio_slice, weight_slice, normalize=True):
+    N = ratio_slice.shape[0]
+
+    # Catalogs with at least one non-zero-weight edge
+    active = (weight_slice > 0).any(axis=0)
+    idx_active = np.where(active)[0]
+
+    if len(idx_active) == 0:
+        return np.full(N, np.nan)
+
+    # Work on the active sub
+    ratio_sub  = ratio_slice[np.ix_(idx_active, idx_active)]
+    weight_sub = weight_slice[np.ix_(idx_active, idx_active)]
+
+    s_sub = solve_flux_scales(ratio_sub, weight_sub, ref=0, normalize=normalize)
+
+    # NaN for inactive catalogs
+    s_full = np.full(N, np.nan)
+    s_full[idx_active] = s_sub
+    return s_full
+
 """Get two catalogs and return flux and snr (flux / e_flux)"""
 def get_catalog_matched_flux(cat1, cat2, thres_arc=2):
     idx_cat1, idx_cat2 = match_catalogs_2D([cat1, cat2], thres_arc=thres_arc)
