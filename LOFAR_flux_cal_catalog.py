@@ -54,7 +54,7 @@ def quick_compare_catalog(cat1, cat2, config):
 
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
-def compute_flux_correction_factor(cats, config, debug=False, internal_output=False):
+def compute_flux_correction_factor(cats, config, debug=False, internal_output=False, anchor_override=None):
     indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma, thres_arc_override=config.thres_arc_override, crowd_radius_arc=config.crowd_radius_arc)
 
     # if there are too few sources, return None
@@ -68,11 +68,14 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
     if config.anchor_catalog is None:
         anchor_index = 0
     else:
-        try:
-            anchor_index = cats.index(config.anchor_catalog)
-        except:
-            print("Anchor catalog missing from inputs")
-            return None
+        if anchor_override is None:
+            try:
+                anchor_index = cats.index(config.anchor_catalog)
+            except:
+                print("Anchor catalog missing from inputs")
+                return None
+        else:
+            anchor_index = anchor_override
     other_index.remove(anchor_index)
 
     # if crowding parameter is available, store max neighbour (withing crowding_radius) count per source
@@ -224,7 +227,7 @@ lofar_dr3_config = config(spectral_damping_factor = 5,
                           snr_lower_limit = 7,
                           nsigma = 2,
                           minimum_points = 3,
-                          crowd_radius_arc = 10,
+                          crowd_radius_arc = None,
                           minimum_frequency_spacing = None,
                           catalogs = [racs, racs_gal, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3],
                           reference_file = None,
