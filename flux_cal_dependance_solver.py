@@ -179,26 +179,6 @@ for ii, combination in enumerate(all_combinations):
     wf_local  = tot_wf[valid]
     spx_local = spx[valid]
     flux_local = flux[valid]
-    
-    #### old code
-    # # Calculate more likely spectral index (px) and correction factor (py)
-    # _, _, _, px, py = calculate_contour_statistics(spx_local, cor_local, wf_local, logy=True, n=1000)
-
-    # # Map back to global indices:
-    # # anchor_global = combination[0], ref_global = combination[1]
-    # anchor_global = combination[0]
-    # ref_global    = combination[1]
-
-    # i = anchor_global
-    # j = ref_global
-
-    # # ratio[i,j] = s_i / s_j = 1 / (s_j / s_i) = 1 / py
-    # log_r_ij = np.log(1.0 / py)
-    # w_ij     = np.sum(wf_local)
-
-    # # Add values
-    # log_ratio_sum[i, j] += w_ij * log_r_ij
-    # weight_pair[i, j]   += w_ij
 
     #### new code
     anchor_global = combination[0]
@@ -262,3 +242,19 @@ for scale, beta, cat in zip(scales, beta_s, config.catalogs):
     print(f"{cat.name:9}  {scale:8.5f}  {beta:8.4f}  {interp}")
 
 
+print("Weight matrix (pairs with >0 sources):")
+for i in range(N):
+    for j in range(i+1, N):
+        if weight_pair[i, j] > 0:
+            print(f"  {config.catalogs[i].name:10} — {config.catalogs[j].name:10}  w={weight_pair[i,j]:.1f}")
+
+for i in range(N):
+    for j in range(i+1, N):
+        scale_product = scales[i] * scales[j]
+        beta_sum      = beta_s[i] + beta_s[j]
+        if abs(scale_product - 1.0) < 0.001 and abs(beta_sum) < 0.001:
+            print(f"WARNING: {config.catalogs[i].name} + {config.catalogs[j].name} are conjugate — underconstrained!")
+
+plt.imshow(weight_pair, origin='lower', norm='log')
+plt.colorbar()
+plt.show()
