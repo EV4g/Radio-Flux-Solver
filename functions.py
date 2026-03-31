@@ -6,7 +6,6 @@ from astropy.coordinates import SkyCoord
 import astropy.units as u
 import numpy as np
 from scipy.optimize import curve_fit, minimize
-
 from scipy.spatial import cKDTree
 from scipy.stats import gaussian_kde
 from scipy.ndimage import gaussian_filter, gaussian_filter1d
@@ -98,61 +97,6 @@ def cutout_to_galactic_wh(cutout_lon, cutout_lat):
     height = abs(dlat)
     return center, width, height
 
-"""A 2D gaussian function, used for fitting point sources"""
-def twoD_Gaussian(xy, amplitude, xo, yo, sigma_x, sigma_y, theta, offset):
-    x, y = xy
-
-    dx, dy = x - xo, y - yo
-    sint_sq, cost_sq = np.sin(theta)**2, np.cos(theta)**2
-    two_sig_x_sq, two_sig_y_sq = 2*sigma_x**2, 2*sigma_y**2
-
-    a = cost_sq / two_sig_x_sq + sint_sq / two_sig_y_sq
-    b = -np.sin(2*theta) / (2 * two_sig_x_sq) + np.sin(2*theta) / (2 * two_sig_y_sq)
-    c = sint_sq / two_sig_x_sq + cost_sq / two_sig_y_sq
-    g = offset + amplitude*np.exp( - (a*dx**2 + 2*b*dx*dy + c*dy**2))
-    return g.T.ravel()
-
-"""A simplified 2D gaussian function, used for fitting point sources"""
-def twoD_Gaussian_simple(xy, amplitude, xo, yo, sigma, offset):
-    x, y = xy
-    dx, dy = x - xo, y - yo
-    a = 1 / (2 * sigma**2)
-    g = offset + amplitude*np.exp( - a*(dx**2 + dy**2))
-    return g.T.ravel()
-
-"""Function to automatically fit a gaussian, and return the best fit"""
-def fit_gauss(array, simple=False, mf=1000, debug=False):
-    xy = np.where(np.isfinite(array) & (array != 0))
-
-    x = np.linspace(0, array.shape[0] - 1, array.shape[0])
-    y = np.linspace(0, array.shape[1] - 1, array.shape[1])
-    x, y = np.meshgrid(x, y)
-
-    mx, mn = np.nanmax(array),  np.nanmin(array)
-    diff = mx - mn
-    half_x, half_y = array.shape[0]/2, array.shape[1]/2
-
-    if debug or simple:
-        # amplitude, x, y, sigma, z_offset
-        init = (mx, half_x, half_y, 1, mn)
-        bounds = [[mn, 0, 0, 0, -np.inf], [mx, array.shape[0], array.shape[1], np.inf, mx]]
-        popt, pcov = curve_fit(twoD_Gaussian_simple, xy, array[xy], p0=init, bounds=bounds, maxfev=mf)
-
-        if debug: return twoD_Gaussian_simple((x, y), *popt).reshape((array.shape[0], array.shape[1])), popt, pcov
-        else:     return twoD_Gaussian_simple((x, y), *popt).reshape((array.shape[0], array.shape[1]))
-
-    else:
-        # amplitude, x, y, sigma_x, sigma_y, theta, z_offset
-        init = (diff, half_x, half_y, 1, 1, 0, 0)
-        bounds = [[0, half_x-10, half_y-10, 0, 0, 0, -np.inf], [2 * diff, half_x+10, half_y+10, np.inf, np.inf, 2*np.pi, mx]]
-        popt, _ = curve_fit(twoD_Gaussian, xy, array[xy], p0=init, bounds=bounds, maxfev=mf)
-        return twoD_Gaussian((x, y), *popt).reshape((array.shape[0], array.shape[1]))
-
-"""Volume under a 2D gaussian """
-def gaussian_volume(A, sx, sy=None):
-    if sy is None: return A * sx**2 * 2 * np.pi
-    else:        return A * sx * sy * 2 * np.pi
-
 """Return beam size [degree] from fits header"""
 def get_beam_size(file):
     hdul = fits.open(file)
@@ -162,8 +106,6 @@ def get_beam_size(file):
     except:
         return header['CLEANBMJ'], header['CLEANBMN'], header['CLEANBPA']
     return None
-
-
 
 """Get frequency and flux arrays for two different datasets, and compute the flux-calibration offset between them compared to the -0.7 spectral index baseline
 data_1 gets compared versus the baseline of data_2. Returns (expected) fitted spectral_flux_ratio, and (actual) index, as well as the (offset) ratios and scaling factor.
@@ -453,20 +395,6 @@ def fits_to_png(fits_path, output_path, hdu_index=0, vmin=None, vmax=None, cmap=
 
     plt.imsave(output_path, data, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
 
-"""Plot (log)ratio as function of position in field."""
-def plot_location_dependant_index(ra, dec, ratio):
-    plt.scatter(ra, dec, c=ratio)
-    plt.colorbar()
-    plt.gca().set_box_aspect(1)
-    plt.show()
-
-"""(cat1, cat2) --> [(ra1, dec1), (ra2, dec2)]"""
-def radec_list_simple(cats):
-    radec_list = []
-    for cat in cats:
-        radec_list.append((cat['ra'], cat['dec']))
-    return radec_list
-
 """Remove outliers at eitherside of the distribution"""
 def remove_outliers(var, clip_percentage):
     clip_top = np.percentile(var, 100 - clip_percentage)
@@ -537,13 +465,6 @@ def get_permutations(cats, size=3, required_index=None, skip_index=None, only_so
 
         result.append(indices)
     return result
-
-"""(cat1, cat2) --> [(ra1, dec1), (ra2, dec2)]"""
-def radec_list(cats):
-    radec_list = []
-    for cat in cats:
-        radec_list.append((cat.ra, cat.dec))
-    return radec_list
 
 """"""
 def weighted_bin_stats(x, y, w, n_bins=200):
