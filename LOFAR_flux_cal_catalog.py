@@ -12,7 +12,7 @@ start = perf_counter()
 #### all available catalogs
 all_catalogs = catalog_set([
     catalog("/catalogs/racs/racs_gal_clean.fits",             887.5e6,    "racs_gal"),                  # the galactic portion of the racs survey
-    catalog("/catalogs/racs/racs_full_clean.fits",            887.5e6,    "racs"),                      # the rest of the racs survey
+    catalog("/catalogs/racs/racs_full_clean.fits",            887.5e6,    "racs",       flux_lim=1e-4), # the rest of the racs survey
     catalog("/catalogs/meerkat/meerkat_clean.fits",           1359.7e6,   "meerkat"),
     catalog("/catalogs/vlssr/vlssr_clean.fits",               73.8e6,     "vlssr"),
     catalog("/catalogs/tgss/tgss_clean.fits",                 150e6,      "tgss"),
@@ -62,22 +62,22 @@ cygnus_config = config(spectral_damping_factor = 5,
                        )
 
 small_config = config(spectral_damping_factor = 5,
-                       snr_lower_limit = 0,
-                       nsigma = 3,
+                       snr_lower_limit = 7,
+                       nsigma = 2,
                        minimum_points = 3,
                        crowd_radius_arc = None,
                        minimum_frequency_spacing = None,
-                       catalogs = [wenss, nvss, racs_gal, racs],
+                       catalogs = [racs, vlssr, tgss, gleam_300, nvss, wenss, lofar_dr3],
                        reference_file = None,
-                       anchor_catalog = wenss,
+                       anchor_catalog = nvss,
                        )
 
 #### Parameters
 debug = True
-config = lofar_dr3_config
+#config = lofar_dr3_config
 #config = default_config
 #config = cygnus_config
-#config = small_config
+config = small_config
 
 config.setup()
 
