@@ -8,11 +8,12 @@ base_path = Path(__file__).resolve().parent
 
 # wrapper class for incoming Table data
 class catalog:
-    def __init__(self, path=None, freq_hz=None, name=None):
+    def __init__(self, path=None, freq_hz=None, name=None, flux_lim=0):
         self.path      = base_path / path.lstrip("/")
         self.freq      = freq_hz
         self.freq_unit = 'Hz'
         self.name      = name
+        self.flux_lim  = flux_lim
         # data is None until load() is called
         self.flux = self.e_flux = self.flux_unit = None
         self.ra = self.dec = self.e_ra = self.e_dec = None
@@ -25,14 +26,18 @@ class catalog:
         catalog = Table.read(self.path)
         
         self.flux       = np.array(catalog['flux_jy'])
-        self.e_flux     = np.array(catalog['e_flux_jy'])
+        
+        flux_threshold = (self.flux > self.flux_lim)
+        
+        self.flux       = self.flux[flux_threshold]
+        self.e_flux     = np.array(catalog['e_flux_jy'])[flux_threshold]
         self.flux_unit  = str(catalog['flux_jy'].unit)
-        self.ra         = np.array(catalog['ra']) % 360
-        self.dec        = np.array(catalog['dec'])
+        self.ra         = (np.array(catalog['ra']) % 360)[flux_threshold]
+        self.dec        = np.array(catalog['dec'])[flux_threshold]
         
         try:
-            self.e_ra   = np.array(catalog['e_ra'])
-            self.e_dec  = np.array(catalog['e_dec'])
+            self.e_ra   = np.array(catalog['e_ra'])[flux_threshold]
+            self.e_dec  = np.array(catalog['e_dec'])[flux_threshold]
             self.e_ra[np.where(np.isnan(self.e_ra))] = 0   # sanitize NaNs
             self.e_dec[np.where(np.isnan(self.e_dec))] = 0 # sanitize NaNs
             self.err_rad = np.deg2rad(get_pos_err_deg(self))

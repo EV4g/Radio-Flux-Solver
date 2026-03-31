@@ -11,8 +11,8 @@ start = perf_counter()
 
 #### all available catalogs
 all_catalogs = catalog_set([
-    catalog("/catalogs/racs/racs_gal_clean.fits",             887.5e6,    "racs_gal"),  # the galactic portion of the racs survey
-    catalog("/catalogs/racs/racs_full_clean.fits",            887.5e6,    "racs"),      # the rest of the racs survey
+    catalog("/catalogs/racs/racs_gal_clean.fits",             887.5e6,    "racs_gal"),                  # the galactic portion of the racs survey
+    catalog("/catalogs/racs/racs_full_clean.fits",            887.5e6,    "racs"),                      # the rest of the racs survey
     catalog("/catalogs/meerkat/meerkat_clean.fits",           1359.7e6,   "meerkat"),
     catalog("/catalogs/vlssr/vlssr_clean.fits",               73.8e6,     "vlssr"),
     catalog("/catalogs/tgss/tgss_clean.fits",                 150e6,      "tgss"),
@@ -20,9 +20,9 @@ all_catalogs = catalog_set([
     catalog("/catalogs/gleam_x_gp/gleam_x_gp_clean.fits",     200e6,      "gleam_xgp"),
     catalog("/catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss"),
     catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss"),
-    catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar"),     # LOFAR P282+00
-    catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3"),
-    catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus"),    # vla cygnus region
+    catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar"),                     # LOFAR P282+00
+    catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3", flux_lim=1e-4),
+    catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus"),                    # vla cygnus region
     ])
 
 racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar, lofar_dr3, cygnus = all_catalogs.catalogs
@@ -30,7 +30,7 @@ racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar, 
 #### available configurations
 lofar_dr3_config = config(spectral_damping_factor = 5,
                           snr_lower_limit = 7,
-                          nsigma = 2,
+                          nsigma = 2.5,
                           minimum_points = 3,
                           crowd_radius_arc = None,
                           minimum_frequency_spacing = None,
@@ -73,7 +73,7 @@ small_config = config(spectral_damping_factor = 5,
                        )
 
 #### Parameters
-debug = False
+debug = True
 config = lofar_dr3_config
 #config = default_config
 #config = cygnus_config
