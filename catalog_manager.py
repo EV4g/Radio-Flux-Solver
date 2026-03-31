@@ -27,14 +27,14 @@ class catalog:
         catalog = Table.read(self.path) 
         
         # read out flux data
-        self.flux       = np.array(catalog['flux_jy']) * scale
+        self.flux       = np.array(catalog['flux_jy']) * self.scale
         
         # setup a threshold lower bound based on flux_lim
         flux_threshold = (self.flux > self.flux_lim)
         
         # apply flux_lim threshold
         self.flux       = self.flux[flux_threshold]
-        self.e_flux     = np.array(catalog['e_flux_jy'])[flux_threshold] * scale # also apply scale to e_flux
+        self.e_flux     = np.array(catalog['e_flux_jy'])[flux_threshold] * self.scale # also apply scale to e_flux
         self.flux_unit  = str(catalog['flux_jy'].unit)
         
         self.ra         = (np.array(catalog['ra']) % 360)[flux_threshold]
