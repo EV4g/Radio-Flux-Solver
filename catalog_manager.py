@@ -8,30 +8,35 @@ base_path = Path(__file__).resolve().parent
 
 # wrapper class for incoming Table data
 class catalog:
-    def __init__(self, path=None, freq_hz=None, name=None, flux_lim=0):
+    def __init__(self, path=None, freq_hz=None, name=None, flux_lim=0, scale=1):
         self.path      = base_path / path.lstrip("/")
-        self.freq      = freq_hz
-        self.freq_unit = 'Hz'
-        self.name      = name
-        self.flux_lim  = flux_lim
+        self.freq      = freq_hz    # central frequency
+        self.freq_unit = 'Hz'       # frequency unit
+        self.name      = name       # survey name
+        self.flux_lim  = flux_lim   # lower flux limit; everything below is discarded
+        self.scale     = scale      # scale factor, flux data is multiplied by this value
         # data is None until load() is called
         self.flux = self.e_flux = self.flux_unit = None
         self.ra = self.dec = self.e_ra = self.e_dec = None
         self.err_rad = None
     
     def load(self):
-        if self.ra is not None:
-            return # already loaded
+        if self.ra is not None: return # already loaded
         
-        catalog = Table.read(self.path)
+        # read out from disk
+        catalog = Table.read(self.path) 
         
-        self.flux       = np.array(catalog['flux_jy'])
+        # read out flux data
+        self.flux       = np.array(catalog['flux_jy']) * scale
         
+        # setup a threshold lower bound based on flux_lim
         flux_threshold = (self.flux > self.flux_lim)
         
+        # apply flux_lim threshold
         self.flux       = self.flux[flux_threshold]
-        self.e_flux     = np.array(catalog['e_flux_jy'])[flux_threshold]
+        self.e_flux     = np.array(catalog['e_flux_jy'])[flux_threshold] * scale # also apply scale to e_flux
         self.flux_unit  = str(catalog['flux_jy'].unit)
+        
         self.ra         = (np.array(catalog['ra']) % 360)[flux_threshold]
         self.dec        = np.array(catalog['dec'])[flux_threshold]
         
