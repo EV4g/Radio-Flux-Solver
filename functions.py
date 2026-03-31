@@ -683,9 +683,14 @@ def quick_compare_catalog(cat1, cat2, config):
 
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
-def compute_flux_correction_factor(cats, config, debug=False, internal_output=False, anchor_override=None):
-    indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma, thres_arc_override=config.thres_arc_override, crowd_radius_arc=config.crowd_radius_arc)
-
+def compute_flux_correction_factor(cats, config, debug=False, internal_output=False, anchor_override=None, precomputed_indices=None, precomputed_quality=None):
+    
+    if precomputed_indices is None and precomputed_quality is None:
+        indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma, thres_arc_override=config.thres_arc_override, crowd_radius_arc=config.crowd_radius_arc)
+    else:
+        indices = precomputed_indices
+        quality = precomputed_quality
+        
     # if there are too few sources, return None
     if len(indices[0]) <= config.minimum_points:
         if internal_output: print(f"Error: no source-matches found between [{', '.join(f'{cat.name}' for cat in cats)}]")
@@ -721,7 +726,7 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
         return None
 
     # create subsets of all catalogs, such that we can ignore (i0,i1,...) afterwards
-    for index, cat in enumerate(cats): cats[index] = cat.create_subset(indices[index])
+    cats = [cat.create_subset(indices[index]) for index, cat in enumerate(cats)]
 
     # all pairwise separations, then take per-source maximum
     coords = [SkyCoord(ra=cat.ra * u.deg, dec=cat.dec * u.deg) for cat in cats]
