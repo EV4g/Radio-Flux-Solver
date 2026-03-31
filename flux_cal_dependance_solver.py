@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from functions import match_catalogs_2D, get_combinations, solve_flux_scales, calculate_contour_statistics
+from functions import match_catalogs_2D, get_combinations, get_permutations, solve_flux_scales, calculate_contour_statistics
 from functions import compute_flux_correction_factor, calculate_correction_factor_weight, calculate_1d_peak, solve_flux_scales_band
 from time import perf_counter
 from catalog_manager import catalog, config, catalog_set
@@ -27,13 +27,14 @@ racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_d
 full_config = config(spectral_damping_factor = 5,
                     spectral_index_theory = -0.7,
                     snr_lower_limit = 7,
-                    nsigma = 2,
-                    minimum_points = 3,
+                    nsigma = 3,
+                    minimum_points = 10,
                     crowd_radius_arc = None,
                     minimum_frequency_spacing = None,
-                    catalogs = [racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3],
+                    #catalogs = [racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3],
+                    catalogs = [racs, tgss, nvss],
                     reference_file = None,
-                    anchor_catalog = lofar_dr3,
+                    anchor_catalog = nvss,
                     )
 
 #### Parameters
@@ -137,9 +138,6 @@ print(f"Setup done at: {perf_counter() - start} s")
 # plt.show()
 
 
-print(f"Calculations done at: {perf_counter() - start} s")
-
-
 #################################################
 #### System of equations flux-triplet solver ####
 #################################################
@@ -152,7 +150,8 @@ weight_pair    = np.zeros((N, N), dtype=float)
 beta_slope_sum = np.zeros((N, N), dtype=float)
 beta_weight    = np.zeros((N, N), dtype=float)
 
-all_combinations = get_combinations(config.catalogs, size=3)
+#all_combinations = get_combinations(config.catalogs, size=3)
+all_combinations = get_permutations(config.catalogs, size=3, only_sorted=False)
 output_width = len(str(len(all_combinations)))
 
 for ii, combination in enumerate(all_combinations):
@@ -172,15 +171,14 @@ for ii, combination in enumerate(all_combinations):
     tot_wf = calculate_correction_factor_weight(spx, snr, catw, max_sep, p_weight, n_crowd, config)
 
     valid = (tot_wf > 0)
-    if np.count_nonzero(valid) < 2:
+    if np.count_nonzero(valid) < config.minimum_points:
         continue
 
     cor_local = cor[valid]
     wf_local  = tot_wf[valid]
     spx_local = spx[valid]
     flux_local = flux[valid]
-
-    #### new code
+    
     anchor_global = combination[0]
     ref_global    = combination[1]
 
@@ -200,7 +198,7 @@ for ii, combination in enumerate(all_combinations):
     beta_ij  = coeffs[0]   # flux-dependent slope
     b_ij     = coeffs[1]   # global offset
 
-    w_ij = np.sum(wf_local)
+    w_ij = np.sum(wf_local) # sum of correction-factor weights
 
     log_ratio_sum[i, j]  += w_ij * sign * (-b_ij)
     weight_pair[i, j]    += w_ij
@@ -210,7 +208,6 @@ for ii, combination in enumerate(all_combinations):
 # Build final pairwise ratio and weight matrices from accumulated sums
 cor_matrix    = np.zeros((N, N), dtype=float)
 weight_matrix = np.zeros((N, N), dtype=float)
-
 beta_cor_matrix    = np.zeros((N, N), dtype=float)
 beta_weight_matrix = np.zeros((N, N), dtype=float)
 
@@ -218,7 +215,7 @@ for i in range(N):
     for j in range(i + 1, N):
         w_ij = weight_pair[i, j]
         if w_ij > 0:
-            r_ij = np.exp(log_ratio_sum[i, j] / w_ij)
+            r_ij = 10 ** (log_ratio_sum[i, j] / w_ij)
             cor_matrix[i, j]    = r_ij
             cor_matrix[j, i]    = 1.0 / r_ij
             weight_matrix[i, j] = w_ij
@@ -232,15 +229,15 @@ for i in range(N):
             beta_weight_matrix[i, j] = w_beta
             beta_weight_matrix[j, i] = w_beta
 
-scales    = solve_flux_scales(cor_matrix,      weight_matrix,      normalize=True)
-beta_s    = np.log10(solve_flux_scales(beta_cor_matrix, beta_weight_matrix, normalize=True))
+scales = solve_flux_scales(cor_matrix, weight_matrix, normalize=True)
+beta_s = np.log10(solve_flux_scales(beta_cor_matrix, beta_weight_matrix, normalize=True))
 
 print(f"\n{'Catalog':9}  {'scale':>8}  {'beta':>8}  {'interpretation'}")
 print("-------------------------------------------------------")
 for scale, beta, cat in zip(scales, beta_s, config.catalogs):
     interp = "faint-biased" if beta > 0.02 else ("bright-biased" if beta < -0.02 else "ok")
     print(f"{cat.name:9}  {scale:8.5f}  {beta:8.4f}  {interp}")
-
+print("-------------------------------------------------------")
 
 print("Weight matrix (pairs with >0 sources):")
 for i in range(N):
@@ -253,8 +250,11 @@ for i in range(N):
         scale_product = scales[i] * scales[j]
         beta_sum      = beta_s[i] + beta_s[j]
         if abs(scale_product - 1.0) < 0.001 and abs(beta_sum) < 0.001:
-            print(f"WARNING: {config.catalogs[i].name} + {config.catalogs[j].name} are conjugate — underconstrained!")
+            print(f"WARNING: {config.catalogs[i].name} + {config.catalogs[j].name} are conjugate / underconstrained!")
 
 plt.imshow(weight_pair, origin='lower', norm='log')
 plt.colorbar()
 plt.show()
+
+
+print(f"Calculations done at: {perf_counter() - start} s")
