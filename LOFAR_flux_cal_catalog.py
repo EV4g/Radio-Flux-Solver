@@ -11,18 +11,18 @@ start = perf_counter()
 
 #### all available catalogs
 all_catalogs = catalog_set([
-    catalog("/catalogs/racs/racs_gal_clean.fits",             887.5e6,    "racs_gal"),                  # the galactic portion of the racs survey
-    catalog("/catalogs/racs/racs_full_clean.fits",            887.5e6,    "racs",       flux_lim=1e-4), # the rest of the racs survey
-    catalog("/catalogs/meerkat/meerkat_clean.fits",           1359.7e6,   "meerkat"),
-    catalog("/catalogs/vlssr/vlssr_clean.fits",               73.8e6,     "vlssr"),
-    catalog("/catalogs/tgss/tgss_clean.fits",                 150e6,      "tgss"),
-    catalog("/catalogs/gleam_300/gleam_300_clean.fits",       300e6,      "gleam_300"),
-    catalog("/catalogs/gleam_x_gp/gleam_x_gp_clean.fits",     200e6,      "gleam_xgp"),
-    catalog("/catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss"),
-    catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss"),
-    catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar"),                     # LOFAR P282+00
-    catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3", flux_lim=1e-4),
-    catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus"),                    # vla cygnus region
+    catalog("/catalogs/racs/racs_gal_clean.fits",             887.5e6,    "racs_gal",   scale=0.850),                # the galactic portion of the racs survey
+    catalog("/catalogs/racs/racs_full_clean.fits",            887.5e6,    "racs",       scale=0.850),                # the rest of the racs survey
+    catalog("/catalogs/meerkat/meerkat_clean.fits",           1359.7e6,   "meerkat",    scale=1),
+    catalog("/catalogs/vlssr/vlssr_clean.fits",               73.8e6,     "vlssr",      scale=1.228),
+    catalog("/catalogs/tgss/tgss_clean.fits",                 150e6,      "tgss",       scale=1.101),
+    catalog("/catalogs/gleam_300/gleam_300_clean.fits",       300e6,      "gleam_300",  scale=1.151),
+    catalog("/catalogs/gleam_x_gp/gleam_x_gp_clean.fits",     200e6,      "gleam_xgp",  scale=1),
+    catalog("/catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss",       scale=1),
+    catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss",      scale=1.012),
+    catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar",      scale=1),                    # LOFAR P282+00
+    catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3",  scale=1.018, flux_lim=1e-4),
+    catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus",     scale=1),                    # vla cygnus region
     ])
 
 racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar, lofar_dr3, cygnus = all_catalogs.catalogs
@@ -73,7 +73,7 @@ small_config = config(spectral_damping_factor = 5,
                        )
 
 #### Parameters
-debug = True
+debug = False
 #config = lofar_dr3_config
 #config = default_config
 #config = cygnus_config
@@ -309,14 +309,16 @@ print(f"Done at: {perf_counter() - start} s")
 ###################################################
 #### catalog four-way combination auto-looper ####
 ###################################################
-# for combination in get_combinations(catalogs, size=4, required_index=6, skip_index=2):
-#     local_cats = [catalogs[i] for i in combination]
-
+# all_combinations = get_combinations(config.catalogs, size=4, required_index=config.anchor_catalog_index)
+# output_width = len(str(len(all_combinations)))
+# for i, combination in enumerate(all_combinations):
+#     local_cats = [config.catalogs[j] for j in combination]
 #     output = compute_flux_correction_factor(local_cats, config, debug=debug)
-
+    
 #     if output is not None:
-#         spx, snr, cor, flux, catw, max_sep, p_weight, ra, dec = output
-
+#         spx, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
+#         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(spx)}")
+        
 #         ras += [ra]; decs += [dec]
 #         correction_factor_global += [cor]
 #         spectral_index_global += [spx]
@@ -325,3 +327,8 @@ print(f"Done at: {perf_counter() - start} s")
 #         catalog_weight_factor += [catw]
 #         max_separation += [max_sep]
 #         point_probability += [p_weight]
+#         crowding_parameter += [n_crowd]
+#     else:
+#         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", "Matches: None")
+
+# print(f"Calculations done at: {perf_counter() - start} s")
