@@ -67,9 +67,10 @@ small_config = config(spectral_damping_factor = 5,
                        minimum_points = 3,
                        crowd_radius_arc = None,
                        minimum_frequency_spacing = None,
-                       catalogs = [racs, vlssr, tgss, gleam_300, nvss, wenss, lofar_dr3],
+                       #catalogs = [racs, vlssr, tgss, gleam_300, nvss, wenss, lofar_dr3],
+                       catalogs = [racs, nvss, wenss, lofar_dr3],
                        reference_file = None,
-                       anchor_catalog = nvss,
+                       anchor_catalog = lofar_dr3,
                        )
 
 #### Parameters

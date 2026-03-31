@@ -772,11 +772,11 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
             return None
 
     # fit is based on measuring between two points, linear is average between assuming theoretical extragalactic value for both
-    extrapolated_flux_fit = get_flux_from_index(spectral_indices, cats[other_index[0]].flux, cats[anchor_index].freq, cats[other_index[0]].freq)
+    extrapolated_flux_fit = predict_flux(cats[anchor_index].freq, cats[other_index[0]].freq, cats[other_index[0]].flux, spectral_indices)
     
     # calculate the linear theoretical flux at anchor_index based on all the other catalogs, and average the result
-    extrapolated_flux_linear = np.mean([get_flux_from_index(config.spectral_index_theory, cats[index].flux, cats[anchor_index].freq, cats[index].freq) for index in other_index], axis=0)
-
+    extrapolated_flux_linear = np.mean([predict_flux(cats[anchor_index].freq, cats[index].freq, cats[index].flux, config.spectral_index_theory) for index in other_index], axis=0)
+    
     if debug:
         for flux in np.array([cat.flux for cat in cats]).T:
             plt.plot(np.array([cat.freq for cat in cats])*1e-6, flux)
@@ -833,6 +833,24 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
     
     return (spectral_indices, snr, correction_factor, extrapolated_flux_fit, catalog_weight_factor, max_sep, p_weight, n_crowd, ra, dec)
 
+def fit_log_parabola(freq, flux):
+    # ln(flux) = scale + spectral_index ln(nu) + curvature [ln(nu)]^2
+    x = np.log(freq)
+    y = np.log(flux)
+    
+    curvature, spectral_index, scale = np.polyfit(x, y, 2) # np.polyfit returns [curvature, spectral_index, scale] for degree=2
+    return scale, spectral_index, curvature
+
+"""Extrapolate flux based on two frequencies, one flux, a spectral index, and an optional curvature parameter"""
+def predict_flux(freq_target, freq_reference, flux_reference, spectral_index, curvature=0):
+    log_freq_delta = np.log(freq_target / freq_reference)
+    log_flux_ratio = spectral_index * log_freq_delta + curvature * log_freq_delta**2
+    return flux_reference * np.exp(log_flux_ratio)
+
+def alpha_at_nu(nu, b, c):
+    x = np.log(nu)
+    return b + 2.0*c*x
+
 """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
 def calculate_correction_factor_weight(spx, snr, catw, max_sep, p_match, n_crowd, config):
     # downweight sources with spectral indices far away from -0.7
@@ -846,7 +864,3 @@ def calculate_correction_factor_weight(spx, snr, catw, max_sep, p_match, n_crowd
     separation_weight = np.exp(-(max_sep / config.thres_arc) ** 2)
     
     return spectral_difference_factor * signal_to_noise_factor * catw * separation_weight * p_match
-
-"""Extrapolate flux based on two frequencies, one flux, and a spectral index"""
-def get_flux_from_index(spectral_index, reference_flux, current_frequency, reference_frequency):
-    return reference_flux * (current_frequency / reference_frequency) ** spectral_index
