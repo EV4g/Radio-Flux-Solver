@@ -688,8 +688,8 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
     if precomputed_indices is None and precomputed_quality is None:
         indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma, thres_arc_override=config.thres_arc_override, crowd_radius_arc=config.crowd_radius_arc)
     else:
-        indices = precomputed_indices
-        quality = precomputed_quality
+        indices = np.array(precomputed_indices)
+        quality = np.array(precomputed_quality)
         
     # if there are too few sources, return None
     if len(indices[0]) <= config.minimum_points:
@@ -752,8 +752,23 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
             spectral_indices = np.ones_like(cats[0].flux) * config.spectral_index_theory
         case 3:
             spectral_indices = get_spectral_index(cats[other_index[0]].flux, cats[other_index[1]].flux, cats[other_index[0]].freq, cats[other_index[1]].freq)
+        case 4:
+            # here should come some code get correction factor based on spectral index fit
+            # it should return not only spectral index, but also spectral curvature gamma
+            # 
+            
+            spectral_index_p1   = get_spectral_index(cats[other_index[0]].flux, cats[other_index[1]].flux, cats[other_index[0]].freq, cats[other_index[1]].freq)
+            spectral_index_p2   = get_spectral_index(cats[other_index[0]].flux, cats[other_index[2]].flux, cats[other_index[0]].freq, cats[other_index[2]].freq)
+            #spectral_index_long = get_spectral_index(cats[other_index[0]].flux, cats[other_index[2]].flux, cats[other_index[0]].freq, cats[other_index[2]].freq)
+            
+            spectral_indices = ... #array; some function of p1 and p2, something we use as baseline to apply curvature ontop off
+            
+            spectral_curvature = ... #also array, since it depends per point we fit; some function of p1 and p2, to measure the difference between them as function of the difference in frequencies
+            # if we need a mid point for frequencies (since we need a single point to attach the spectral indices p1 and p2 each to), then it might be best to pick a logarithmic mean
+            # exp((log(freq1) + log(freq2)) / 2) ~ something like that?
+            
         case _:
-            print("Not yet implemented")
+            print(f"Case N={len(cats)} not yet implemented")
             return None
 
     # fit is based on measuring between two points, linear is average between assuming theoretical extragalactic value for both
