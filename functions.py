@@ -834,15 +834,16 @@ def fit_log_parabola(freq, flux):
     curvature, spectral_index, scale = np.polyfit(x, y, 2) # np.polyfit returns [curvature, spectral_index, scale] for degree=2
     return scale, spectral_index, curvature
 
+def predict_flux_from_parab_fit(freq_target, scale, spectral_index, curvature):
+    x = np.log(freq_target)
+    log_flux = scale + spectral_index * x + curvature * x**2
+    return np.exp(log_flux)
+
 """Extrapolate flux based on two frequencies, one flux, a spectral index, and an optional curvature parameter"""
 def predict_flux(freq_target, freq_reference, flux_reference, spectral_index, curvature=0):
     log_freq_delta = np.log(freq_target / freq_reference)
     log_flux_ratio = spectral_index * log_freq_delta + curvature * log_freq_delta**2
     return flux_reference * np.exp(log_flux_ratio)
-
-def alpha_at_nu(nu, b, c):
-    x = np.log(nu)
-    return b + 2.0*c*x
 
 """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
 def calculate_correction_factor_weight(spx, snr, max_sep, p_match, n_crowd, config):
