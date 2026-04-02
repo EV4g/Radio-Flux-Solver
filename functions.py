@@ -14,6 +14,8 @@ from itertools import combinations, permutations
 from scipy.stats import chi2 as _chi2_dist, binned_statistic_2d
 from scipy.stats import chi2
 
+warnings.filterwarnings("ignore", module="matplotlib")
+
 try:
     from termcolor import colored
 except ImportError:

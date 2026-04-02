@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 import glob
@@ -7,6 +8,7 @@ from functions import compute_flux_correction_factor, calculate_correction_facto
 from time import perf_counter
 from catalog_manager import Catalog, Config, Catalog_set
 from joblib import Parallel, delayed
+warnings.filterwarnings("ignore", message=".*non-interactive.*")
 
 try:
     from termcolor import colored
@@ -28,8 +30,8 @@ all_catalogs = Catalog_set([
     Catalog("/catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss",       scale=1),
     Catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss",      scale=1.020),
     Catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3",  scale=1),
-    Catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar",      scale=1),                    # LOFAR P282+00
-    Catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus",     scale=1),                    # vla cygnus region
+    Catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar",      scale=1),       # LOFAR P282+00
+    Catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus",     scale=1),       # vla cygnus region
     ])
 
 racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3, lofar, cygnus = all_catalogs.catalogs
