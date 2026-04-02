@@ -94,7 +94,7 @@ config = small_config
 
 config.setup()
 
-print(f"Setup done at: {round(perf_counter() - start, 2)} s")
+print(f"Setup done at: {(perf_counter() - start):.2f} s")
 print("------------------------------------------------")
 
 if debug:    
@@ -183,7 +183,7 @@ for i, (combo, output) in enumerate(zip(all_combinations, outputs)):
     else:
         print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]","Matches:", colored("None", "yellow"))
             
-print(f"Flux compute done at {round(perf_counter() - start, 2)} seconds")
+print(f"Flux compute done at {(perf_counter() - start):.2f} seconds")
 
 
 
@@ -263,7 +263,7 @@ plt.title("Correction factor as function of fitted spectral index\nall catalogs"
 plt.show()
 
 print("------------------------------------------------")
-print(f"Spectral index: {round(px,3)}, correction factor: {round(py,3)}, total matches: {len(correction_factor_global)}")
+print(f"Spectral index: {px:.3f}, correction factor: {py:.3f}, total matches: {len(correction_factor_global)}")
 print("------------------------------------------------")
 
 ##########################
@@ -347,7 +347,7 @@ if inspection_plots:
     #     plt.title(cat.name)
     #     plt.show()
 
-print(f"Done at: {round(perf_counter() - start, 2)} s")
+print(f"Done at: {(perf_counter() - start):.2f} s")
 
 #### variables
 # ras                      = [] # positional coordinates

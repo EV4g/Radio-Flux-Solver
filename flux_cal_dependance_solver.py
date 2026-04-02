@@ -4,6 +4,7 @@ from functions import get_combinations, solve_flux_scales#, calculate_contour_st
 from functions import compute_flux_correction_factor, calculate_correction_factor_weight, calculate_1d_peak#, solve_flux_scales_band
 from time import perf_counter
 from catalog_manager import Catalog, Config, Catalog_set
+from joblib import Parallel, delayed
 
 try:
     from termcolor import colored
@@ -36,9 +37,9 @@ full_config = Config(spectral_damping_factor = 5,
                     nsigma = 3,
                     minimum_points = 10,
                     crowd_radius_arc = None,
-                    minimum_frequency_spacing = None,
-                    catalogs = [racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3],
-                    #catalogs = [racs, vlssr, tgss, gleam_300, nvss, wenss, lofar_dr3], # no galactic specific surveys
+                    minimum_frequency_spacing = 0,
+                    #catalogs = [racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3],
+                    catalogs = [racs, vlssr, tgss, gleam_300, nvss, wenss, lofar_dr3], # no galactic specific surveys
                     #catalogs = [racs, nvss, tgss, vlssr],
                     reference_file = None,
                     anchor_catalog = nvss,
@@ -49,7 +50,7 @@ debug = False
 config = full_config
 config.setup()
 
-print(f"Setup done at: {perf_counter() - start} s")
+print(f"Setup done at: {(perf_counter() - start):.2f} s")
 
 ##############################################
 #### System of equations flux-pair solver ####
@@ -59,9 +60,11 @@ weight_matrix = np.zeros((len(config.catalogs), len(config.catalogs)))
 
 all_combinations = get_combinations(config.catalogs, size=2)
 output_width = len(str(len(all_combinations)))
-for i, combination in enumerate(all_combinations):
+
+outputs = Parallel(n_jobs=-1)(delayed(compute_flux_correction_factor)([config.catalogs[j] for j in combo], config, debug=False, anchor_override=0) for combo in all_combinations)
+
+for i, (combination, output) in enumerate(zip(all_combinations, outputs)):
     local_cats = [config.catalogs[j] for j in combination]
-    output = compute_flux_correction_factor(local_cats, config, debug=False, anchor_override=0)
     
     if output is not None:
         spx, curv, snr, cor, flux, max_sep, p_weight, n_crowd, ra, dec = output
@@ -82,14 +85,18 @@ for i, combination in enumerate(all_combinations):
         weight_matrix[y, x] = np.sum(tot_wf)
         weight_matrix[x, y] = np.sum(tot_wf)
     else:
-        print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]","Matches:", colored("None", "yellow"))
+        print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", "Matches:", colored("None", "yellow"))
+
 
 
 scales = solve_flux_scales(cor_matrix, weight_matrix, normalize=True)
 
 print("--------------------------------------------------------------------------")
-for scale, cat in zip(scales / scales[config.catalogs.index(config.anchor_catalog)], config.catalogs):
-    print(f"Catalog {cat.name:9} should be multiplied by {scale:.4f}, to get {cat.scale * scale:.4f}")
+for i, (scale, cat) in enumerate(zip(scales / scales[config.catalogs.index(config.anchor_catalog)], config.catalogs)):
+    print(f"Catalog {cat.name:9} should be multiplied by {scale:.4f}, to get {cat.scale * scale:.4f}", colored("baseline", "yellow") if i == config.catalogs.index(config.anchor_catalog) else "")
+
+
+
 
 
 #####################################################################
@@ -286,4 +293,4 @@ for scale, cat in zip(scales / scales[config.catalogs.index(config.anchor_catalo
 # plt.show()
 
 
-# print(f"Calculations done at: {perf_counter() - start} s")
+print(f"Calculations done at: {(perf_counter() - start):.2f} s")
