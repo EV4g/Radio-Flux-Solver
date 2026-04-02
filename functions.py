@@ -427,7 +427,7 @@ def remove_outliers_2D_iterative(var1, var2, clip_percentage, n):
     return var1, var2
 
 """Return indices of catalog of all unique, non-double, <size> combinations with the optional condition f[i] < f[i+1]"""
-def get_combinations(cats, size=3, required_index=None, skip_index=None, only_sorted=True):
+def get_combinations(cats, size=3, required_index=None, skip_index=None, only_sorted=True, minimum_spacing=0):
     freqs = [cat.freq for cat in cats]
     indexed = sorted(enumerate(zip(freqs, cats)), key=lambda x: x[1][0])
     
@@ -439,15 +439,16 @@ def get_combinations(cats, size=3, required_index=None, skip_index=None, only_so
         indices = tuple(i for i, (f, _) in combo)
         freqs_c = [f for _, (f, _) in combo]
 
-        if (freqs_c != sorted(freqs_c)) and only_sorted: continue
-        if required and not required.issubset(indices):  continue
-        if skip     and any(i in skip for i in indices): continue
+        if (freqs_c != sorted(freqs_c)) and only_sorted:        continue
+        if np.any(np.diff(sorted(freqs_c)) < minimum_spacing):  continue
+        if required and not required.issubset(indices):         continue
+        if skip     and any(i in skip for i in indices):        continue
 
         result.append(indices)
     return result
 
 """Return indices of catalog of all unique, non-double, <size> permutations with the optional condition f[i] < f[i+1]"""
-def get_permutations(cats, size=3, required_index=None, skip_index=None, only_sorted=True):
+def get_permutations(cats, size=3, required_index=None, skip_index=None, only_sorted=True, minimum_spacing=0):
     freqs = [cat.freq for cat in cats]
     indexed = sorted(enumerate(zip(freqs, cats)), key=lambda x: x[1][0])
     
@@ -459,9 +460,10 @@ def get_permutations(cats, size=3, required_index=None, skip_index=None, only_so
         indices = tuple(i for i, (f, _) in combo)
         freqs_c = [f for _, (f, _) in combo]
 
-        if (freqs_c != sorted(freqs_c)) and only_sorted: continue
-        if required and not required.issubset(indices):  continue
-        if skip     and any(i in skip for i in indices): continue
+        if (freqs_c != sorted(freqs_c)) and only_sorted:        continue
+        if np.any(np.diff(sorted(freqs_c)) < minimum_spacing):  continue
+        if required and not required.issubset(indices):         continue
+        if skip     and any(i in skip for i in indices):        continue
 
         result.append(indices)
     return result
