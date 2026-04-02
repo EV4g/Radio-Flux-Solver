@@ -123,5 +123,3 @@ class config:
                 self.anchor_catalog = next(c for c in self.catalogs if c.name == anchor_name)
             except StopIteration:
                 raise ValueError(f"Anchor_catalog '{anchor_name}' not found in config.catalogs")
-
-            
