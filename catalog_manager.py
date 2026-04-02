@@ -7,7 +7,7 @@ from pathlib import Path
 base_path = Path(__file__).resolve().parent
 
 # wrapper class for incoming Table data
-class catalog:
+class Catalog:
     def __init__(self, path=None, freq_hz=None, name=None, flux_lim=0, scale=1):
         self.path      = base_path / path.lstrip("/")
         self.freq      = freq_hz    # central frequency
@@ -58,7 +58,7 @@ class catalog:
         if self.err_rad is not None: subset.err_rad = self.err_rad[valid]
         return subset
 
-class catalog_set:
+class Catalog_set:
     """Registry of catalogs, accessible by name or as an ordered list."""
     def __init__(self, catalogs):
         self._registry = {cat.name: cat for cat in catalogs}
@@ -77,7 +77,7 @@ class catalog_set:
         return list(self._registry.values())
 
 # wrapper class for passable parameters
-class config:
+class Config:
     def __init__(self, spectral_damping_factor = 5,
                  snr_lower_limit               = 7,
                  spectral_index_theory         = -0.7,

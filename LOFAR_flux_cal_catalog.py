@@ -2,33 +2,34 @@ import numpy as np
 import matplotlib.pyplot as plt
 import glob
 import os
-from functions import match_catalogs_2D, compute_fluxcal_statistics, get_spectral_index, calculate_contour_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d
+from functions import match_catalogs_2D, compute_fluxcal_statistics, calculate_contour_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d
 from functions import compute_flux_correction_factor, calculate_correction_factor_weight, calculate_1d_peak
 from time import perf_counter
-from catalog_manager import catalog, config, catalog_set
+from catalog_manager import Catalog, Config, Catalog_set
+from joblib import Parallel, delayed
 
 start = perf_counter()
 
 #### all available catalogs
-all_catalogs = catalog_set([
-    catalog("/catalogs/racs/racs_gal_clean.fits",             887.5e6,    "racs_gal",   scale=0.850),                # the galactic portion of the racs survey
-    catalog("/catalogs/racs/racs_full_clean.fits",            887.5e6,    "racs",       scale=0.850),                # the rest of the racs survey
-    catalog("/catalogs/meerkat/meerkat_clean.fits",           1359.7e6,   "meerkat",    scale=1),
-    catalog("/catalogs/vlssr/vlssr_clean.fits",               73.8e6,     "vlssr",      scale=1.228),
-    catalog("/catalogs/tgss/tgss_clean.fits",                 150e6,      "tgss",       scale=1.101),
-    catalog("/catalogs/gleam_300/gleam_300_clean.fits",       300e6,      "gleam_300",  scale=1.151),
-    catalog("/catalogs/gleam_x_gp/gleam_x_gp_clean.fits",     200e6,      "gleam_xgp",  scale=1),
-    catalog("/catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss",       scale=1),
-    catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss",      scale=1.012),
-    catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar",      scale=1),                    # LOFAR P282+00
-    catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3",  scale=1.018, flux_lim=1e-4),
-    catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus",     scale=1),                    # vla cygnus region
+all_catalogs = Catalog_set([
+    Catalog("/catalogs/racs/racs_gal_clean.fits",             887.5e6,    "racs_gal",   scale=0.894),  # the galactic portion of the racs survey
+    Catalog("/catalogs/racs/racs_full_clean.fits",            887.5e6,    "racs",       scale=0.868),  # the rest of the racs survey
+    Catalog("/catalogs/meerkat/meerkat_clean.fits",           1359.7e6,   "meerkat",    scale=0.876),
+    Catalog("/catalogs/vlssr/vlssr_clean.fits",               73.8e6,     "vlssr",      scale=1.247),
+    Catalog("/catalogs/tgss/tgss_clean.fits",                 150e6,      "tgss",       scale=1.087),
+    Catalog("/catalogs/gleam_300/gleam_300_clean.fits",       300e6,      "gleam_300",  scale=1.149),
+    Catalog("/catalogs/gleam_x_gp/gleam_x_gp_clean.fits",     200e6,      "gleam_xgp",  scale=1.060),
+    Catalog("/catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss",       scale=1),
+    Catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss",      scale=1.020),
+    Catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3",  scale=1),
+    Catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar",      scale=1),                    # LOFAR P282+00
+    Catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus",     scale=1),                    # vla cygnus region
     ])
 
-racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar, lofar_dr3, cygnus = all_catalogs.catalogs
+racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3, lofar, cygnus = all_catalogs.catalogs
 
 #### available configurations
-lofar_dr3_config = config(spectral_damping_factor = 5,
+lofar_dr3_config = Config(spectral_damping_factor = 5,
                           snr_lower_limit = 7,
                           nsigma = 2.5,
                           minimum_points = 3,
@@ -39,7 +40,7 @@ lofar_dr3_config = config(spectral_damping_factor = 5,
                           anchor_catalog = lofar_dr3,
                           )
 
-default_config = config(spectral_damping_factor = 5,
+default_config = Config(spectral_damping_factor = 5,
                         snr_lower_limit = 7,
                         nsigma = 3,
                         minimum_points = 3,
@@ -50,7 +51,7 @@ default_config = config(spectral_damping_factor = 5,
                         anchor_catalog = lofar,
                         )
 
-cygnus_config = config(spectral_damping_factor = 5,
+cygnus_config = Config(spectral_damping_factor = 5,
                        snr_lower_limit = 7,
                        nsigma = 3,
                        minimum_points = 3,
@@ -61,7 +62,8 @@ cygnus_config = config(spectral_damping_factor = 5,
                        anchor_catalog = cygnus,
                        )
 
-small_config = config(spectral_damping_factor = 5,
+small_config = Config(spectral_damping_factor = 5,
+                      spectral_index_theory=-0.8,
                        snr_lower_limit = 7,
                        nsigma = 2,
                        minimum_points = 3,
@@ -104,15 +106,17 @@ if debug:
     plt.show()
 
 #### variables
-ras, decs = [], []              # positional coordinates
-correction_factor_global = []   # ratio between read-out catalog0 flux and computed
-spectral_index_global = []      # per-source two-point spectral index
-fitted_flux = []                # catalog0 flux based on two-point spectral index extrapolation
-signal_to_noise = []            # signal-to-noise (flux_jy / e_flux_jy)
-catalog_weight_factor = []      # weighting factor based on systematic catalog uncertainty; to be deprecated
-max_separation = []             # maximum per-source separation between all three matched catalog positions
-point_probability = []          # probability of points matching
-crowding_parameter = []         # maximum number of neighbours per source within crowd_radius_arc
+ras                      = [] # positional coordinates
+decs                     = [] # positional coordinates
+correction_factor_global = [] # ratio between read-out anchor_catalog flux and computed flux
+spectral_index_global    = [] # per-source spectral index
+spectral_curvature       = [] # per-source spectral curvature
+fitted_flux              = [] # anchor_catalog flux based on spectral index extrapolation
+signal_to_noise          = [] # signal-to-noise (flux_jy / e_flux_jy)
+catalog_weight_factor    = [] # weighting factor based on systematic catalog uncertainty; to be deprecated
+max_separation           = [] # maximum per-source separation between all three matched catalog positions
+point_probability        = [] # probability of points matching
+crowding_parameter       = [] # maximum number of neighbours per source within crowd_radius_arc
 
 ###################################################
 #### catalog three-way combination auto-looper ####
