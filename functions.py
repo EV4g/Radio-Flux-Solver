@@ -738,13 +738,17 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
     coords = [SkyCoord(ra=cat.ra * u.deg, dec=cat.dec * u.deg) for cat in cats]
     sig    = [np.rad2deg(cat.err_rad) * 3600 for cat in cats]   # arcsec per-source
 
+    # pair probability weighting
     pair_seps = {}
     p_weight  = np.ones(len(cats[0].ra))
+    n_pairs   = len(cats) * (len(cats) - 1) // 2
     for a, b in combinations(range(len(cats)), 2):
         sep = coords[a].separation(coords[b]).arcsec
         pair_seps[(a, b)] = sep
         p_weight *= 1.0 - chi2.cdf((sep / np.hypot(sig[a], sig[b])) ** 2, df=2)
-
+    p_weight = p_weight ** (1 / n_pairs) # geometric mean of probabilities as normalization
+    
+    # maximum separation of each matched pair
     max_sep = np.maximum.reduce(list(pair_seps.values()))
 
     # flux and flux error
@@ -852,4 +856,4 @@ def calculate_correction_factor_weight(spx, snr, max_sep, p_match, n_crowd, conf
     # weighting based on separation between points
     # separation_weight = np.exp(-(max_sep / config.thres_arc) ** 2)
     
-    return spectral_difference_factor * signal_to_noise_factor #* separation_weight * p_match
+    return spectral_difference_factor * signal_to_noise_factor * p_match
