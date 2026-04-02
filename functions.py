@@ -5,7 +5,7 @@ from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 import numpy as np
-from scipy.optimize import curve_fit, minimize
+from scipy.optimize import minimize
 from scipy.spatial import cKDTree
 from scipy.stats import gaussian_kde
 from scipy.ndimage import gaussian_filter, gaussian_filter1d
@@ -13,6 +13,12 @@ import matplotlib.pyplot as plt
 from itertools import combinations, permutations
 from scipy.stats import chi2 as _chi2_dist, binned_statistic_2d
 from scipy.stats import chi2
+
+try:
+    from termcolor import colored
+except ImportError:
+    print("termcolor not found, ignoring color")
+    def colored(str, col): return str
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
@@ -708,7 +714,7 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
             try:
                 anchor_index = cats.index(config.anchor_catalog)
             except:
-                print("Anchor catalog missing from inputs")
+                print(colored("Anchor catalog missing from inputs", "light_red"))
                 return None
         else:
             anchor_index = anchor_override
@@ -722,10 +728,10 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
             if nc is not None and len(nc):
                 n_crowd = np.maximum(n_crowd, nc[match_idx])
     
-    # re-check after crowding
-    if len(indices[0]) <= config.minimum_points:
-        if internal_output: print(f"Error: no source-matches found between [{', '.join(f'{cat.name}' for cat in cats)}] after crowding check")
-        return None
+    # re-check after crowding [to be removed since crowding now stored, no longer removes directly]
+    # if len(indices[0]) <= config.minimum_points:
+    #     if internal_output: print(f"Error: no source-matches found between [{', '.join(f'{cat.name}' for cat in cats)}] after crowding check")
+    #     return None
 
     # create subsets of all catalogs, such that we can ignore (i0,i1,...) afterwards
     cats = [cat.create_subset(indices[index]) for index, cat in enumerate(cats)]
@@ -770,7 +776,7 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
             # exp((log(freq1) + log(freq2)) / 2) ~ something like that?
             
         case _:
-            print(f"Case N={len(cats)} not yet implemented")
+            print(colored(f"Case N={len(cats)} not yet implemented", "light_red"))
             return None
 
     # fit is based on measuring between two points, linear is average between assuming theoretical extragalactic value for both

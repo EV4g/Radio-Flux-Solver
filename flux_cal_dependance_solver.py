@@ -1,9 +1,15 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from functions import match_catalogs_2D, get_combinations, get_permutations, solve_flux_scales, calculate_contour_statistics
-from functions import compute_flux_correction_factor, calculate_correction_factor_weight, calculate_1d_peak, solve_flux_scales_band
+#import matplotlib.pyplot as plt
+from functions import get_combinations, solve_flux_scales#, calculate_contour_statistics
+from functions import compute_flux_correction_factor, calculate_correction_factor_weight, calculate_1d_peak#, solve_flux_scales_band
 from time import perf_counter
 from catalog_manager import Catalog, Config, Catalog_set
+
+try:
+    from termcolor import colored
+except ImportError:
+    print("termcolor not found, ignoring color")
+    def colored(str, col): return str
 
 start = perf_counter()
 
@@ -76,7 +82,7 @@ for i, combination in enumerate(all_combinations):
         weight_matrix[y, x] = np.sum(tot_wf)
         weight_matrix[x, y] = np.sum(tot_wf)
     else:
-        print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", "Matches: None")
+        print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]","Matches:", colored("None", "yellow"))
 
 
 scales = solve_flux_scales(cor_matrix, weight_matrix, normalize=True)
