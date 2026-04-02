@@ -37,8 +37,8 @@ full_config = Config(spectral_damping_factor = 5,
                     minimum_points = 10,
                     crowd_radius_arc = None,
                     minimum_frequency_spacing = None,
-                    #catalogs = [racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3],
-                    catalogs = [racs, vlssr, tgss, gleam_300, nvss, wenss, lofar_dr3], # no galactic specific surveys
+                    catalogs = [racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3],
+                    #catalogs = [racs, vlssr, tgss, gleam_300, nvss, wenss, lofar_dr3], # no galactic specific surveys
                     #catalogs = [racs, nvss, tgss, vlssr],
                     reference_file = None,
                     anchor_catalog = nvss,
@@ -64,7 +64,7 @@ for i, combination in enumerate(all_combinations):
     output = compute_flux_correction_factor(local_cats, config, debug=False, anchor_override=0)
     
     if output is not None:
-        spx, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
+        spx, curv, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(spx)}")
         
         tot_wf = calculate_correction_factor_weight(spx, snr, catw, max_sep, p_weight, n_crowd, config)
@@ -108,7 +108,7 @@ for scale, cat in zip(scales / scales[config.catalogs.index(config.anchor_catalo
 #     output = compute_flux_correction_factor(local_cats, config, debug=False, anchor_override=0)
     
 #     if output is not None:
-#         spx, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
+#         spx, curv, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
 #         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(spx)}")
         
 #         for d, declination in enumerate(decs):
@@ -185,7 +185,7 @@ for scale, cat in zip(scales / scales[config.catalogs.index(config.anchor_catalo
 #         if output is None:
 #             continue
 
-#         spx, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
+#         spx, curv, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
 
 #         tot_wf = calculate_correction_factor_weight(spx, snr, catw, max_sep, p_weight, n_crowd, config)
 #         valid = tot_wf > 0

@@ -693,6 +693,7 @@ def quick_compare_catalog(cat1, cat2, config):
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
 def compute_flux_correction_factor(cats, config, debug=False, internal_output=False, anchor_override=None, precomputed_indices=None, precomputed_quality=None):
     
+    # allow for pre-computed inputs, to skip match_catalogs_2D
     if precomputed_indices is None and precomputed_quality is None:
         indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma, thres_arc_override=config.thres_arc_override, crowd_radius_arc=config.crowd_radius_arc)
     else:
@@ -752,7 +753,10 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
     # flux and flux error
     uncorrected_flux = cats[anchor_index].flux
     uncorrected_flux_error = cats[anchor_index].e_flux
-
+    
+    # setup a spectral curvature array, will remain 0 if not fitted for
+    spectral_curvature = np.zeros_like(uncorrected_flux)
+    
     # calculate spectral indices based on available data
     # w.i.p. for case n=4, where curvature can be estimated
     match len(cats):
@@ -761,20 +765,8 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
         case 3:
             spectral_indices = get_spectral_index(cats[other_index[0]].flux, cats[other_index[1]].flux, cats[other_index[0]].freq, cats[other_index[1]].freq)
         case 4:
-            # here should come some code get correction factor based on spectral index fit
-            # it should return not only spectral index, but also spectral curvature gamma
-            # 
-            
-            spectral_index_p1   = get_spectral_index(cats[other_index[0]].flux, cats[other_index[1]].flux, cats[other_index[0]].freq, cats[other_index[1]].freq)
-            spectral_index_p2   = get_spectral_index(cats[other_index[0]].flux, cats[other_index[2]].flux, cats[other_index[0]].freq, cats[other_index[2]].freq)
-            #spectral_index_long = get_spectral_index(cats[other_index[0]].flux, cats[other_index[2]].flux, cats[other_index[0]].freq, cats[other_index[2]].freq)
-            
-            spectral_indices = ... #array; some function of p1 and p2, something we use as baseline to apply curvature ontop off
-            
-            spectral_curvature = ... #also array, since it depends per point we fit; some function of p1 and p2, to measure the difference between them as function of the difference in frequencies
-            # if we need a mid point for frequencies (since we need a single point to attach the spectral indices p1 and p2 each to), then it might be best to pick a logarithmic mean
-            # exp((log(freq1) + log(freq2)) / 2) ~ something like that?
-            
+            _, spectral_indices, spectral_curvature = fit_log_parabola([cats[index].freq for index in other_index], [cats[index].flux for index in other_index])
+            spectral_indices = spectral_indices + 2 * spectral_curvature * np.log(cats[other_index[0]].freq) # go from log-parabola units to something predict_flux() can use
         case _:
             print(colored(f"Case N={len(cats)} not yet implemented", "light_red"))
             return None
@@ -783,7 +775,7 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
     extrapolated_flux_fit = predict_flux(cats[anchor_index].freq, cats[other_index[0]].freq, cats[other_index[0]].flux, spectral_indices)
     
     # calculate the linear theoretical flux at anchor_index based on all the other catalogs, and average the result
-    extrapolated_flux_linear = np.mean([predict_flux(cats[anchor_index].freq, cats[index].freq, cats[index].flux, config.spectral_index_theory) for index in other_index], axis=0)
+    extrapolated_flux_linear = np.mean([predict_flux(cats[anchor_index].freq, cats[index].freq, cats[index].flux, config.spectral_index_theory, spectral_curvature) for index in other_index], axis=0)
     
     if debug:
         for flux in np.array([cat.flux for cat in cats]).T:
@@ -839,7 +831,7 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
         
     if internal_output: print(f"Completed set [{', '.join(f'{cat.name:9}' for cat in cats)}]", f"Matches: {len(indices[0])}")    
     
-    return (spectral_indices, snr, correction_factor, extrapolated_flux_fit, catalog_weight_factor, max_sep, p_weight, n_crowd, ra, dec)
+    return (spectral_indices, spectral_curvature, snr, correction_factor, extrapolated_flux_fit, catalog_weight_factor, max_sep, p_weight, n_crowd, ra, dec)
 
 def fit_log_parabola(freq, flux):
     # ln(flux) = scale + spectral_index ln(nu) + curvature [ln(nu)]^2

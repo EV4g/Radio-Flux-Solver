@@ -130,27 +130,68 @@ crowding_parameter       = [] # maximum number of neighbours per source within c
 ###################################################
 #### catalog three-way combination auto-looper ####
 ###################################################
-all_combinations = get_combinations(config.catalogs, size=3, required_index=config.anchor_catalog_index)
-output_width = len(str(len(all_combinations)))
-for i, combination in enumerate(all_combinations):
-    local_cats = [config.catalogs[j] for j in combination]
-    output = compute_flux_correction_factor(local_cats, config, debug=debug)
+# all_combinations = get_combinations(config.catalogs, size=3, required_index=config.anchor_catalog_index)
+# output_width = len(str(len(all_combinations)))
+# for i, combination in enumerate(all_combinations):
+#     local_cats = [config.catalogs[j] for j in combination]
+#     output = compute_flux_correction_factor(local_cats, config, debug=debug)
     
-    if output is not None:
-        spx, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
-        print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(spx)}")
+#     if output is not None:
+#         spx, curv, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
+#         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(spx)}")
         
-        ras += [ra]; decs += [dec]
+#         ras                      += [ra]
+#         decs                     += [dec]
+#         correction_factor_global += [cor]
+#         spectral_index_global    += [spx]
+#         spectral_curvature       += [curv]
+#         fitted_flux              += [flux]
+#         signal_to_noise          += [snr]
+#         catalog_weight_factor    += [catw]
+#         max_separation           += [max_sep]
+#         point_probability        += [p_weight]
+#         crowding_parameter       += [n_crowd]
+#     else:
+#         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", "Matches: None")
+
+# print(f"Calculations done at: {perf_counter() - start} s")
+
+
+
+all_combinations = get_combinations(config.catalogs, size=3, required_index=config.anchor_catalog_index, minimum_spacing=config.minimum_frequency_spacing)
+output_width = len(str(len(all_combinations)))
+
+outputs = Parallel(n_jobs=-1)(delayed(compute_flux_correction_factor)([config.catalogs[j] for j in combo], config) for combo in all_combinations)
+
+for i, (combo, output) in enumerate(zip(all_combinations, outputs)):
+    local_cats = [config.catalogs[j] for j in combo]
+
+    if output is not None:
+        spx, curv, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
+        print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",f"Matches: {len(spx)}")
+
+        ras                      += [ra]
+        decs                     += [dec]
         correction_factor_global += [cor]
-        spectral_index_global += [spx]
-        fitted_flux += [flux]
-        signal_to_noise += [snr]
-        catalog_weight_factor += [catw]
-        max_separation += [max_sep]
-        point_probability += [p_weight]
-        crowding_parameter += [n_crowd]
+        spectral_index_global    += [spx]
+        spectral_curvature       += [curv]
+        fitted_flux              += [flux]
+        signal_to_noise          += [snr]
+        catalog_weight_factor    += [catw]
+        max_separation           += [max_sep]
+        point_probability        += [p_weight]
+        crowding_parameter       += [n_crowd]
     else:
-        print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", "Matches: None")
+        print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]","Matches:", colored("None", "yellow"))
+            
+print(f"Flux compute done at {round(perf_counter() - start, 2)} seconds")
+
+
+
+
+
+
+
 
 
 ###########################################################
@@ -184,6 +225,7 @@ ras = np.concatenate(ras)
 decs = np.concatenate(decs)
 correction_factor_global = np.concatenate(correction_factor_global)
 spectral_index_global = np.concatenate(spectral_index_global)
+spectral_curvature = np.concatenate(spectral_curvature)
 fitted_flux = np.concatenate(fitted_flux)
 signal_to_noise = np.concatenate(signal_to_noise)
 catalog_weight_factor = np.concatenate(catalog_weight_factor)
@@ -330,7 +372,7 @@ print(f"Done at: {round(perf_counter() - start, 2)} s")
 #     output = compute_flux_correction_factor(local_cats, config, debug=debug)
     
 #     if output is not None:
-#         spx, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
+#         spx, curv, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
 #         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(spx)}")
         
 #         ras += [ra]; decs += [dec]
