@@ -728,11 +728,6 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
             nc = quality['n_crowd'].get(cat_idx)
             if nc is not None and len(nc):
                 n_crowd = np.maximum(n_crowd, nc[match_idx])
-    
-    # re-check after crowding [to be removed since crowding now stored, no longer removes directly]
-    # if len(indices[0]) <= config.minimum_points:
-    #     if internal_output: print(f"Error: no source-matches found between [{', '.join(f'{cat.name}' for cat in cats)}] after crowding check")
-    #     return None
 
     # create subsets of all catalogs, such that we can ignore (i0,i1,...) afterwards
     cats = [cat.create_subset(indices[index]) for index, cat in enumerate(cats)]
@@ -790,14 +785,6 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
     correction_factor = extrapolated_flux_fit / uncorrected_flux
     snr = uncorrected_flux / uncorrected_flux_error
     
-    # apply weighting factor per catalog, downweighting uncertain ones. To be depracated in favour
-    # of a proper flux extrapolator and proper catalog uncertainty values.
-    catalog_weight_factor = np.ones_like(snr)
-    for cat in cats:
-        if cat.name.lower() == "tgss": catalog_weight_factor *= 0.5
-        if cat.name.lower() == "gleam_300": catalog_weight_factor *= 0.7
-        if cat.name.lower() == "gleam_xgp": catalog_weight_factor *= 0.8
-    
     # calculate average position over all catalogs instead of using the first catalog
     ra = np.average([cat.ra for cat in cats], axis=0)
     dec = np.average([cat.dec for cat in cats], axis=0)
@@ -831,7 +818,7 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
         
     if internal_output: print(f"Completed set [{', '.join(f'{cat.name:9}' for cat in cats)}]", f"Matches: {len(indices[0])}")    
     
-    return (spectral_indices, spectral_curvature, snr, correction_factor, extrapolated_flux_fit, catalog_weight_factor, max_sep, p_weight, n_crowd, ra, dec)
+    return (spectral_indices, spectral_curvature, snr, correction_factor, extrapolated_flux_fit, max_sep, p_weight, n_crowd, ra, dec)
 
 def fit_log_parabola(freq, flux):
     # ln(flux) = scale + spectral_index ln(nu) + curvature [ln(nu)]^2
@@ -852,7 +839,7 @@ def alpha_at_nu(nu, b, c):
     return b + 2.0*c*x
 
 """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
-def calculate_correction_factor_weight(spx, snr, catw, max_sep, p_match, n_crowd, config):
+def calculate_correction_factor_weight(spx, snr, max_sep, p_match, n_crowd, config):
     # downweight sources with spectral indices far away from -0.7
     spectral_difference_factor = np.exp(-config.spectral_damping_factor * (spx - config.spectral_index_theory)**2)
     
@@ -861,6 +848,6 @@ def calculate_correction_factor_weight(spx, snr, catw, max_sep, p_match, n_crowd
     signal_to_noise_factor[signal_to_noise_factor < config.snr_lower_limit] = 0
     
     # weighting based on separation between points
-    separation_weight = np.exp(-(max_sep / config.thres_arc) ** 2)
+    # separation_weight = np.exp(-(max_sep / config.thres_arc) ** 2)
     
-    return spectral_difference_factor * signal_to_noise_factor * catw * separation_weight * p_match
+    return spectral_difference_factor * signal_to_noise_factor #* separation_weight * p_match

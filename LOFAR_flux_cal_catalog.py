@@ -122,7 +122,6 @@ spectral_index_global    = [] # per-source spectral index
 spectral_curvature       = [] # per-source spectral curvature
 fitted_flux              = [] # anchor_catalog flux based on spectral index extrapolation
 signal_to_noise          = [] # signal-to-noise (flux_jy / e_flux_jy)
-catalog_weight_factor    = [] # weighting factor based on systematic catalog uncertainty; to be deprecated
 max_separation           = [] # maximum per-source separation between all three matched catalog positions
 point_probability        = [] # probability of points matching
 crowding_parameter       = [] # maximum number of neighbours per source within crowd_radius_arc
@@ -137,7 +136,7 @@ crowding_parameter       = [] # maximum number of neighbours per source within c
 #     output = compute_flux_correction_factor(local_cats, config, debug=debug)
     
 #     if output is not None:
-#         spx, curv, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
+#         spx, curv, snr, cor, flux, max_sep, p_weight, n_crowd, ra, dec = output
 #         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(spx)}")
         
 #         ras                      += [ra]
@@ -147,7 +146,6 @@ crowding_parameter       = [] # maximum number of neighbours per source within c
 #         spectral_curvature       += [curv]
 #         fitted_flux              += [flux]
 #         signal_to_noise          += [snr]
-#         catalog_weight_factor    += [catw]
 #         max_separation           += [max_sep]
 #         point_probability        += [p_weight]
 #         crowding_parameter       += [n_crowd]
@@ -167,7 +165,7 @@ for i, (combo, output) in enumerate(zip(all_combinations, outputs)):
     local_cats = [config.catalogs[j] for j in combo]
 
     if output is not None:
-        spx, curv, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
+        spx, curv, snr, cor, flux, max_sep, p_weight, n_crowd, ra, dec = output
         print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",f"Matches: {len(spx)}")
 
         ras                      += [ra]
@@ -177,7 +175,6 @@ for i, (combo, output) in enumerate(zip(all_combinations, outputs)):
         spectral_curvature       += [curv]
         fitted_flux              += [flux]
         signal_to_noise          += [snr]
-        catalog_weight_factor    += [catw]
         max_separation           += [max_sep]
         point_probability        += [p_weight]
         crowding_parameter       += [n_crowd]
@@ -197,8 +194,8 @@ print(f"Flux compute done at {round(perf_counter() - start, 2)} seconds")
 ###########################################################
 #### plotting correction factor for each catalog combo ####
 ###########################################################
-# for spx, snr, cor, catw, max_sep in zip(spectral_index_global, signal_to_noise, correction_factor_global, catalog_weight_factor, max_separation):
-#     total_weighting_factor = calculate_weighted_correction_factor(spx, snr, catw, max_sep, config)
+# for spx, snr, cor, max_sep in zip(spectral_index_global, signal_to_noise, correction_factor_global, catalog_weight_factor, max_separation):
+#     total_weighting_factor = calculate_weighted_correction_factor(spx, snr, max_sep, config)
 #     Xi, Yi, Zi, px, py = calculate_contour_statistics(spx, cor, total_weighting_factor, logy=True)
 
 #     o = np.argsort(total_weighting_factor)
@@ -228,14 +225,12 @@ spectral_index_global = np.concatenate(spectral_index_global)
 spectral_curvature = np.concatenate(spectral_curvature)
 fitted_flux = np.concatenate(fitted_flux)
 signal_to_noise = np.concatenate(signal_to_noise)
-catalog_weight_factor = np.concatenate(catalog_weight_factor)
 max_separation = np.concatenate(max_separation)
 crowding_parameter = np.concatenate(crowding_parameter)
 point_probability = np.concatenate(point_probability)
 
 total_weighting_factor = calculate_correction_factor_weight(spectral_index_global,
                                                             signal_to_noise,
-                                                            catalog_weight_factor,
                                                             max_separation,
                                                             point_probability,
                                                             crowding_parameter,
@@ -353,14 +348,16 @@ if inspection_plots:
 print(f"Done at: {round(perf_counter() - start, 2)} s")
 
 #### variables
-# ras, decs = [], []              # positional coordinates
-# correction_factor_global = []   # ratio between read-out catalog0 flux and computed
-# spectral_index_global = []      # per-source two-point spectral index
-# fitted_flux = []                # catalog0 flux based on two-point spectral index extrapolation
-# signal_to_noise = []            # signal-to-noise (flux_jy / e_flux_jy)
-# catalog_weight_factor = []      # weighting factor based on systematic catalog uncertainty; to be deprecated
-# max_separation = []             # maximum per-source separation between all three matched catalog positions
-# point_probability = []          # probability of points matching
+# ras                      = [] # positional coordinates
+# decs                     = [] # positional coordinates
+# correction_factor_global = [] # ratio between read-out anchor_catalog flux and computed flux
+# spectral_index_global    = [] # per-source spectral index
+# spectral_curvature       = [] # per-source spectral curvature
+# fitted_flux              = [] # anchor_catalog flux based on spectral index extrapolation
+# signal_to_noise          = [] # signal-to-noise (flux_jy / e_flux_jy)
+# max_separation           = [] # maximum per-source separation between all three matched catalog positions
+# point_probability        = [] # probability of points matching
+# crowding_parameter       = [] # maximum number of neighbours per source within crowd_radius_arc
 
 ###################################################
 #### catalog four-way combination auto-looper ####
@@ -372,18 +369,19 @@ print(f"Done at: {round(perf_counter() - start, 2)} s")
 #     output = compute_flux_correction_factor(local_cats, config, debug=debug)
     
 #     if output is not None:
-#         spx, curv, snr, cor, flux, catw, max_sep, p_weight, n_crowd, ra, dec = output
+#         spx, curv, snr, cor, flux, max_sep, p_weight, n_crowd, ra, dec = output
 #         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(spx)}")
-        
-#         ras += [ra]; decs += [dec]
+
+#         ras                      += [ra]
+#         decs                     += [dec]
 #         correction_factor_global += [cor]
-#         spectral_index_global += [spx]
-#         fitted_flux += [flux]
-#         signal_to_noise += [snr]
-#         catalog_weight_factor += [catw]
-#         max_separation += [max_sep]
-#         point_probability += [p_weight]
-#         crowding_parameter += [n_crowd]
+#         spectral_index_global    += [spx]
+#         spectral_curvature       += [curv]
+#         fitted_flux              += [flux]
+#         signal_to_noise          += [snr]
+#         max_separation           += [max_sep]
+#         point_probability        += [p_weight]
+#         crowding_parameter       += [n_crowd]
 #     else:
 #         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", "Matches: None")
 
