@@ -89,7 +89,8 @@ class Config:
                  reference_file                = None,
                  anchor_catalog                = None,
                  thres_arc                     = 2,
-                 thres_arc_override            = False):
+                 thres_arc_override            = False,
+                 spectral_curvature_theory     = 0):
         
         self.thres_arc                  = thres_arc
         self.spectral_damping_factor    = spectral_damping_factor
@@ -105,6 +106,7 @@ class Config:
         self.anchor_catalog             = anchor_catalog
         self.anchor_catalog_index       = self.catalogs.index(anchor_catalog) if catalogs is not None else None
         self.thres_arc_override         = thres_arc_override
+        self.spectral_curvature_theory  = spectral_curvature_theory
         
     def setup(self):
         # load the data per catalog

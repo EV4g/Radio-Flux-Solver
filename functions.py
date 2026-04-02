@@ -751,8 +751,8 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
     uncorrected_flux = cats[anchor_index].flux
     uncorrected_flux_error = cats[anchor_index].e_flux
     
-    # setup a spectral curvature array, will remain 0 if not fitted for
-    spectral_curvature = np.zeros_like(uncorrected_flux)
+    # setup a spectral curvature array, will remain theoretical value if not fitted for
+    spectral_curvature = np.zeros_like(uncorrected_flux) + config.spectral_curvature_theory
     
     # calculate spectral indices based on available data
     # w.i.p. for case n=4, where curvature can be estimated
@@ -769,10 +769,10 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
             return None
 
     # fit is based on measuring between two points, linear is average between assuming theoretical extragalactic value for both
-    extrapolated_flux_fit = predict_flux(cats[anchor_index].freq, cats[other_index[0]].freq, cats[other_index[0]].flux, spectral_indices)
+    extrapolated_flux_fit = predict_flux(cats[anchor_index].freq, cats[other_index[0]].freq, cats[other_index[0]].flux, spectral_indices, spectral_curvature)
     
     # calculate the linear theoretical flux at anchor_index based on all the other catalogs, and average the result
-    extrapolated_flux_linear = np.mean([predict_flux(cats[anchor_index].freq, cats[index].freq, cats[index].flux, config.spectral_index_theory, spectral_curvature) for index in other_index], axis=0)
+    extrapolated_flux_linear = np.mean([predict_flux(cats[anchor_index].freq, cats[index].freq, cats[index].flux, config.spectral_index_theory, config.spectral_curvature_theory) for index in other_index], axis=0)
     
     if debug:
         for flux in np.array([cat.flux for cat in cats]).T:
