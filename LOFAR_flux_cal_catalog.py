@@ -235,7 +235,8 @@ o = np.argsort(total_weighting_factor)
 
 fig, ax = plt.subplots()
 sc = ax.scatter(spectral_index_global[o], correction_factor_global[o], c=total_weighting_factor[o])
-ax.contour(Xi, Yi, Zi, levels=6, colors='red', alpha=0.7, linewidths=0.8)
+levels = Zi.max() * np.array([0.01, 0.05, 0.15, 0.35, 0.65, 0.90])
+ax.contour(Xi, Yi, Zi, levels=levels, colors='red', alpha=0.7, linewidths=0.8)
 plt.colorbar(sc, label="Combined weighting factor")
 plt.yscale('log')
 
