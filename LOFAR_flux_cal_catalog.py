@@ -20,19 +20,19 @@ start = perf_counter()
 
 #### all available catalogs
 all_catalogs = Catalog_set([
-    Catalog("/catalogs/racs/racs_low_gal_clean.fits",         887.5e6,    "racs_gal",   scale=0.894),  # the galactic portion of the racs-low survey
-    Catalog("/catalogs/racs/racs_low_clean.fits",             887.5e6,    "racs_low",   scale=0.868),  # the rest of the racs-low survey
-    Catalog("/catalogs/racs/racs_mid_clean.fits",             1367.5e6,   "racs_mid",   scale=1),
-    Catalog("/catalogs/racs/racs_high_clean.fits",            1655.5e6,   "racs_high",  scale=1),
-    Catalog("/catalogs/meerkat/meerkat_clean.fits",           1359.7e6,   "meerkat",    scale=0.876),
-    Catalog("/catalogs/vlssr/vlssr_clean.fits",               73.8e6,     "vlssr",      scale=1.247),
-    Catalog("/catalogs/tgss/tgss_clean.fits",                 150e6,      "tgss",       scale=1.087),
-    Catalog("/catalogs/gleam_300/gleam_300_clean.fits",       300e6,      "gleam_300",  scale=1.149),
-    Catalog("/catalogs/gleam_x_gp/gleam_x_gp_clean.fits",     200e6,      "gleam_xgp",  scale=1.060),
+    Catalog("/catalogs/racs/racs_low_gal_clean.fits",         887.5e6,    "racs_gal",   scale=0.9068),  # the galactic portion of the racs-low survey
+    Catalog("/catalogs/racs/racs_low_clean.fits",             887.5e6,    "racs_low",   scale=0.8852),  # the rest of the racs-low survey
+    Catalog("/catalogs/racs/racs_mid_clean.fits",             1367.5e6,   "racs_mid",   scale=0.9430),
+    Catalog("/catalogs/racs/racs_high_clean.fits",            1655.5e6,   "racs_high",  scale=0.9860),
+    Catalog("/catalogs/meerkat/meerkat_clean.fits",           1359.7e6,   "meerkat",    scale=0.8525),
+    Catalog("/catalogs/vlssr/vlssr_clean.fits",               73.8e6,     "vlssr",      scale=1.2008),
+    Catalog("/catalogs/tgss/tgss_clean.fits",                 150e6,      "tgss",       scale=1.1158),
+    Catalog("/catalogs/gleam_300/gleam_300_clean.fits",       300e6,      "gleam_300",  scale=1.1578),
+    Catalog("/catalogs/gleam_x_gp/gleam_x_gp_clean.fits",     200e6,      "gleam_xgp",  scale=1.0716),
     Catalog("/catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss",       scale=1),
-    Catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss",      scale=1.020),
+    Catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss",      scale=1.0426),
     Catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3",  scale=1),
-    Catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar",      scale=1),       # LOFAR P282+00
+    Catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar",      scale=1.0457),       # LOFAR P282+00
     Catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus",     scale=1),       # vla cygnus region
     ])
 
@@ -87,7 +87,7 @@ small_config = Config(spectral_damping_factor = 5,
                        )
 
 #### Parameters
-debug = False
+debug = True
 inspection_plots = True
 #config = lofar_dr3_config
 #config = default_config
@@ -322,7 +322,7 @@ if inspection_plots:
         ras[mask], decs[mask],
         correction_factor_global[mask],
         total_weighting_factor[mask],
-        n_bins=40, m_bins=40
+        n_bins=400, m_bins=100
     )
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
