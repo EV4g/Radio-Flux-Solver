@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import glob
 import os
 from functions import calculate_contour_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d
-from functions import compute_flux_correction_factor, calculate_correction_factor_weight#, calculate_1d_peak
+from functions import compute_flux_correction_factor, calculate_correction_factor_weight, biweight_location
 from time import perf_counter
 from catalog_manager import Catalog, Config, Catalog_set
 from joblib import Parallel, delayed
@@ -75,19 +75,20 @@ cygnus_config = Config(spectral_damping_factor = 5,
 small_config = Config(spectral_damping_factor = 5,
                       spectral_index_theory=-0.8,
                        snr_lower_limit = 7,
-                       nsigma = 2,
+                       nsigma = 2.5,
                        minimum_points = 3,
                        crowd_radius_arc = None,
                        minimum_frequency_spacing = 0,#50e6,
-                       catalogs = [racs_low, racs_gal, vlssr, tgss, gleam_300, gleam_xgp, lofar_dr3, wenss, nvss, racs_mid, racs_high],
+                       catalogs = all_catalogs.catalogs,
+                       #catalogs = [racs_low, racs_gal, vlssr, tgss, gleam_300, gleam_xgp, lofar_dr3, wenss, nvss, racs_mid, racs_high],
                        #catalogs = [vlssr, gleam_300, gleam_xgp, tgss, lofar_dr3],
-                       #catalogs = [lofar_dr3, racs_low, nvss],
+                       #catalogs = [lofar_dr3, racs_low, meerkat, vlssr, tgss],
                        reference_file = None,
                        anchor_catalog = lofar_dr3,
                        )
 
 #### Parameters
-debug = True
+debug = False
 inspection_plots = True
 #config = lofar_dr3_config
 #config = default_config
@@ -204,10 +205,30 @@ total_weighting_factor = calculate_correction_factor_weight(spectral_index_globa
                                                             crowding_parameter,
                                                             config)
 
+mask = total_weighting_factor > 0
+
+ras                      = ras[mask]
+decs                     = decs[mask]
+correction_factor_global = correction_factor_global[mask]
+spectral_index_global    = spectral_index_global[mask]
+spectral_curvature       = spectral_curvature[mask]
+fitted_flux              = fitted_flux[mask]
+signal_to_noise          = signal_to_noise[mask]
+max_separation           = max_separation[mask]
+point_probability        = point_probability[mask]
+crowding_parameter       = crowding_parameter[mask]
+
+total_weighting_factor   = total_weighting_factor[mask]
 
 ############################################################################
 #### plotting correction factor based on all previous catalog matchings ####
 ############################################################################
+
+
+    
+mspx, mcor, mcur = biweight_location(spectral_index_global, correction_factor_global, spectral_curvature, weights=total_weighting_factor)
+
+
 Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index_global, correction_factor_global, total_weighting_factor, logy=True, n=1000)
 
 o = np.argsort(total_weighting_factor)
@@ -230,6 +251,7 @@ plt.show()
 
 print("------------------------------------------------")
 print(f"Spectral index: {px:.3f}, correction factor: {py:.3f}, total matches: {len(correction_factor_global)}")
+print(f"Spectral index: {mspx:.3f}, correction factor: {mcor:.3f}, total matches: {len(correction_factor_global)}")
 print("------------------------------------------------")
 
 ##########################
