@@ -819,3 +819,62 @@ def calculate_correction_factor_weight(spx, snr, max_sep, p_match, n_crowd, conf
     # separation_weight = np.exp(-(max_sep / config.thres_arc) ** 2)
     
     return spectral_difference_factor * signal_to_noise_factor * p_match
+
+"""Return median of an array with value weights"""
+def weighted_median(val, w):
+    idx = np.argsort(val)
+    val, w = val[idx], w[idx]
+    return float(val[np.cumsum(w) >= w.sum() / 2][0])
+
+"""Return biweight location statistic for determining the center of a distribution"""
+def biweight_location(arr1, arr2, arr3, weights=None, c=None, max_iter=30, tol=1e-9):
+    # stack data
+    X = np.column_stack([np.asarray(a, dtype=float) for a in (arr1, arr2, arr3)])
+
+    # load weights, and discard NaN and 0 weights
+    w = np.ones(len(X)) if weights is None else np.asarray(weights, dtype=float)
+    w = np.where(np.isfinite(w) & (w > 0), w, 0.0)
+    keep = np.isfinite(X).all(axis=1) & (w > 0)
+    X, w = X[keep], w[keep]
+
+    if len(X) == 0: return (np.nan, np.nan, np.nan)
+    
+    # normalize weights
+    w /= w.sum()
+    
+    # count the number of non-degenerate axes
+    active = np.ptp(X, axis=0) > 0
+    
+    # calculate auto-rejection threshold
+    if c is None: c = np.sqrt(chi2.ppf(0.975, df=max(int(active.sum()), 1)))
+    
+    # initial guess from simple weighted median
+    mu = np.array([weighted_median(X[:, j], w) for j in range(3)])
+    
+    # iterative re-weighted least-square loop
+    for _ in range(max_iter):
+        # median absolute deviation
+        mad   = np.array([weighted_median(np.abs(X[:, j] - mu[j]), w) for j in range(3)])
+        scale = np.where(mad > 0, mad, 1.0)
+        
+        # clip to avoid overflow
+        diff  = np.clip((X - mu) / scale, -1e7, 1e7)
+        dist  = np.sqrt(np.sum(diff[:, active] ** 2, axis=1))
+        
+        # median joint distance
+        med_d = weighted_median(dist, w)
+        if med_d == 0: break
+        
+        # tukey bisquare kernel
+        u    = dist / (c * med_d)
+        w_bw = np.zeros_like(u)
+        w_bw[u < 1] = (1 - u[u < 1] ** 2) ** 2
+        
+        w_tot = w * w_bw
+        if w_tot.sum() == 0: break
+        
+        mu_new = (w_tot @ X) / w_tot.sum()
+        if np.max(np.abs(mu_new - mu)) < tol: mu = mu_new; break
+        mu = mu_new
+        
+    return tuple(mu)
