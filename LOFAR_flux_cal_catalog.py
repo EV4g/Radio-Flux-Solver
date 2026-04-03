@@ -20,8 +20,10 @@ start = perf_counter()
 
 #### all available catalogs
 all_catalogs = Catalog_set([
-    Catalog("/catalogs/racs/racs_gal_clean.fits",             887.5e6,    "racs_gal",   scale=0.894),  # the galactic portion of the racs survey
-    Catalog("/catalogs/racs/racs_full_clean.fits",            887.5e6,    "racs",       scale=0.868),  # the rest of the racs survey
+    Catalog("/catalogs/racs/racs_low_gal_clean.fits",         887.5e6,    "racs_gal",   scale=0.894),  # the galactic portion of the racs-low survey
+    Catalog("/catalogs/racs/racs_low_clean.fits",             887.5e6,    "racs-low",   scale=0.868),  # the rest of the racs-low survey
+    Catalog("/catalogs/racs/racs_mid_clean.fits",             1367.5e6,   "racs-mid",   scale=1),
+    Catalog("/catalogs/racs/racs_high_clean.fits",            1655.5e5,   "racs-high",  scale=1),
     Catalog("/catalogs/meerkat/meerkat_clean.fits",           1359.7e6,   "meerkat",    scale=0.876),
     Catalog("/catalogs/vlssr/vlssr_clean.fits",               73.8e6,     "vlssr",      scale=1.247),
     Catalog("/catalogs/tgss/tgss_clean.fits",                 150e6,      "tgss",       scale=1.087),
@@ -34,7 +36,7 @@ all_catalogs = Catalog_set([
     Catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus",     scale=1),       # vla cygnus region
     ])
 
-racs_gal, racs, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3, lofar, cygnus = all_catalogs.catalogs
+racs_gal, racs_low, racs_mid, racs_high, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3, lofar, cygnus = all_catalogs.catalogs
 
 #### available configurations
 lofar_dr3_config = Config(spectral_damping_factor = 5,
@@ -43,7 +45,7 @@ lofar_dr3_config = Config(spectral_damping_factor = 5,
                           minimum_points = 3,
                           crowd_radius_arc = None,
                           minimum_frequency_spacing = None,
-                          catalogs = [racs, racs_gal, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3],
+                          catalogs = [racs_low, racs_gal, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3],
                           reference_file = None,
                           anchor_catalog = lofar_dr3,
                           )
@@ -65,7 +67,7 @@ cygnus_config = Config(spectral_damping_factor = 5,
                        minimum_points = 3,
                        crowd_radius_arc = None,
                        minimum_frequency_spacing = None,
-                       catalogs = [racs, vlssr, tgss, gleam_300, nvss, wenss, lofar_dr3, cygnus],
+                       catalogs = [racs_low, vlssr, tgss, gleam_300, nvss, wenss, lofar_dr3, cygnus],
                        reference_file = np.sort(glob.glob(os.getcwd()+"/data/other/*.fits"))[0],
                        anchor_catalog = cygnus,
                        )
@@ -76,10 +78,10 @@ small_config = Config(spectral_damping_factor = 5,
                        nsigma = 2,
                        minimum_points = 3,
                        crowd_radius_arc = None,
-                       minimum_frequency_spacing = 50e6,
-                       catalogs = [racs, racs_gal, vlssr, tgss, gleam_300, gleam_xgp, lofar_dr3, wenss, nvss],
+                       minimum_frequency_spacing = 0,#50e6,
+                       catalogs = [racs_low, racs_gal, vlssr, tgss, gleam_300, gleam_xgp, lofar_dr3, wenss, nvss, racs_mid, racs_high],
                        #catalogs = [vlssr, gleam_300, gleam_xgp, tgss, lofar_dr3],
-                       #catalogs = [lofar_dr3, racs, nvss],
+                       #catalogs = [lofar_dr3, racs_low, nvss],
                        reference_file = None,
                        anchor_catalog = lofar_dr3,
                        )

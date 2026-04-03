@@ -16,8 +16,66 @@ import numpy as np
 # wenss     = Table.read(os.getcwd()+"/catalogs/wenss/WENSS.fits")
 # lofar_dr3 = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl.fits")
 # lofar     = Table.read(os.getcwd()+'/catalogs/lofar/lofar_sources_pipeline.fits')
-
 # cygnus = Table.read(os.getcwd()+'/catalogs/other/cygnus_sources.fits')
+
+# racs_mid   = Table.read(os.getcwd()+"/catalogs/racs/RACS-mid1_sources.xml")
+# racs_high  = Table.read(os.getcwd()+"/catalogs/racs/RACS-high_sources.xml")
+
+#### racs_mid
+# racs_mid.rename_column("RA", "ra")
+# racs_mid.rename_column("Dec_corr", "dec")
+# racs_mid.rename_column("E_RA", "e_ra")
+# racs_mid.rename_column("E_Dec", "e_dec")
+# racs_mid.rename_column('Total_flux', 'flux_jy')
+# racs_mid.rename_column('E_Total_flux', 'e_flux_jy')
+
+# if str(racs_mid['flux_jy'].unit) == 'mJy':
+#     racs_mid['flux_jy'] *= 1e-3
+#     racs_mid['e_flux_jy'] *= 1e-3
+#     racs_mid['flux_jy'].unit = 'Jy'
+#     racs_mid['e_flux_jy'].unit = 'Jy'
+
+# if str(racs_mid["e_ra"].unit) == 'arcsec':
+#         racs_mid['e_ra'] /= 3600
+#         racs_mid['e_ra'].unit = 'deg'
+#         racs_mid['e_dec'] /= 3600
+#         racs_mid['e_dec'].unit = 'deg'
+
+# racs_mid_out = Table()
+# for col in racs_mid.colnames:
+#     data = np.array(racs_mid[col])  # strips Quantity/mixin type
+#     unit = str(racs_mid[col].unit) if racs_mid[col].unit else None
+#     racs_mid_out[col] = Column(data, unit=unit)
+
+# racs_mid_out.write("racs_mid_clean.fits", overwrite=True)
+
+#### racs_high ####
+# racs_high.rename_column("RA", "ra")
+# racs_high.rename_column("Dec_corr", "dec")
+# racs_high.rename_column("E_RA", "e_ra")
+# racs_high.rename_column("E_Dec", "e_dec")
+# racs_high.rename_column('Total_flux', 'flux_jy')
+# racs_high.rename_column('E_Total_flux', 'e_flux_jy')
+
+# if str(racs_high['flux_jy'].unit) == 'mJy':
+#     racs_high['flux_jy'] *= 1e-3
+#     racs_high['e_flux_jy'] *= 1e-3
+#     racs_high['flux_jy'].unit = 'Jy'
+#     racs_high['e_flux_jy'].unit = 'Jy'
+
+# if str(racs_high["e_ra"].unit) == 'arcsec':
+#         racs_high['e_ra'] /= 3600
+#         racs_high['e_ra'].unit = 'deg'
+#         racs_high['e_dec'] /= 3600
+#         racs_high['e_dec'].unit = 'deg'
+
+# racs_high_out = Table()
+# for col in racs_high.colnames:
+#     data = np.array(racs_high[col])  # strips Quantity/mixin type
+#     unit = str(racs_high[col].unit) if racs_high[col].unit else None
+#     racs_high_out[col] = Column(data, unit=unit)
+
+# racs_high_out.write("racs_high_clean.fits", overwrite=True)
 
 #### cygnus ####
 # cygnus.rename_column("RA", "ra")
