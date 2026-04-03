@@ -21,9 +21,9 @@ start = perf_counter()
 #### all available catalogs
 all_catalogs = Catalog_set([
     Catalog("/catalogs/racs/racs_low_gal_clean.fits",         887.5e6,    "racs_gal",   scale=0.894),  # the galactic portion of the racs-low survey
-    Catalog("/catalogs/racs/racs_low_clean.fits",             887.5e6,    "racs-low",   scale=0.868),  # the rest of the racs-low survey
-    Catalog("/catalogs/racs/racs_mid_clean.fits",             1367.5e6,   "racs-mid",   scale=1),
-    Catalog("/catalogs/racs/racs_high_clean.fits",            1655.5e5,   "racs-high",  scale=1),
+    Catalog("/catalogs/racs/racs_low_clean.fits",             887.5e6,    "racs_low",   scale=0.868),  # the rest of the racs-low survey
+    Catalog("/catalogs/racs/racs_mid_clean.fits",             1367.5e6,   "racs_mid",   scale=1),
+    Catalog("/catalogs/racs/racs_high_clean.fits",            1655.5e6,   "racs_high",  scale=1),
     Catalog("/catalogs/meerkat/meerkat_clean.fits",           1359.7e6,   "meerkat",    scale=0.876),
     Catalog("/catalogs/vlssr/vlssr_clean.fits",               73.8e6,     "vlssr",      scale=1.247),
     Catalog("/catalogs/tgss/tgss_clean.fits",                 150e6,      "tgss",       scale=1.087),
