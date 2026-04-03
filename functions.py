@@ -775,7 +775,7 @@ def compute_flux_correction_factor(cats, config, debug=False, anchor_override=No
     extrapolated_flux_fit = predict_flux(cats[anchor_index].freq, cats[other_index[0]].freq, cats[other_index[0]].flux, spectral_indices, spectral_curvature)
     
     # calculate the linear theoretical flux at anchor_index based on all the other catalogs, and average the result
-    extrapolated_flux_linear = np.mean([predict_flux(cats[anchor_index].freq, cats[index].freq, cats[index].flux, config.spectral_index_theory, config.spectral_curvature_theory) for index in other_index], axis=0)
+    #extrapolated_flux_linear = np.mean([predict_flux(cats[anchor_index].freq, cats[index].freq, cats[index].flux, config.spectral_index_theory, config.spectral_curvature_theory) for index in other_index], axis=0)
     
     # correction factor is the factor to multiply the anchor_catalog flux by to get what it should be, based on the other catalogs
     correction_factor = extrapolated_flux_fit / uncorrected_flux
@@ -807,9 +807,11 @@ def predict_flux(freq_target, freq_reference, flux_reference, spectral_index, cu
     return flux_reference * np.exp(log_flux_ratio)
 
 """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
-def calculate_correction_factor_weight(spx, snr, max_sep, p_match, n_crowd, config):
+def calculate_correction_factor_weight(spx, snr, max_sep, p_match, n_crowd, config, sigma_cutoff=6):
     # downweight sources with spectral indices far away from -0.7
-    spectral_difference_factor = np.exp(-config.spectral_damping_factor * (spx - config.spectral_index_theory)**2)
+    exponent = config.spectral_damping_factor * (spx - config.spectral_index_theory)**2
+    cutoff = 0.5 * sigma_cutoff**2
+    spectral_difference_factor = np.where(exponent < cutoff, np.exp(-exponent), 0.0)
     
     # discard low snr sources
     signal_to_noise_factor = snr.copy()
