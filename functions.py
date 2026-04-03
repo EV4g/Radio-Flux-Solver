@@ -535,7 +535,7 @@ def sources_in_fits(ra_deg, dec_deg, fn):
 
     return (x >= 0) & (x < nx) & (y >= 0) & (y < ny)
 
-def calculate_1d_peak(x, c, log=False, n=1000):    
+def calculate_1d_peak(x, c, log=False, n=1000):
     if log: x = np.log10(x)
 
     mask = np.isfinite(x) & np.isfinite(c) & (c > 0)

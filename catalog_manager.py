@@ -9,7 +9,7 @@ base_path = Path(__file__).resolve().parent
 # wrapper class for incoming Table data
 class Catalog:
     def __init__(self, path=None, freq_hz=None, name=None, flux_lim=0, scale=1):
-        self.path      = base_path / path.lstrip("/")
+        self.path      = base_path / path.lstrip("/") if path is not None else None
         self.freq      = freq_hz    # central frequency
         self.freq_unit = 'Hz'       # frequency unit
         self.name      = name       # survey name

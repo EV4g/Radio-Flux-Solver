@@ -36,7 +36,7 @@ racs_gal, racs_low, racs_mid, racs_high, meerkat, vlssr, tgss, gleam_300, gleam_
 full_config = Config(spectral_damping_factor = 5,
                     spectral_index_theory = -0.8,
                     snr_lower_limit = 7,
-                    nsigma = 3,
+                    nsigma = 2,
                     minimum_points = 10,
                     crowd_radius_arc = None,
                     minimum_frequency_spacing = 0,
