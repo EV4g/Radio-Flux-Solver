@@ -133,33 +133,6 @@ crowding_parameter       = [] # maximum number of neighbours per source within c
 ###################################################
 #### catalog three-way combination auto-looper ####
 ###################################################
-# all_combinations = get_combinations(config.catalogs, size=3, required_index=config.anchor_catalog_index)
-# output_width = len(str(len(all_combinations)))
-# for i, combination in enumerate(all_combinations):
-#     local_cats = [config.catalogs[j] for j in combination]
-#     output = compute_flux_correction_factor(local_cats, config, debug=debug)
-    
-#     if output is not None:
-#         spx, curv, snr, cor, flux, max_sep, p_weight, n_crowd, ra, dec = output
-#         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(spx)}")
-        
-#         ras                      += [ra]
-#         decs                     += [dec]
-#         correction_factor_global += [cor]
-#         spectral_index_global    += [spx]
-#         spectral_curvature       += [curv]
-#         fitted_flux              += [flux]
-#         signal_to_noise          += [snr]
-#         max_separation           += [max_sep]
-#         point_probability        += [p_weight]
-#         crowding_parameter       += [n_crowd]
-#     else:
-#         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", "Matches: None")
-
-# print(f"Calculations done at: {perf_counter() - start} s")
-
-
-
 all_combinations = get_combinations(config.catalogs, size=3, required_index=config.anchor_catalog_index, minimum_spacing=config.minimum_frequency_spacing)
 output_width = len(str(len(all_combinations)))
 
@@ -182,6 +155,29 @@ for i, (combo, output) in enumerate(zip(all_combinations, outputs)):
         max_separation           += [max_sep]
         point_probability        += [p_weight]
         crowding_parameter       += [n_crowd]
+        
+        if debug:
+            # compare -0.7 assumption versus fitted spectral indices
+            plt.scatter(flux, cor, c=spx)
+            plt.yscale('log')
+            plt.xscale('log')
+            plt.colorbar(label = r"Spectral index $\alpha$")
+            plt.xlabel(f"{config.anchor_catalog.name} fitted flux (Jy)")
+            plt.ylabel("Correction factor")
+            plt.title(f"{config.anchor_catalog.name} "+r"flux, $\alpha$=-0.7 vs fitted")
+            plt.show()
+            
+            # compare fitted spectral index with correction factor
+            plt.scatter(spx, cor, c=flux, norm='log')
+            plt.yscale('log')
+            plt.axvline(-0.7, ls='--', c='k')
+            plt.axhline(1, ls='--', c='k')
+            plt.colorbar(label='Flux (Jy)')
+            plt.ylabel("Flux correction factor")
+            plt.xlabel(r"Spectral index $\alpha$")
+            plt.title("Flux correction as function of spectral index")
+            plt.show()
+        
     else:
         print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]","Matches:", colored("None", "yellow"))
             
@@ -189,38 +185,6 @@ print(f"Flux compute done at {(perf_counter() - start):.2f} seconds")
 
 
 
-
-
-
-
-
-
-###########################################################
-#### plotting correction factor for each catalog combo ####
-###########################################################
-# for spx, snr, cor, max_sep in zip(spectral_index_global, signal_to_noise, correction_factor_global, catalog_weight_factor, max_separation):
-#     total_weighting_factor = calculate_weighted_correction_factor(spx, snr, max_sep, config)
-#     Xi, Yi, Zi, px, py = calculate_contour_statistics(spx, cor, total_weighting_factor, logy=True)
-
-#     o = np.argsort(total_weighting_factor)
-
-#     fig, ax = plt.subplots()
-#     sc = ax.scatter(spx[o], cor[o], c=total_weighting_factor[o])
-#     ax.contour(Xi, Yi, Zi, levels=6, colors='red', alpha=0.7, linewidths=0.8)
-#     plt.colorbar(sc, label="Combined weighting factor")
-#     plt.yscale('log')
-
-#     plt.axhline(py, ls="--", color="gray")
-#     plt.axvline(px, ls="--", color="gray")
-
-#     plt.xlim(np.percentile(spx, 1), np.percentile(spx, 99))
-#     plt.ylim(np.percentile(cor, 1), np.percentile(cor, 99))
-#     plt.ylabel("Correction factor")
-#     plt.xlabel(r"Fitted spectral index $\alpha$")
-#     plt.title("Correction factor as function of fitted spectral index")
-#     plt.show()
-
-#     print(f"Spectral index: {round(px,3)}, correction factor: {round(py,3)}")
 
 ras = np.concatenate(ras)
 decs = np.concatenate(decs)

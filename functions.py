@@ -693,7 +693,7 @@ def quick_compare_catalog(cat1, cat2, config):
 
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
-def compute_flux_correction_factor(cats, config, debug=False, internal_output=False, anchor_override=None, precomputed_indices=None, precomputed_quality=None):
+def compute_flux_correction_factor(cats, config, debug=False, anchor_override=None, precomputed_indices=None, precomputed_quality=None):
     
     # allow for pre-computed inputs, to skip match_catalogs_2D
     if precomputed_indices is None and precomputed_quality is None:
@@ -704,7 +704,6 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
         
     # if there are too few sources, return None
     if len(indices[0]) <= config.minimum_points:
-        if internal_output: print(f"Error: no source-matches found between [{', '.join(f'{cat.name}' for cat in cats)}]")
         return None
 
     # figure out for which catalog the correction factor should be calculated
@@ -778,15 +777,6 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
     # calculate the linear theoretical flux at anchor_index based on all the other catalogs, and average the result
     extrapolated_flux_linear = np.mean([predict_flux(cats[anchor_index].freq, cats[index].freq, cats[index].flux, config.spectral_index_theory, config.spectral_curvature_theory) for index in other_index], axis=0)
     
-    if debug:
-        for flux in np.array([cat.flux for cat in cats]).T:
-            plt.plot(np.array([cat.freq for cat in cats])*1e-6, flux)
-        
-        plt.yscale('log')
-        plt.ylabel(r"log$_{10}$(Jy)")
-        plt.xlabel("Frequency (MHz)")
-        plt.show()
-        
     # correction factor is the factor to multiply the anchor_catalog flux by to get what it should be, based on the other catalogs
     correction_factor = extrapolated_flux_fit / uncorrected_flux
     snr = uncorrected_flux / uncorrected_flux_error
@@ -794,35 +784,6 @@ def compute_flux_correction_factor(cats, config, debug=False, internal_output=Fa
     # calculate average position over all catalogs instead of using the first catalog
     ra = np.average([cat.ra for cat in cats], axis=0)
     dec = np.average([cat.dec for cat in cats], axis=0)
-    
-    if debug:
-        # compare -0.7 assumption versus fitted spectral indices
-        mn, mx = min(np.min(extrapolated_flux_fit), np.min(extrapolated_flux_linear)), max(np.max(extrapolated_flux_fit), np.max(extrapolated_flux_linear))
-        plt.scatter(extrapolated_flux_linear, extrapolated_flux_fit, c=spectral_indices)
-        plt.yscale('log')
-        plt.xscale('log')
-        plt.xlim(mn, mx)
-        plt.ylim(mn, mx)
-        plt.gca().set_box_aspect(1)
-        plt.plot((mn, mx), (mn, mx), c='k', ls='--')
-        plt.colorbar(label = r"Spectral index $\alpha$")
-        plt.xlabel(f"{cats[anchor_index].name} linear flux (Jy)")
-        plt.ylabel(f"{cats[anchor_index].name} fitted flux (Jy)")
-        plt.title(f"{cats[anchor_index].name} "+r"flux, $\alpha$=-0.7 vs fitted")
-        plt.show()
-        
-        # compare fitted spectral index with correction factor
-        plt.scatter(spectral_indices, correction_factor, c=uncorrected_flux, norm='log')
-        plt.yscale('log')
-        plt.axvline(-0.7, ls='--', c='k')
-        plt.axhline(1, ls='--', c='k')
-        plt.colorbar(label='Flux (Jy)')
-        plt.ylabel("Flux correction factor")
-        plt.xlabel(r"Spectral index $\alpha$")
-        plt.title("Flux correction as function of spectral index")
-        plt.show()
-        
-    if internal_output: print(f"Completed set [{', '.join(f'{cat.name:9}' for cat in cats)}]", f"Matches: {len(indices[0])}")    
     
     return (spectral_indices, spectral_curvature, snr, correction_factor, extrapolated_flux_fit, max_sep, p_weight, n_crowd, ra, dec)
 
