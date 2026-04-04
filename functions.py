@@ -24,10 +24,6 @@ except ImportError:
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
-"""Linspace, but logarithmic scaling to avoid oversampling at low values"""
-def log_linspace(mn, mx, n):
-    return 10**np.linspace(np.log10(mn), np.log10(mx), n)
-
 """Average of an array in logspace"""
 def log_average(arr, w):
     return np.exp(np.average(np.log(arr), weights=w))
@@ -114,33 +110,6 @@ def get_beam_size(file):
     except:
         return header['CLEANBMJ'], header['CLEANBMN'], header['CLEANBPA']
     return None
-
-"""Get frequency and flux arrays for two different datasets, and compute the flux-calibration offset between them compared to the -0.7 spectral index baseline
-data_1 gets compared versus the baseline of data_2. Returns (expected) fitted spectral_flux_ratio, and (actual) index, as well as the (offset) ratios and scaling factor.
-Optional Valid parameter to only select a subset of all arrays."""
-def compute_fluxcal_statistics(freq1, freq2, flux1, flux2, spectral_index_theory=-0.7, valid=None):
-    if type(valid) is not type(None):
-        flux1 = flux1[valid]
-        flux2 = flux2[valid]
-    spectral_flux_ratio = (freq1 / freq2)**spectral_index_theory
-    spectral_index_actual = 10**np.mean(np.log10(flux1 / flux2))
-    x = log_linspace(np.min(flux2), np.max(flux2), 10)
-
-    ratio = flux1 / (flux2 * spectral_flux_ratio)
-    #valid_ratio = np.isfinite(ratio) & (ratio > 0)
-    log_ratio = np.log10(ratio)
-
-    scale_factor = np.median(log_ratio)
-    scatter      = np.std(log_ratio)
-    N            = len(log_ratio)
-    stderr       = scatter / np.sqrt(N)
-
-    print(f"N valid sources      : {N}")
-    print(f"Median log10(ratio)  : {scale_factor:.4f}  ({10**scale_factor:.4f}×)")
-    print(f"Scatter (1σ)         : {scatter:.4f} dex")
-    print(f"Uncertainty on median: ±{stderr:.4f} dex")
-
-    return spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor
 
 """Return a per-source 1D positional RMS (deg) for a catalog.
 e_ra / e_dec are combined as sigma_1d = sqrt((e_ra^2 + e_dec^2) / 2)."""
@@ -403,36 +372,7 @@ def fits_to_png(fits_path, output_path, hdu_index=0, vmin=None, vmax=None, cmap=
 
     plt.imsave(output_path, data, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
 
-"""Remove outliers at eitherside of the distribution"""
-def remove_outliers(var, clip_percentage):
-    clip_top = np.percentile(var, 100 - clip_percentage)
-    clip_bottom = np.percentile(var, clip_percentage)
-    return var[(var < clip_top) & (var > clip_bottom)]
 
-"""Remove outliers at eitherside of the distribution, consider two variables at once"""
-def remove_outliers_2D(var1, var2, clip_percentage):
-    v1_clip_top = np.percentile(var1, 100 - clip_percentage)
-    v1_clip_bottom = np.percentile(var1, clip_percentage)
-    v2_clip_top = np.percentile(var2, 100 - clip_percentage)
-    v2_clip_bottom = np.percentile(var2, clip_percentage)
-
-    condition = (var1 > v1_clip_bottom) & (var1 < v1_clip_top) & (var2 > v2_clip_bottom) & (var2 < v2_clip_top)
-
-    return var1[condition], var2[condition]
-
-"""Remove outliers at eitherside of the distribution, consider two variables at once, repeat n times"""
-def remove_outliers_2D_iterative(var1, var2, clip_percentage, n):
-    for _ in range(n):
-        v1_clip_top = np.percentile(var1, 100 - clip_percentage)
-        v1_clip_bottom = np.percentile(var1, clip_percentage)
-        v2_clip_top = np.percentile(var2, 100 - clip_percentage)
-        v2_clip_bottom = np.percentile(var2, clip_percentage)
-
-        condition = (var1 > v1_clip_bottom) & (var1 < v1_clip_top) & (var2 > v2_clip_bottom) & (var2 < v2_clip_top)
-        var1 = var1[condition]
-        var2 = var2[condition]
-
-    return var1, var2
 
 """Return indices of catalog of all unique, non-double, <size> combinations with the optional condition f[i] < f[i+1]"""
 def get_combinations(cats, size=3, required_index=None, skip_index=None, only_sorted=True, minimum_spacing=0):
@@ -654,42 +594,6 @@ def solve_flux_scales_band(ratio_slice, weight_slice, normalize=True):
     return s_full
 
 """Get two catalogs and return flux and snr (flux / e_flux)"""
-def get_catalog_matched_flux(cat1, cat2, thres_arc=2):
-    idx_cat1, idx_cat2 = match_catalogs_2D([cat1, cat2], thres_arc=thres_arc)
-
-    flux1 = cat1.flux[idx_cat1]
-    snr1 = flux1 / cat1.e_flux[idx_cat1]
-
-    flux2 = cat2.flux[idx_cat2]
-    snr2 = flux2 / cat2.e_flux[idx_cat2]
-
-    return flux1, flux2, snr1, snr2
-
-"""Load two catalogs and plot their relative fluxes, according to a powerlaw"""
-def quick_compare_catalog(cat1, cat2, config):
-    flux1, flux2, _, _ = get_catalog_matched_flux(cat1, cat2, thres_arc=config.thres_arc)
-    spectral_flux_ratio, spectral_index_actual, x, log_ratio, scale_factor = compute_fluxcal_statistics(cat1.freq, cat2.freq, flux1, flux2, config.spectral_index_theory)
-
-    fig, ax = plt.subplots(1, 2, figsize=(8, 4))
-    ax[0].scatter(flux2, flux1, s=10, alpha=0.7)
-    ax[0].plot(x, x * spectral_index_actual, color='purple', ls='--', label="Data fit")
-    ax[0].plot(x, x, color='black', ls='--', label="x = y")
-    ax[0].plot(x, x * spectral_flux_ratio, 'r--', label=f'Expected (α={config.spectral_index_theory})')
-    ax[0].set_xscale('log'); ax[0].set_yscale('log')
-    ax[0].set_xlabel(f"{cat1.name} flux [Jy]"); ax[0].set_ylabel(f"{cat2.name} flux [Jy]")
-    ax[0].legend()
-    
-    # Log-ratio histogram
-    ax[1].hist(log_ratio, bins=30, edgecolor='k')
-    ax[1].axvline(scale_factor, color='red', ls='--', label=f'Median = {scale_factor:.3f}')
-    ax[1].set_xlabel(f"log10(S_{cat1.name} / S_{cat2.name})")
-    ax[1].set_ylabel("N")
-    ax[1].legend()
-    plt.tight_layout()
-    #plt.savefig("flux_scale_comparison.png", dpi=150)
-    plt.show()
-
-    print(f"Compared {cat1.name} to {cat2.name} \n")
 
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
