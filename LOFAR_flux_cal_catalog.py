@@ -3,12 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import glob
 import os
-from functions import calculate_contour_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d
+#from tqdm import tqdm
+from functions import plot_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d
 from functions import compute_flux_correction_factor, calculate_correction_factor_weight, biweight_location
 from time import perf_counter
 from catalog_manager import Catalog, Config, Catalog_set, Output
 from joblib import Parallel, delayed
-warnings.filterwarnings("ignore", message=".*non-interactive.*")
+warnings.filterwarnings("ignore", message=".*(non-interactive|tqdm).*")
 
 try:
     from termcolor import colored
@@ -96,9 +97,6 @@ config = test_config
 config.setup()
 output = Output()
 
-print(f"Setup done at: {(perf_counter() - start):.2f} s")
-print("------------------------------------------------")
-
 if debug:    
     # cutdown catalog plot
     for cat in config.catalogs:
@@ -118,14 +116,16 @@ if debug:
     plt.legend(loc='lower left')
     plt.show()
 
+print(f"Setup done at: {(perf_counter() - start):.2f} s")
 
 ###################################################
 #### catalog three-way combination auto-looper ####
 ###################################################
-all_combinations = get_combinations(config.catalogs, size=4, required_index=config.anchor_catalog_index, minimum_spacing=config.minimum_frequency_spacing)
+all_combinations = get_combinations(config.catalogs, size=3, required_index=config.anchor_catalog_index, minimum_spacing=config.minimum_frequency_spacing)
 output_width = len(str(len(all_combinations)))
 
 print(f"Found {len(all_combinations)} valid combinations")
+print("------------------------------------------------")
 
 outputs = Parallel(n_jobs=-1)(delayed(compute_flux_correction_factor)([config.catalogs[j] for j in combo], config) for combo in all_combinations)
 
@@ -175,52 +175,20 @@ ras, decs, correction_factor, spectral_index, spectral_curvature, fitted_flux, s
 ############################################################################
 #### plotting correction factor based on all previous catalog matchings ####
 ############################################################################
-
 mspx, mcor, mcur = biweight_location(spectral_index, np.log10(correction_factor), spectral_curvature, weights=total_weighting_factor)
 mcor = 10**mcor
 
+plot_statistics(spectral_index, correction_factor, total_weighting_factor, logy=True,
+                xlabel=r"Fitted spectral index $\alpha$",
+                ylabel="Correction factor",
+                title="Correction factor as function of fitted spectral index\nall catalogs")
 
-Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index, correction_factor, total_weighting_factor, logy=True, n=1000)
-
-o = np.argsort(total_weighting_factor)
-
-fig, ax = plt.subplots()
-sc = ax.scatter(spectral_index[o], correction_factor[o], c=total_weighting_factor[o])
-levels = Zi.max() * np.array([0.01, 0.05, 0.15, 0.35, 0.65, 0.90])
-ax.contour(Xi, Yi, Zi, levels=levels, colors='red', alpha=0.7, linewidths=0.8)
-plt.colorbar(sc, label="Combined weighting factor")
-plt.yscale('log')
-
-plt.axhline(py, ls="--", color="gray")
-plt.axvline(px, ls="--", color="gray")
-
-plt.xlim(np.percentile(spectral_index, 1), np.percentile(spectral_index, 99))
-plt.ylim(np.percentile(correction_factor, 1), np.percentile(correction_factor, 99))
-plt.ylabel("Correction factor")
-plt.xlabel(r"Fitted spectral index $\alpha$")
-plt.title("Correction factor as function of fitted spectral index\nall catalogs")
-plt.show()
-
-Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index, spectral_curvature, total_weighting_factor, n=1000)
-
-fig, ax = plt.subplots()
-sc = ax.scatter(spectral_index[o], spectral_curvature[o], c=total_weighting_factor[o])
-levels = Zi.max() * np.array([0.01, 0.05, 0.15, 0.35, 0.65, 0.90])
-ax.contour(Xi, Yi, Zi, levels=levels, colors='red', alpha=0.7, linewidths=0.8)
-plt.colorbar(sc, label="Combined weighting factor")
-
-plt.axhline(py, ls="--", color="gray")
-plt.axvline(px, ls="--", color="gray")
-
-plt.xlim(np.percentile(spectral_index, 1), np.percentile(spectral_index, 99))
-plt.ylim(np.percentile(spectral_curvature, 1), np.percentile(spectral_curvature, 99))
-plt.ylabel("Spectral curvature")
-plt.xlabel(r"Fitted spectral index $\alpha$")
-plt.title("Spectral curvature as function of fitted spectral index\nall catalogs")
-plt.show()
+plot_statistics(spectral_index, spectral_curvature, total_weighting_factor,
+                xlabel=r"Fitted spectral index $\alpha$",
+                ylabel="Spectral curvature",
+                title="Spectral curvature as function of fitted spectral index\nall catalogs")
 
 print("------------------------------------------------")
-print(f"Spectral index: {px:.3f}, correction factor: {py:.3f}, curvature: 0.000, total matches: {len(correction_factor)}")
 print(f"Spectral index: {mspx:.3f}, correction factor: {mcor:.3f}, curvature: {mcur:.3f}, total matches: {len(correction_factor)}")
 print("------------------------------------------------")
 
@@ -230,8 +198,8 @@ print("------------------------------------------------")
 if inspection_plots:
     #### position dependant correction factor
     #o = np.argsort(correction_factor)
-    f = (correction_factor[o] > 1e-2) & (correction_factor[o] < 1e2)
-    plt.scatter(ras[o][f], decs[o][f], c=correction_factor[o][f], s=2, norm='log')
+    f = (correction_factor > 1e-2) & (correction_factor < 1e2)
+    plt.scatter(ras[f], decs[f], c=correction_factor[f], s=2, norm='log')
     plt.colorbar(label='Correction factor')
     plt.ylabel("DEC (deg)")
     plt.xlabel("RA (deg)")
@@ -242,7 +210,7 @@ if inspection_plots:
     plt.yscale('log')
     plt.xscale('log')
     plt.axhline(1, ls='--', color='black', alpha=0.5, label='1')
-    plt.axhline(py, ls='--', color='tomato', label='Fit')
+    plt.axhline(mcor, ls='--', color='tomato', label='Fit')
     plt.ylabel("Correction factor")
     plt.xlabel("Total weighting factor")
     plt.legend()

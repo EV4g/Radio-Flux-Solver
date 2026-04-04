@@ -365,6 +365,52 @@ def calculate_contour_statistics(x, y, c, logx=False, logy=False, n=1000):
 
     return Xi, Yi, Zi, peak_x0, peak_y0
 
+def plot_statistics(x, y, weights=None, bins=(50, 50), contour_levels='auto', contour_resolution=1000, percentile_cut=5, show_peaks=True, logx=False, logy=False, xlabel="", ylabel="", title=""):
+    # set min max based on percentile cut
+    percentile_cut = np.clip(percentile_cut, 0, 50)
+    xmin, xmax = np.percentile(x, percentile_cut), np.percentile(x, 100 - percentile_cut)
+    ymin, ymax = np.percentile(y, percentile_cut), np.percentile(y, 100 - percentile_cut)
+    
+    # clip values outside of min max
+    mask = (x >= xmin) & (x <= xmax) & (y >= ymin) & (y <= ymax)
+    x = x[mask]
+    y = y[mask]
+    
+    # set weights if not given
+    weights = weights[mask] if weights is not None else np.ones_like(x)
+    
+    binx = np.logspace(np.log10(xmin), np.log10(xmax), bins[0]) if logx else np.linspace(xmin, xmax, bins[0])
+    biny = np.logspace(np.log10(ymin), np.log10(ymax), bins[1]) if logy else np.linspace(ymin, ymax, bins[1])
+    
+    # if degenerate arrays, just skip
+    if np.ptp(x) == 0 or np.ptp(y) == 0:
+        return
+    
+    # if fewer than 50 points, just default to regular scatter plot
+    fig, ax = plt.subplots()
+    if len(x) < 50: ax.scatter(x, y, c=weights, s=5)
+    else:           ax.hist2d(x, y, bins=(binx, biny), weights=weights)
+    
+    # if auto, use preset, otherwise use given array
+    if contour_levels is not None:
+        Xi, Yi, Zi, px, py = calculate_contour_statistics(x, y, weights, logy=logy, logx=logx, n=contour_resolution)
+        if contour_levels == 'auto': contour_levels= Zi.max() * np.array([0.01, 0.05, 0.15, 0.35, 0.65, 0.90])
+        ax.contour(Xi, Yi, Zi, levels=contour_levels, colors='red', alpha=0.7, linewidths=0.8)
+    
+    if logx: ax.set_xscale('log')
+    if logy: ax.set_yscale('log')
+    
+    # show peak values
+    if show_peaks and contour_levels is not None:
+        ax.axhline(py, ls="--", color="gray")
+        ax.axvline(px, ls="--", color="gray")
+    
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    plt.show()
+    
+
 """A simple way to save fits files to png"""
 def fits_to_png(fits_path, output_path, hdu_index=0, vmin=None, vmax=None, cmap="viridis"):
     with fits.open(fits_path) as hdul:
