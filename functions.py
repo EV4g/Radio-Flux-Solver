@@ -758,24 +758,24 @@ def compute_flux_correction_factor(cats, config, debug=False, anchor_override=No
     spectral_curvature = np.zeros_like(uncorrected_flux) + config.spectral_curvature_theory
     
     # calculate spectral indices based on available data
-    # w.i.p. for case n=4, where curvature can be estimated
     match len(cats):
         case 2:
             spectral_indices = np.ones_like(cats[0].flux) * config.spectral_index_theory
+            flux_ref = cats[other_index[0]].flux
+            freq_ref = cats[other_index[0]].freq
         case 3:
             spectral_indices = get_spectral_index(cats[other_index[0]].flux, cats[other_index[1]].flux, cats[other_index[0]].freq, cats[other_index[1]].freq)
+            flux_ref = cats[other_index[0]].flux
+            freq_ref = cats[other_index[0]].freq
         case 4:
-            _, spectral_indices, spectral_curvature = fit_log_parabola([cats[index].freq for index in other_index], [cats[index].flux for index in other_index])
-            spectral_indices = spectral_indices + 2 * spectral_curvature * np.log(cats[other_index[0]].freq) # go from log-parabola units to something predict_flux() can use
+            scale, spectral_indices, spectral_curvature, freq_ref = fit_log_parabola([cats[i].freq for i in other_index], [cats[i].flux for i in other_index])
+            flux_ref = np.exp(scale)
         case _:
             print(colored(f"Case N={len(cats)} not yet implemented", "light_red"))
             return None
 
     # fit is based on measuring between two points, linear is average between assuming theoretical extragalactic value for both
-    extrapolated_flux_fit = predict_flux(cats[anchor_index].freq, cats[other_index[0]].freq, cats[other_index[0]].flux, spectral_indices, spectral_curvature)
-    
-    # calculate the linear theoretical flux at anchor_index based on all the other catalogs, and average the result
-    #extrapolated_flux_linear = np.mean([predict_flux(cats[anchor_index].freq, cats[index].freq, cats[index].flux, config.spectral_index_theory, config.spectral_curvature_theory) for index in other_index], axis=0)
+    extrapolated_flux_fit = predict_flux(cats[anchor_index].freq, freq_ref, flux_ref, spectral_indices, spectral_curvature)
     
     # correction factor is the factor to multiply the anchor_catalog flux by to get what it should be, based on the other catalogs
     correction_factor = extrapolated_flux_fit / uncorrected_flux
@@ -787,18 +787,13 @@ def compute_flux_correction_factor(cats, config, debug=False, anchor_override=No
     
     return (spectral_indices, spectral_curvature, snr, correction_factor, extrapolated_flux_fit, max_sep, p_weight, n_crowd, ra, dec)
 
-def fit_log_parabola(freq, flux):
-    # ln(flux) = scale + spectral_index ln(nu) + curvature [ln(nu)]^2
-    x = np.log(freq)
+"""fit log parabola, but now with pivot to ensure scale remains stable"""
+def fit_log_parabola(freq, flux, freq_pivot=100e6):
+    freq = np.array(freq)
+    x = np.log(freq / freq_pivot)
     y = np.log(flux)
-    
-    curvature, spectral_index, scale = np.polyfit(x, y, 2) # np.polyfit returns [curvature, spectral_index, scale] for degree=2
-    return scale, spectral_index, curvature
-
-def predict_flux_from_parab_fit(freq_target, scale, spectral_index, curvature):
-    x = np.log(freq_target)
-    log_flux = scale + spectral_index * x + curvature * x**2
-    return np.exp(log_flux)
+    curvature, spectral_index, scale = np.polyfit(x, y, 2)
+    return scale, spectral_index, curvature, freq_pivot
 
 """Extrapolate flux based on two frequencies, one flux, a spectral index, and an optional curvature parameter"""
 def predict_flux(freq_target, freq_reference, flux_reference, spectral_index, curvature=0):

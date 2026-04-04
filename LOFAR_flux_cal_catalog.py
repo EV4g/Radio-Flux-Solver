@@ -72,27 +72,28 @@ cygnus_config = Config(spectral_damping_factor = 5,
                        anchor_catalog = cygnus,
                        )
 
-small_config = Config(spectral_damping_factor = 5,
-                      spectral_index_theory=-0.8,
-                       snr_lower_limit = 7,
-                       nsigma = 2.5,
-                       minimum_points = 3,
-                       crowd_radius_arc = None,
-                       minimum_frequency_spacing = 0,#50e6,
-                       #catalogs = all_catalogs.catalogs,
-                       #catalogs = [racs_low, racs_gal, vlssr, tgss, gleam_300, gleam_xgp, lofar_dr3, wenss, nvss, racs_mid, racs_high],
-                       #catalogs = [vlssr, gleam_300, gleam_xgp, tgss, lofar_dr3],
-                       catalogs = [lofar_dr3, racs_low, meerkat, vlssr, tgss],
-                       reference_file = None,
-                       anchor_catalog = lofar_dr3,
-                       )
+test_config = Config(spectral_damping_factor = 5,
+                     spectral_index_theory=-0.8,
+                     snr_lower_limit = 7,
+                     nsigma = 2.5,
+                     minimum_points = 3,
+                     crowd_radius_arc = None,
+                     minimum_frequency_spacing = 0,#50e6,
+                     #catalogs = all_catalogs.catalogs,
+                     catalogs = [racs_low, vlssr, tgss, gleam_300, gleam_xgp, lofar_dr3, wenss, nvss, racs_mid, racs_high],
+                     #catalogs = [vlssr, gleam_300, gleam_xgp, tgss, lofar_dr3],
+                     #catalogs = [lofar_dr3, racs_low, meerkat, vlssr, tgss],
+                     reference_file = None,
+                     anchor_catalog = lofar_dr3,
+                     )
 
 #### Parameters
 debug = False
 inspection_plots = False
-config = small_config
-config.setup()
 
+#### setup
+config = test_config
+config.setup()
 output = Output()
 
 print(f"Setup done at: {(perf_counter() - start):.2f} s")
@@ -117,14 +118,14 @@ if debug:
     plt.legend(loc='lower left')
     plt.show()
 
-#### variables
-
 
 ###################################################
 #### catalog three-way combination auto-looper ####
 ###################################################
-all_combinations = get_combinations(config.catalogs, size=3, required_index=config.anchor_catalog_index, minimum_spacing=config.minimum_frequency_spacing)
+all_combinations = get_combinations(config.catalogs, size=4, required_index=config.anchor_catalog_index, minimum_spacing=config.minimum_frequency_spacing)
 output_width = len(str(len(all_combinations)))
+
+print(f"Found {len(all_combinations)} valid combinations")
 
 outputs = Parallel(n_jobs=-1)(delayed(compute_flux_correction_factor)([config.catalogs[j] for j in combo], config) for combo in all_combinations)
 
@@ -200,9 +201,27 @@ plt.xlabel(r"Fitted spectral index $\alpha$")
 plt.title("Correction factor as function of fitted spectral index\nall catalogs")
 plt.show()
 
+Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index, spectral_curvature, total_weighting_factor, n=1000)
+
+fig, ax = plt.subplots()
+sc = ax.scatter(spectral_index[o], spectral_curvature[o], c=total_weighting_factor[o])
+levels = Zi.max() * np.array([0.01, 0.05, 0.15, 0.35, 0.65, 0.90])
+ax.contour(Xi, Yi, Zi, levels=levels, colors='red', alpha=0.7, linewidths=0.8)
+plt.colorbar(sc, label="Combined weighting factor")
+
+plt.axhline(py, ls="--", color="gray")
+plt.axvline(px, ls="--", color="gray")
+
+plt.xlim(np.percentile(spectral_index, 1), np.percentile(spectral_index, 99))
+plt.ylim(np.percentile(spectral_curvature, 1), np.percentile(spectral_curvature, 99))
+plt.ylabel("Spectral curvature")
+plt.xlabel(r"Fitted spectral index $\alpha$")
+plt.title("Spectral curvature as function of fitted spectral index\nall catalogs")
+plt.show()
+
 print("------------------------------------------------")
-print(f"Spectral index: {px:.3f}, correction factor: {py:.3f}, total matches: {len(correction_factor)}")
-print(f"Spectral index: {mspx:.3f}, correction factor: {mcor:.3f}, total matches: {len(correction_factor)}")
+print(f"Spectral index: {px:.3f}, correction factor: {py:.3f}, curvature: 0.000, total matches: {len(correction_factor)}")
+print(f"Spectral index: {mspx:.3f}, correction factor: {mcor:.3f}, curvature: {mcur:.3f}, total matches: {len(correction_factor)}")
 print("------------------------------------------------")
 
 ##########################
@@ -288,42 +307,46 @@ if inspection_plots:
 
 print(f"Done at: {(perf_counter() - start):.2f} s")
 
-#### variables
-# ras                = [] # positional coordinates
-# decs               = [] # positional coordinates
-# correction_factor  = [] # ratio between read-out anchor_catalog flux and computed flux
-# spectral_index     = [] # per-source spectral index
-# spectral_curvature = [] # per-source spectral curvature
-# fitted_flux        = [] # anchor_catalog flux based on spectral index extrapolation
-# signal_to_noise    = [] # signal-to-noise (flux_jy / e_flux_jy)
-# max_separation     = [] # maximum per-source separation between all three matched catalog positions
-# point_probability  = [] # probability of points matching
-# crowding_parameter = [] # maximum number of neighbours per source within crowd_radius_arc
 
 ###################################################
 #### catalog four-way combination auto-looper ####
 ###################################################
-# all_combinations = get_combinations(config.catalogs, size=4, required_index=config.anchor_catalog_index)
+# output_quad = Output()
+
+# all_combinations = get_combinations(config.catalogs, size=3, required_index=config.anchor_catalog_index, minimum_spacing=config.minimum_frequency_spacing)
 # output_width = len(str(len(all_combinations)))
-# for i, combination in enumerate(all_combinations):
-#     local_cats = [config.catalogs[j] for j in combination]
-#     output = compute_flux_correction_factor(local_cats, config, debug=debug)
-    
-#     if output is not None:
-#         spx, curv, snr, cor, flux, max_sep, p_weight, n_crowd, ra, dec = output
-#         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(spx)}")
 
-#         ras                += [ra]
-#         decs               += [dec]
-#         correction_factor  += [cor]
-#         spectral_index     += [spx]
-#         spectral_curvature += [curv]
-#         fitted_flux        += [flux]
-#         signal_to_noise    += [snr]
-#         max_separation     += [max_sep]
-#         point_probability  += [p_weight]
-#         crowding_parameter += [n_crowd]
+# outputs = Parallel(n_jobs=-1)(delayed(compute_flux_correction_factor)([config.catalogs[j] for j in combo], config) for combo in all_combinations)
+
+# for i, (combo, out) in enumerate(zip(all_combinations, outputs)):
+#     local_cats = [config.catalogs[j] for j in combo]
+
+#     if out is not None:
+#         print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",f"Matches: {len(out[0])}")
+        
+#         output.add(*out)
+        
+#         if debug:
+#             # compare -0.7 assumption versus fitted spectral indices
+#             plt.scatter(output.fitted_flux, output.correction_factor, c=output.spectral_index)
+#             plt.yscale('log')
+#             plt.xscale('log')
+#             plt.colorbar(label = r"Spectral index $\alpha$")
+#             plt.xlabel(f"{config.anchor_catalog.name} fitted flux (Jy)")
+#             plt.ylabel("Correction factor")
+#             plt.title(f"{config.anchor_catalog.name} "+r"flux, $\alpha$=-0.7 vs fitted")
+#             plt.show()
+            
+#             # compare fitted spectral index with correction factor
+#             plt.scatter(output.spectral_index, output.correction_factor, c=output.fitted_flux, norm='log')
+#             plt.yscale('log')
+#             plt.axvline(-0.7, ls='--', c='k')
+#             plt.axhline(1, ls='--', c='k')
+#             plt.colorbar(label='Flux (Jy)')
+#             plt.ylabel("Flux correction factor")
+#             plt.xlabel(r"Spectral index $\alpha$")
+#             plt.title("Flux correction as function of spectral index")
+#             plt.show()
+        
 #     else:
-#         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", "Matches: None")
-
-# print(f"Calculations done at: {perf_counter() - start} s")
+#         print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]","Matches:", colored("None", "yellow"))
