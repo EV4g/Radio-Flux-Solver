@@ -6,7 +6,7 @@ import os
 from functions import calculate_contour_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d
 from functions import compute_flux_correction_factor, calculate_correction_factor_weight, biweight_location
 from time import perf_counter
-from catalog_manager import Catalog, Config, Catalog_set
+from catalog_manager import Catalog, Config, Catalog_set, Output
 from joblib import Parallel, delayed
 warnings.filterwarnings("ignore", message=".*non-interactive.*")
 
@@ -32,7 +32,7 @@ all_catalogs = Catalog_set([
     Catalog("/catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss",       scale=1),
     Catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss",      scale=1.0426),
     Catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3",  scale=1),
-    Catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar",      scale=1.0457),  # LOFAR P282+00
+    Catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar",      scale=1),       # LOFAR P282+00
     Catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus",     scale=1),       # vla cygnus region
     ])
 
@@ -79,23 +79,21 @@ small_config = Config(spectral_damping_factor = 5,
                        minimum_points = 3,
                        crowd_radius_arc = None,
                        minimum_frequency_spacing = 0,#50e6,
-                       catalogs = all_catalogs.catalogs,
+                       #catalogs = all_catalogs.catalogs,
                        #catalogs = [racs_low, racs_gal, vlssr, tgss, gleam_300, gleam_xgp, lofar_dr3, wenss, nvss, racs_mid, racs_high],
                        #catalogs = [vlssr, gleam_300, gleam_xgp, tgss, lofar_dr3],
-                       #catalogs = [lofar_dr3, racs_low, meerkat, vlssr, tgss],
+                       catalogs = [lofar_dr3, racs_low, meerkat, vlssr, tgss],
                        reference_file = None,
                        anchor_catalog = lofar_dr3,
                        )
 
 #### Parameters
 debug = False
-inspection_plots = True
-#config = lofar_dr3_config
-#config = default_config
-#config = cygnus_config
+inspection_plots = False
 config = small_config
-
 config.setup()
+
+output = Output()
 
 print(f"Setup done at: {(perf_counter() - start):.2f} s")
 print("------------------------------------------------")
@@ -120,16 +118,7 @@ if debug:
     plt.show()
 
 #### variables
-ras                = [] # positional coordinates
-decs               = [] # positional coordinates
-correction_factor  = [] # ratio between read-out anchor_catalog flux and computed flux
-spectral_index     = [] # per-source spectral index
-spectral_curvature = [] # per-source spectral curvature
-fitted_flux        = [] # anchor_catalog flux based on spectral index extrapolation
-signal_to_noise    = [] # signal-to-noise (flux_jy / e_flux_jy)
-max_separation     = [] # maximum per-source separation between all three matched catalog positions
-point_probability  = [] # probability of points matching
-crowding_parameter = [] # maximum number of neighbours per source within crowd_radius_arc
+
 
 ###################################################
 #### catalog three-way combination auto-looper ####
@@ -139,27 +128,17 @@ output_width = len(str(len(all_combinations)))
 
 outputs = Parallel(n_jobs=-1)(delayed(compute_flux_correction_factor)([config.catalogs[j] for j in combo], config) for combo in all_combinations)
 
-for i, (combo, output) in enumerate(zip(all_combinations, outputs)):
+for i, (combo, out) in enumerate(zip(all_combinations, outputs)):
     local_cats = [config.catalogs[j] for j in combo]
 
-    if output is not None:
-        spx, curv, snr, cor, flux, max_sep, p_weight, n_crowd, ra, dec = output
-        print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",f"Matches: {len(spx)}")
-
-        ras                += [ra]
-        decs               += [dec]
-        correction_factor  += [cor]
-        spectral_index     += [spx]
-        spectral_curvature += [curv]
-        fitted_flux        += [flux]
-        signal_to_noise    += [snr]
-        max_separation     += [max_sep]
-        point_probability  += [p_weight]
-        crowding_parameter += [n_crowd]
+    if out is not None:
+        print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",f"Matches: {len(out[0])}")
+        
+        output.add(*out)
         
         if debug:
             # compare -0.7 assumption versus fitted spectral indices
-            plt.scatter(flux, cor, c=spx)
+            plt.scatter(output.fitted_flux, output.correction_factor, c=output.spectral_index)
             plt.yscale('log')
             plt.xscale('log')
             plt.colorbar(label = r"Spectral index $\alpha$")
@@ -169,7 +148,7 @@ for i, (combo, output) in enumerate(zip(all_combinations, outputs)):
             plt.show()
             
             # compare fitted spectral index with correction factor
-            plt.scatter(spx, cor, c=flux, norm='log')
+            plt.scatter(output.spectral_index, output.correction_factor, c=output.fitted_flux, norm='log')
             plt.yscale('log')
             plt.axvline(-0.7, ls='--', c='k')
             plt.axhline(1, ls='--', c='k')
@@ -184,49 +163,20 @@ for i, (combo, output) in enumerate(zip(all_combinations, outputs)):
             
 print(f"Flux compute done at {(perf_counter() - start):.2f} seconds")
 
-
-
-
-ras = np.concatenate(ras)
-decs = np.concatenate(decs)
-correction_factor = np.concatenate(correction_factor)
-spectral_index = np.concatenate(spectral_index)
-spectral_curvature = np.concatenate(spectral_curvature)
-fitted_flux = np.concatenate(fitted_flux)
-signal_to_noise = np.concatenate(signal_to_noise)
-max_separation = np.concatenate(max_separation)
-crowding_parameter = np.concatenate(crowding_parameter)
-point_probability = np.concatenate(point_probability)
-
-total_weighting_factor = calculate_correction_factor_weight(spectral_index,
-                                                            signal_to_noise,
-                                                            max_separation,
-                                                            point_probability,
-                                                            crowding_parameter,
-                                                            config)
-
+output.concatenate()
+total_weighting_factor = calculate_correction_factor_weight(output, config)
 mask = total_weighting_factor > 0
-
-ras                    = ras[mask]
-decs                   = decs[mask]
-correction_factor      = correction_factor[mask]
-spectral_index         = spectral_index[mask]
-spectral_curvature     = spectral_curvature[mask]
-fitted_flux            = fitted_flux[mask]
-signal_to_noise        = signal_to_noise[mask]
-max_separation         = max_separation[mask]
-point_probability      = point_probability[mask]
-crowding_parameter     = crowding_parameter[mask]
-
+output.apply_mask(mask)
 total_weighting_factor = total_weighting_factor[mask]
+
+ras, decs, correction_factor, spectral_index, spectral_curvature, fitted_flux, signal_to_noise, max_separation, point_probability, crowding_parameter = output.return_values()
 
 ############################################################################
 #### plotting correction factor based on all previous catalog matchings ####
 ############################################################################
 
-
-    
-mspx, mcor, mcur = biweight_location(spectral_index, correction_factor, spectral_curvature, weights=total_weighting_factor)
+mspx, mcor, mcur = biweight_location(spectral_index, np.log10(correction_factor), spectral_curvature, weights=total_weighting_factor)
+mcor = 10**mcor
 
 
 Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index, correction_factor, total_weighting_factor, logy=True, n=1000)

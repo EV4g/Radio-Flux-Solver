@@ -125,3 +125,55 @@ class Config:
                 self.anchor_catalog = next(c for c in self.catalogs if c.name == anchor_name)
             except StopIteration:
                 raise ValueError(f"Anchor_catalog '{anchor_name}' not found in config.catalogs")
+
+class Output:
+    def __init__(self, spx=None, cur=None, snr=None, cor=None, flux=None, sep=None, pmatch=None, ncrowd=None, ra=None, dec=None):
+        self.spectral_index     = [] if spx    is None else spx    # per-source spectral index
+        self.spectral_curvature = [] if cur    is None else cur    # per-source spectral curvature
+        self.signal_to_noise    = [] if snr    is None else snr    # signal-to-noise (flux_jy / e_flux_jy)
+        self.correction_factor  = [] if cor    is None else cor    # ratio between read-out anchor_catalog flux and computed flux
+        self.fitted_flux        = [] if flux   is None else flux   # anchor_catalog flux based on spectral index extrapolation
+        self.max_separation     = [] if sep    is None else sep    # maximum per-source separation between all three matched catalog positions
+        self.point_probability  = [] if pmatch is None else pmatch # probability of points matching
+        self.crowding_parameter = [] if ncrowd is None else ncrowd # maximum number of neighbours per source within crowd_radius_arc
+        self.ras                = [] if ra     is None else ra     # positional coordinates
+        self.decs               = [] if dec    is None else dec    # positional coordinates
+    
+    def add(self, spx, cur, snr, cor, flux, sep, pmatch, ncrowd, ra, dec):
+        self.ras.append(ra)
+        self.decs.append(dec)
+        self.correction_factor.append(cor)
+        self.spectral_index.append(spx)
+        self.spectral_curvature.append(cur)
+        self.fitted_flux.append(flux)
+        self.signal_to_noise.append(snr)
+        self.max_separation.append(sep)
+        self.point_probability.append(pmatch)
+        self.crowding_parameter.append(ncrowd)
+        
+    def concatenate(self):
+        self.ras                   = np.concatenate(self.ras)
+        self.decs                  = np.concatenate(self.decs)
+        self.correction_factor     = np.concatenate(self.correction_factor)
+        self.spectral_index        = np.concatenate(self.spectral_index)
+        self.spectral_curvature    = np.concatenate(self.spectral_curvature)
+        self.fitted_flux           = np.concatenate(self.fitted_flux)
+        self.signal_to_noise       = np.concatenate(self.signal_to_noise)
+        self.max_separation        = np.concatenate(self.max_separation)
+        self.point_probability     = np.concatenate(self.point_probability)
+        self.crowding_parameter    = np.concatenate(self.crowding_parameter)
+        
+    def apply_mask(self, mask):
+        self.ras                   = self.ras[mask]
+        self.decs                  = self.decs[mask]
+        self.correction_factor     = self.correction_factor[mask]
+        self.spectral_index        = self.spectral_index[mask]
+        self.spectral_curvature    = self.spectral_curvature[mask]
+        self.fitted_flux           = self.fitted_flux[mask]
+        self.signal_to_noise       = self.signal_to_noise[mask]
+        self.max_separation        = self.max_separation[mask]
+        self.point_probability     = self.point_probability[mask]
+        self.crowding_parameter    = self.crowding_parameter[mask]
+
+    def return_values(self):
+        return self.ras, self.decs, self.correction_factor, self.spectral_index, self.spectral_curvature, self.fitted_flux, self.signal_to_noise, self.max_separation, self.point_probability, self.crowding_parameter

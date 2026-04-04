@@ -807,20 +807,20 @@ def predict_flux(freq_target, freq_reference, flux_reference, spectral_index, cu
     return flux_reference * np.exp(log_flux_ratio)
 
 """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
-def calculate_correction_factor_weight(spx, snr, max_sep, p_match, n_crowd, config, sigma_cutoff=6):
+def calculate_correction_factor_weight(output, config, sigma_cutoff=6):
     # downweight sources with spectral indices far away from -0.7
-    exponent = config.spectral_damping_factor * (spx - config.spectral_index_theory)**2
+    exponent = config.spectral_damping_factor * (output.spectral_index - config.spectral_index_theory)**2
     cutoff = 0.5 * sigma_cutoff**2
     spectral_difference_factor = np.where(exponent < cutoff, np.exp(-exponent), 0.0)
     
     # discard low snr sources
-    signal_to_noise_factor = snr.copy()
+    signal_to_noise_factor = output.signal_to_noise.copy()
     signal_to_noise_factor[signal_to_noise_factor < config.snr_lower_limit] = 0
     
     # weighting based on separation between points
     # separation_weight = np.exp(-(max_sep / config.thres_arc) ** 2)
     
-    return spectral_difference_factor * signal_to_noise_factor * p_match
+    return spectral_difference_factor * signal_to_noise_factor * output.point_probability
 
 """Return median of an array with value weights"""
 def weighted_median(val, w):
