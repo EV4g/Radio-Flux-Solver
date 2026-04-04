@@ -32,7 +32,7 @@ all_catalogs = Catalog_set([
     Catalog("/catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss",       scale=1),
     Catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss",      scale=1.0426),
     Catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3",  scale=1),
-    Catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar",      scale=1.0457),       # LOFAR P282+00
+    Catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar",      scale=1.0457),  # LOFAR P282+00
     Catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus",     scale=1),       # vla cygnus region
     ])
 
@@ -120,16 +120,16 @@ if debug:
     plt.show()
 
 #### variables
-ras                      = [] # positional coordinates
-decs                     = [] # positional coordinates
-correction_factor_global = [] # ratio between read-out anchor_catalog flux and computed flux
-spectral_index_global    = [] # per-source spectral index
-spectral_curvature       = [] # per-source spectral curvature
-fitted_flux              = [] # anchor_catalog flux based on spectral index extrapolation
-signal_to_noise          = [] # signal-to-noise (flux_jy / e_flux_jy)
-max_separation           = [] # maximum per-source separation between all three matched catalog positions
-point_probability        = [] # probability of points matching
-crowding_parameter       = [] # maximum number of neighbours per source within crowd_radius_arc
+ras                = [] # positional coordinates
+decs               = [] # positional coordinates
+correction_factor  = [] # ratio between read-out anchor_catalog flux and computed flux
+spectral_index     = [] # per-source spectral index
+spectral_curvature = [] # per-source spectral curvature
+fitted_flux        = [] # anchor_catalog flux based on spectral index extrapolation
+signal_to_noise    = [] # signal-to-noise (flux_jy / e_flux_jy)
+max_separation     = [] # maximum per-source separation between all three matched catalog positions
+point_probability  = [] # probability of points matching
+crowding_parameter = [] # maximum number of neighbours per source within crowd_radius_arc
 
 ###################################################
 #### catalog three-way combination auto-looper ####
@@ -146,16 +146,16 @@ for i, (combo, output) in enumerate(zip(all_combinations, outputs)):
         spx, curv, snr, cor, flux, max_sep, p_weight, n_crowd, ra, dec = output
         print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",f"Matches: {len(spx)}")
 
-        ras                      += [ra]
-        decs                     += [dec]
-        correction_factor_global += [cor]
-        spectral_index_global    += [spx]
-        spectral_curvature       += [curv]
-        fitted_flux              += [flux]
-        signal_to_noise          += [snr]
-        max_separation           += [max_sep]
-        point_probability        += [p_weight]
-        crowding_parameter       += [n_crowd]
+        ras                += [ra]
+        decs               += [dec]
+        correction_factor  += [cor]
+        spectral_index     += [spx]
+        spectral_curvature += [curv]
+        fitted_flux        += [flux]
+        signal_to_noise    += [snr]
+        max_separation     += [max_sep]
+        point_probability  += [p_weight]
+        crowding_parameter += [n_crowd]
         
         if debug:
             # compare -0.7 assumption versus fitted spectral indices
@@ -189,8 +189,8 @@ print(f"Flux compute done at {(perf_counter() - start):.2f} seconds")
 
 ras = np.concatenate(ras)
 decs = np.concatenate(decs)
-correction_factor_global = np.concatenate(correction_factor_global)
-spectral_index_global = np.concatenate(spectral_index_global)
+correction_factor = np.concatenate(correction_factor)
+spectral_index = np.concatenate(spectral_index)
 spectral_curvature = np.concatenate(spectral_curvature)
 fitted_flux = np.concatenate(fitted_flux)
 signal_to_noise = np.concatenate(signal_to_noise)
@@ -198,7 +198,7 @@ max_separation = np.concatenate(max_separation)
 crowding_parameter = np.concatenate(crowding_parameter)
 point_probability = np.concatenate(point_probability)
 
-total_weighting_factor = calculate_correction_factor_weight(spectral_index_global,
+total_weighting_factor = calculate_correction_factor_weight(spectral_index,
                                                             signal_to_noise,
                                                             max_separation,
                                                             point_probability,
@@ -207,18 +207,18 @@ total_weighting_factor = calculate_correction_factor_weight(spectral_index_globa
 
 mask = total_weighting_factor > 0
 
-ras                      = ras[mask]
-decs                     = decs[mask]
-correction_factor_global = correction_factor_global[mask]
-spectral_index_global    = spectral_index_global[mask]
-spectral_curvature       = spectral_curvature[mask]
-fitted_flux              = fitted_flux[mask]
-signal_to_noise          = signal_to_noise[mask]
-max_separation           = max_separation[mask]
-point_probability        = point_probability[mask]
-crowding_parameter       = crowding_parameter[mask]
+ras                    = ras[mask]
+decs                   = decs[mask]
+correction_factor      = correction_factor[mask]
+spectral_index         = spectral_index[mask]
+spectral_curvature     = spectral_curvature[mask]
+fitted_flux            = fitted_flux[mask]
+signal_to_noise        = signal_to_noise[mask]
+max_separation         = max_separation[mask]
+point_probability      = point_probability[mask]
+crowding_parameter     = crowding_parameter[mask]
 
-total_weighting_factor   = total_weighting_factor[mask]
+total_weighting_factor = total_weighting_factor[mask]
 
 ############################################################################
 #### plotting correction factor based on all previous catalog matchings ####
@@ -226,15 +226,15 @@ total_weighting_factor   = total_weighting_factor[mask]
 
 
     
-mspx, mcor, mcur = biweight_location(spectral_index_global, correction_factor_global, spectral_curvature, weights=total_weighting_factor)
+mspx, mcor, mcur = biweight_location(spectral_index, correction_factor, spectral_curvature, weights=total_weighting_factor)
 
 
-Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index_global, correction_factor_global, total_weighting_factor, logy=True, n=1000)
+Xi, Yi, Zi, px, py = calculate_contour_statistics(spectral_index, correction_factor, total_weighting_factor, logy=True, n=1000)
 
 o = np.argsort(total_weighting_factor)
 
 fig, ax = plt.subplots()
-sc = ax.scatter(spectral_index_global[o], correction_factor_global[o], c=total_weighting_factor[o])
+sc = ax.scatter(spectral_index[o], correction_factor[o], c=total_weighting_factor[o])
 levels = Zi.max() * np.array([0.01, 0.05, 0.15, 0.35, 0.65, 0.90])
 ax.contour(Xi, Yi, Zi, levels=levels, colors='red', alpha=0.7, linewidths=0.8)
 plt.colorbar(sc, label="Combined weighting factor")
@@ -243,16 +243,16 @@ plt.yscale('log')
 plt.axhline(py, ls="--", color="gray")
 plt.axvline(px, ls="--", color="gray")
 
-plt.xlim(np.percentile(spectral_index_global, 1), np.percentile(spectral_index_global, 99))
-plt.ylim(np.percentile(correction_factor_global, 1), np.percentile(correction_factor_global, 99))
+plt.xlim(np.percentile(spectral_index, 1), np.percentile(spectral_index, 99))
+plt.ylim(np.percentile(correction_factor, 1), np.percentile(correction_factor, 99))
 plt.ylabel("Correction factor")
 plt.xlabel(r"Fitted spectral index $\alpha$")
 plt.title("Correction factor as function of fitted spectral index\nall catalogs")
 plt.show()
 
 print("------------------------------------------------")
-print(f"Spectral index: {px:.3f}, correction factor: {py:.3f}, total matches: {len(correction_factor_global)}")
-print(f"Spectral index: {mspx:.3f}, correction factor: {mcor:.3f}, total matches: {len(correction_factor_global)}")
+print(f"Spectral index: {px:.3f}, correction factor: {py:.3f}, total matches: {len(correction_factor)}")
+print(f"Spectral index: {mspx:.3f}, correction factor: {mcor:.3f}, total matches: {len(correction_factor)}")
 print("------------------------------------------------")
 
 ##########################
@@ -260,16 +260,16 @@ print("------------------------------------------------")
 ##########################
 if inspection_plots:
     #### position dependant correction factor
-    #o = np.argsort(correction_factor_global)
-    f = (correction_factor_global[o] > 1e-2) & (correction_factor_global[o] < 1e2)
-    plt.scatter(ras[o][f], decs[o][f], c=correction_factor_global[o][f], s=2, norm='log')
+    #o = np.argsort(correction_factor)
+    f = (correction_factor[o] > 1e-2) & (correction_factor[o] < 1e2)
+    plt.scatter(ras[o][f], decs[o][f], c=correction_factor[o][f], s=2, norm='log')
     plt.colorbar(label='Correction factor')
     plt.ylabel("DEC (deg)")
     plt.xlabel("RA (deg)")
     plt.show()
     
     #### correction factor as function of total weighting factor
-    plt.scatter(total_weighting_factor, correction_factor_global, s=1.5, alpha=0.2)
+    plt.scatter(total_weighting_factor, correction_factor, s=1.5, alpha=0.2)
     plt.yscale('log')
     plt.xscale('log')
     plt.axhline(1, ls='--', color='black', alpha=0.5, label='1')
@@ -280,15 +280,15 @@ if inspection_plots:
     plt.show()
     
     #### correction factor as function of ra and dec separately
-    mask = (correction_factor_global < 10) & (correction_factor_global > 0.1)
+    mask = (correction_factor < 10) & (correction_factor > 0.1)
     
-    cmean = np.average(correction_factor_global[mask], weights=total_weighting_factor[mask])
-    cstd = np.std(correction_factor_global[mask])
+    cmean = np.average(correction_factor[mask], weights=total_weighting_factor[mask])
+    cstd = np.std(correction_factor[mask])
     cmin, cmax = max(0.1, cmean - 3 * cstd), cmean + 3 * cstd
-    mask &= (correction_factor_global > cmin) & (correction_factor_global < cmax) & (total_weighting_factor > 0)
+    mask &= (correction_factor > cmin) & (correction_factor < cmax) & (total_weighting_factor > 0)
     
-    dec_c, dec_mn, dec_std = weighted_bin_stats(decs[mask], correction_factor_global[mask], total_weighting_factor[mask], n_bins=50)
-    ra_c,  ra_mn,  ra_std  = weighted_bin_stats(ras[mask],  correction_factor_global[mask], total_weighting_factor[mask], n_bins=50)
+    dec_c, dec_mn, dec_std = weighted_bin_stats(decs[mask], correction_factor[mask], total_weighting_factor[mask], n_bins=50)
+    ra_c,  ra_mn,  ra_std  = weighted_bin_stats(ras[mask],  correction_factor[mask], total_weighting_factor[mask], n_bins=50)
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
     ax1.plot(dec_c, dec_mn, color='steelblue', lw=2, label='Weighted mean')
@@ -307,7 +307,7 @@ if inspection_plots:
     #### correction factor as function of [ra, dec] in 2D
     ra_c2, dec_c2, wmean_2d, wstd_2d = weighted_bin_stats_2d(
         ras[mask], decs[mask],
-        correction_factor_global[mask],
+        correction_factor[mask],
         total_weighting_factor[mask],
         n_bins=400, m_bins=100
     )
@@ -339,16 +339,16 @@ if inspection_plots:
 print(f"Done at: {(perf_counter() - start):.2f} s")
 
 #### variables
-# ras                      = [] # positional coordinates
-# decs                     = [] # positional coordinates
-# correction_factor_global = [] # ratio between read-out anchor_catalog flux and computed flux
-# spectral_index_global    = [] # per-source spectral index
-# spectral_curvature       = [] # per-source spectral curvature
-# fitted_flux              = [] # anchor_catalog flux based on spectral index extrapolation
-# signal_to_noise          = [] # signal-to-noise (flux_jy / e_flux_jy)
-# max_separation           = [] # maximum per-source separation between all three matched catalog positions
-# point_probability        = [] # probability of points matching
-# crowding_parameter       = [] # maximum number of neighbours per source within crowd_radius_arc
+# ras                = [] # positional coordinates
+# decs               = [] # positional coordinates
+# correction_factor  = [] # ratio between read-out anchor_catalog flux and computed flux
+# spectral_index     = [] # per-source spectral index
+# spectral_curvature = [] # per-source spectral curvature
+# fitted_flux        = [] # anchor_catalog flux based on spectral index extrapolation
+# signal_to_noise    = [] # signal-to-noise (flux_jy / e_flux_jy)
+# max_separation     = [] # maximum per-source separation between all three matched catalog positions
+# point_probability  = [] # probability of points matching
+# crowding_parameter = [] # maximum number of neighbours per source within crowd_radius_arc
 
 ###################################################
 #### catalog four-way combination auto-looper ####
@@ -363,16 +363,16 @@ print(f"Done at: {(perf_counter() - start):.2f} s")
 #         spx, curv, snr, cor, flux, max_sep, p_weight, n_crowd, ra, dec = output
 #         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(spx)}")
 
-#         ras                      += [ra]
-#         decs                     += [dec]
-#         correction_factor_global += [cor]
-#         spectral_index_global    += [spx]
-#         spectral_curvature       += [curv]
-#         fitted_flux              += [flux]
-#         signal_to_noise          += [snr]
-#         max_separation           += [max_sep]
-#         point_probability        += [p_weight]
-#         crowding_parameter       += [n_crowd]
+#         ras                += [ra]
+#         decs               += [dec]
+#         correction_factor  += [cor]
+#         spectral_index     += [spx]
+#         spectral_curvature += [curv]
+#         fitted_flux        += [flux]
+#         signal_to_noise    += [snr]
+#         max_separation     += [max_sep]
+#         point_probability  += [p_weight]
+#         crowding_parameter += [n_crowd]
 #     else:
 #         print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", "Matches: None")
 
