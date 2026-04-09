@@ -28,9 +28,10 @@ all_catalogs = Catalog_set([
     Catalog("/catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss",       scale=1),
     Catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss",      scale=1),
     Catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3",  scale=1),
+    Catalog("/catalogs/apertif/apertif_clean.fits",           1355e6,     "apertif",    scale=1)
     ])
 
-racs_gal, racs_low, racs_mid, racs_high, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3 = all_catalogs.catalogs
+racs_gal, racs_low, racs_mid, racs_high, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3, apertif = all_catalogs.catalogs
 
 #### available configurations
 full_config = Config(spectral_damping_factor = 5,

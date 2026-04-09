@@ -16,10 +16,34 @@ import numpy as np
 # wenss     = Table.read(os.getcwd()+"/catalogs/wenss/WENSS.fits")
 # lofar_dr3 = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl.fits")
 # lofar     = Table.read(os.getcwd()+'/catalogs/lofar/lofar_sources_pipeline.fits')
-# cygnus = Table.read(os.getcwd()+'/catalogs/other/cygnus_sources.fits')
+# cygnus    = Table.read(os.getcwd()+'/catalogs/other/cygnus_sources.fits')
+# racs_mid  = Table.read(os.getcwd()+"/catalogs/racs/RACS-mid1_sources.xml")
+# racs_high = Table.read(os.getcwd()+"/catalogs/racs/RACS-high_sources.xml")
 
-# racs_mid   = Table.read(os.getcwd()+"/catalogs/racs/RACS-mid1_sources.xml")
-# racs_high  = Table.read(os.getcwd()+"/catalogs/racs/RACS-high_sources.xml")
+# apertif   = Table.read(os.getcwd()+"/catalogs/apertif/apertif.fits")
+
+#### apertif
+# apertif.rename_column("RAICRS", "ra")
+# apertif.rename_column("DEICRS", "dec")
+# apertif.rename_column("e_RAICRS", "e_ra")
+# apertif.rename_column("e_DEICRS", "e_dec")
+# apertif.rename_column('Sint', 'flux_jy')
+# apertif.rename_column('e_Sint', 'e_flux_jy')
+
+# if str(apertif['flux_jy'].unit) == 'mJy':
+#     apertif['flux_jy'] *= 1e-3
+#     apertif['e_flux_jy'] *= 1e-3
+#     apertif['flux_jy'].unit = 'Jy'
+#     apertif['e_flux_jy'].unit = 'Jy'
+    
+# if str(apertif['e_ra'].unit) == 'arcsec':
+#     apertif['e_ra'] /= 3600
+#     apertif['e_ra'].unit = 'deg'
+# if str(apertif['e_dec'].unit) == 'arcsec':
+#     apertif['e_dec'] /= 3600
+#     apertif['e_dec'].unit = 'deg'
+
+# apertif.write("apertif_clean.fits", overwrite=True)
 
 #### racs_mid
 # racs_mid.rename_column("RA", "ra")

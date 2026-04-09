@@ -33,6 +33,7 @@ all_catalogs = Catalog_set([
     Catalog("/catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss",       scale=1),
     Catalog("/catalogs/wenss/wenss_clean.fits",               325e6,      "wenss",      scale=1.0426),
     Catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",  144.6e6,    "lofar_dr3",  scale=1),
+    Catalog("/catalogs/apertif/apertif_clean.fits",           1355e6,     "apertif",    scale=1),
     Catalog("/catalogs/lofar/lofar_sources_pipeline.fits",    144.6e6,    "lofar",      scale=1),       # LOFAR P282+00
     Catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus",     scale=1),       # vla cygnus region
     ])
@@ -76,7 +77,7 @@ cygnus_config = Config(spectral_damping_factor = 5,
 test_config = Config(spectral_damping_factor = 5,
                      spectral_index_theory=-0.8,
                      snr_lower_limit = 7,
-                     nsigma = 2.5,
+                     nsigma = 2,
                      minimum_points = 3,
                      crowd_radius_arc = None,
                      minimum_frequency_spacing = 0,#50e6,
