@@ -38,7 +38,7 @@ all_catalogs = Catalog_set([
     Catalog("/catalogs/other/cygnus_clean.fits",              336e6,      "cygnus",     scale=1),       # vla cygnus region
     ])
 
-racs_gal, racs_low, racs_mid, racs_high, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3, lofar, cygnus = all_catalogs.catalogs
+racs_gal, racs_low, racs_mid, racs_high, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3, apertif, lofar, cygnus = all_catalogs.catalogs
 
 #### available configurations
 lofar_dr3_config = Config(spectral_damping_factor = 5,
@@ -78,13 +78,14 @@ test_config = Config(spectral_damping_factor = 5,
                      spectral_index_theory=-0.8,
                      snr_lower_limit = 7,
                      nsigma = 2,
-                     minimum_points = 3,
+                     minimum_points = 10,
                      crowd_radius_arc = None,
                      minimum_frequency_spacing = 0,#50e6,
                      #catalogs = all_catalogs.catalogs,
-                     catalogs = [racs_low, vlssr, tgss, gleam_300, gleam_xgp, lofar_dr3, wenss, nvss, racs_mid, racs_high],
+                     catalogs = [racs_low, vlssr, tgss, gleam_300, gleam_xgp, lofar_dr3, wenss, nvss, racs_mid, racs_high, apertif],
                      #catalogs = [vlssr, gleam_300, gleam_xgp, tgss, lofar_dr3],
                      #catalogs = [lofar_dr3, racs_low, meerkat, vlssr, tgss],
+                     #catalogs = [lofar_dr3, nvss, apertif],
                      reference_file = None,
                      anchor_catalog = lofar_dr3,
                      )
@@ -137,20 +138,21 @@ for i, (combo, out) in enumerate(zip(all_combinations, outputs)):
         print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",f"Matches: {len(out[0])}")
         
         output.add(*out)
+        spx, curv, snr, cor, flux, max_sep, p_weight, n_crowd, ra, dec = out
         
         if debug:
-            # compare -0.7 assumption versus fitted spectral indices
-            plt.scatter(output.fitted_flux, output.correction_factor, c=output.spectral_index)
+            # compare spectral_index_theory assumption versus fitted spectral indices
+            plt.scatter(flux, cor, c=spx)
             plt.yscale('log')
             plt.xscale('log')
             plt.colorbar(label = r"Spectral index $\alpha$")
             plt.xlabel(f"{config.anchor_catalog.name} fitted flux (Jy)")
             plt.ylabel("Correction factor")
-            plt.title(f"{config.anchor_catalog.name} "+r"flux, $\alpha$=-0.7 vs fitted")
+            plt.title(f"{config.anchor_catalog.name} "+r"flux, $\alpha$=-"+f"{config.spectral_index_theory} vs fitted")
             plt.show()
             
             # compare fitted spectral index with correction factor
-            plt.scatter(output.spectral_index, output.correction_factor, c=output.fitted_flux, norm='log')
+            plt.scatter(spx, cor, c=flux, norm='log')
             plt.yscale('log')
             plt.axvline(-0.7, ls='--', c='k')
             plt.axhline(1, ls='--', c='k')
