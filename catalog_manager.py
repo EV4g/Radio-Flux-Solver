@@ -1,53 +1,99 @@
 import numpy as np
 from astropy.table import Table
 import copy
-from functions import sources_in_fits, get_pos_err_deg
+from functions import sources_in_fits, get_pos_err_deg, get_beam_size
 from pathlib import Path
+import bdsf
 
 base_path = Path(__file__).resolve().parent
 
 # wrapper class for incoming Table data
 class Catalog:
-    def __init__(self, path=None, freq_hz=None, name=None, flux_lim=0, scale=1):
+    def __init__(self, path=None, freq_hz=None, name=None, flux_lim=0, scale=1, table=True):
         self.path      = base_path / path.lstrip("/") if path is not None else None
+        self.dir       = self.path.parent if self.path is not None else None
+        self.path_stem = self.path.stem if self.path is not None else None
         self.freq      = freq_hz    # central frequency
         self.freq_unit = 'Hz'       # frequency unit
         self.name      = name       # survey name
         self.flux_lim  = flux_lim   # lower flux limit; everything below is discarded
         self.scale     = scale      # scale factor, flux data is multiplied by this value
+        self.table     = table      # whether or not the data is a 2D image (False) or table (True)
+        
         # data is None until load() is called
         self.flux = self.e_flux = self.flux_unit = None
         self.ra = self.dec = self.e_ra = self.e_dec = None
         self.err_rad = None
     
     def load(self):
-        if self.ra is not None: return # already loaded
-        
-        # read out from disk
-        catalog = Table.read(self.path) 
-        
-        # read out flux data
-        self.flux       = np.array(catalog['flux_jy']) * self.scale
-        
-        # setup a threshold lower bound based on flux_lim
-        flux_threshold = (self.flux > self.flux_lim)
-        
-        # apply flux_lim threshold
-        self.flux       = self.flux[flux_threshold]
-        self.e_flux     = np.array(catalog['e_flux_jy'])[flux_threshold] * self.scale # also apply scale to e_flux
-        self.flux_unit  = str(catalog['flux_jy'].unit)
-        
-        self.ra         = (np.array(catalog['ra']) % 360)[flux_threshold]
-        self.dec        = np.array(catalog['dec'])[flux_threshold]
-        
-        try:
-            self.e_ra   = np.array(catalog['e_ra'])[flux_threshold]
-            self.e_dec  = np.array(catalog['e_dec'])[flux_threshold]
-            self.e_ra[np.where(np.isnan(self.e_ra))] = 0   # sanitize NaNs
-            self.e_dec[np.where(np.isnan(self.e_dec))] = 0 # sanitize NaNs
-            self.err_rad = np.deg2rad(get_pos_err_deg(self))
-        except Exception:
-            self.e_ra = self.e_dec = self.err_rad = None
+        if self.table:
+            if self.ra is not None: return # already loaded
+            
+            # read out from disk
+            catalog = Table.read(self.path) 
+            
+            # read out flux data
+            self.flux       = np.array(catalog['flux_jy']) * self.scale
+            
+            # setup a threshold lower bound based on flux_lim
+            flux_threshold = (self.flux > self.flux_lim)
+            
+            # apply flux_lim threshold
+            self.flux       = self.flux[flux_threshold]
+            self.e_flux     = np.array(catalog['e_flux_jy'])[flux_threshold] * self.scale # also apply scale to e_flux
+            self.flux_unit  = str(catalog['flux_jy'].unit)
+            
+            self.ra         = (np.array(catalog['ra']) % 360)[flux_threshold]
+            self.dec        = np.array(catalog['dec'])[flux_threshold]
+            
+            try:
+                self.e_ra   = np.array(catalog['e_ra'])[flux_threshold]
+                self.e_dec  = np.array(catalog['e_dec'])[flux_threshold]
+                self.e_ra[np.where(np.isnan(self.e_ra))] = 0   # sanitize NaNs
+                self.e_dec[np.where(np.isnan(self.e_dec))] = 0 # sanitize NaNs
+                self.err_rad = np.deg2rad(get_pos_err_deg(self))
+            except Exception:
+                self.e_ra = self.e_dec = self.err_rad = None
+
+        # if not table, then we assume it to be an image
+        # we use PyBDSF to still turn it into a catalog
+        else:
+            print(f"Running PyBDSF source finding on {self.path_stem}")
+            image = bdsf.process_image(
+                self.path,
+                thresh_isl=3.0,                   # island threshold (sigma)
+                thresh_pix=5.0,                   # peak detection threshold (sigma)
+                rms_box=(200, 50),                # (box_size, step_size) for rms map; tune to your image
+                beam=(get_beam_size(self.path)),  # (maj_deg, min_deg, PA)
+                frequency = self.freq,
+                quiet=True,
+                blank_limit=1e-6,                 # internal mask; values below this (Jy) get ignored
+                outdir='/tmp'
+            )
+            
+            image_catalog_path = f"{self.dir}/{self.path_stem}_catalog.fits"
+            image.write_catalog(outfile=image_catalog_path, catalog_type='srl', format='fits', clobber=True)
+            image_catalog = Table.read(image_catalog_path)
+
+            # stick to convention and overwrite (PyBDSF does not offer column renaming internally)
+            image_catalog.rename_columns(
+                ['RA',  'DEC',  'E_RA', 'E_DEC', 'Total_flux', 'E_Total_flux'],
+                ['ra',  'dec',  'e_ra', 'e_dec', 'flux_jy',    'e_flux_jy']
+            )
+            image_catalog.write(image_catalog_path, overwrite=True)
+
+            print(f"Catalog written to {image_catalog_path}\n")
+            
+            # set data based on image data
+            self.ra       = np.array(image_catalog['ra'])      # degrees
+            self.dec      = np.array(image_catalog['dec'])     # degrees
+            self.e_ra     = np.array(image_catalog['e_ra'])    # degrees
+            self.e_dec    = np.array(image_catalog['e_dec'])   # degrees
+            self.err_rad  = np.deg2rad(get_pos_err_deg(self))
+            self.flux     = np.array(image_catalog['flux_jy'])    # Jy (integrated)
+            self.e_flux   = np.array(image_catalog['e_flux_jy'])  # Jy
+            self.flux_unit = 'Jy'
+            
     
     def create_subset(self, valid):
         subset = copy.deepcopy(self)

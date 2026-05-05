@@ -1,8 +1,8 @@
-import os
-from astropy.table import Table, Column
-import bdsf
-import glob
-import numpy as np
+# import os
+# from astropy.table import Table, Column
+# import bdsf
+# import glob
+# import numpy as np
 
 # get calagogs
 # racs_full = Table.read(os.getcwd()+"/catalogs/racs/racs.fits")
