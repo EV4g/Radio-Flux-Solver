@@ -86,8 +86,11 @@ def get_overlapping_files(ref_file, files):
     return overlapping
 
 """Get spectral index based on two fluxes and two frequencies"""
-def get_spectral_index(S1, S2, v1, v2):
-    return (np.log(S1) - np.log(S2)) / (np.log(v1) - np.log(v2))
+def get_spectral_index(S1, S2, v1, v2, fallback_value=0):
+    if not v1 == v2:
+        return (np.log(S1) - np.log(S2)) / (np.log(v1) - np.log(v2))
+    else:
+        return fallback_value
 
 """"""
 def cutout_to_galactic_wh(cutout_lon, cutout_lat):
@@ -279,7 +282,9 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
     if n == 2:
         i0 = np.array(matched_results[(0, 1)][0])
         i1 = np.array(matched_results[(0, 1)][1])
-        return (i0, i1), quality if return_quality else (i0, i1)
+        if return_quality:
+            return (i0, i1), quality
+        return (i0, i1)
 
     # If more than 2 catalogs: coalescence anchored on anchor_index
     match_dict = {i: {} for i in range(n)}
@@ -327,7 +332,9 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
                 used_indices[cat_i].add(src_i)
 
     result = [np.array(consistent_matches[i]) for i in range(n)]
-    return result, quality if return_quality else result
+    if return_quality:
+        return result, quality
+    return result
 
 """Add contours to scatterplot
 Takes x, y coordinated and a per-source weighting c. Can make the contour fitting work in logspace by using
@@ -704,7 +711,7 @@ def compute_flux_correction_factor(cats, config, debug=False, anchor_override=No
             flux_ref = cats[other_index[0]].flux
             freq_ref = cats[other_index[0]].freq
         case 3:
-            spectral_indices = get_spectral_index(cats[other_index[0]].flux, cats[other_index[1]].flux, cats[other_index[0]].freq, cats[other_index[1]].freq)
+            spectral_indices = get_spectral_index(cats[other_index[0]].flux, cats[other_index[1]].flux, cats[other_index[0]].freq, cats[other_index[1]].freq, fallback_value=np.nan)
             flux_ref = cats[other_index[0]].flux
             freq_ref = cats[other_index[0]].freq
         case 4:
