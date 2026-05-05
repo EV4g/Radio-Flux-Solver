@@ -279,9 +279,7 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
     if n == 2:
         i0 = np.array(matched_results[(0, 1)][0])
         i1 = np.array(matched_results[(0, 1)][1])
-        if return_quality:
-            return (i0, i1), quality
-        return (i0, i1)
+        return (i0, i1), quality if return_quality else (i0, i1)
 
     # If more than 2 catalogs: coalescence anchored on anchor_index
     match_dict = {i: {} for i in range(n)}
@@ -329,9 +327,7 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
                 used_indices[cat_i].add(src_i)
 
     result = [np.array(consistent_matches[i]) for i in range(n)]
-    if return_quality:
-        return result, quality
-    return result
+    return result, quality if return_quality else result
 
 """Add contours to scatterplot
 Takes x, y coordinated and a per-source weighting c. Can make the contour fitting work in logspace by using
@@ -409,7 +405,6 @@ def plot_statistics(x, y, weights=None, bins=(50, 50), contour_levels='auto', co
     ax.set_ylabel(ylabel)
     ax.set_title(title)
     plt.show()
-    
 
 """A simple way to save fits files to png"""
 def fits_to_png(fits_path, output_path, hdu_index=0, vmin=None, vmax=None, cmap="viridis"):
@@ -417,8 +412,6 @@ def fits_to_png(fits_path, output_path, hdu_index=0, vmin=None, vmax=None, cmap=
         data = hdul[hdu_index].data[0,0]
 
     plt.imsave(output_path, data, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
-
-
 
 """Return indices of catalog of all unique, non-double, <size> combinations with the optional condition f[i] < f[i+1]"""
 def get_combinations(cats, size=3, required_index=None, skip_index=None, only_sorted=True, minimum_spacing=0):
@@ -639,12 +632,9 @@ def solve_flux_scales_band(ratio_slice, weight_slice, normalize=True):
     s_full[idx_active] = s_sub
     return s_full
 
-"""Get two catalogs and return flux and snr (flux / e_flux)"""
-
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
 def compute_flux_correction_factor(cats, config, debug=False, anchor_override=None, precomputed_indices=None, precomputed_quality=None):
-    
     # allow for pre-computed inputs, to skip match_catalogs_2D
     if precomputed_indices is None and precomputed_quality is None:
         indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma, thres_arc_override=config.thres_arc_override, crowd_radius_arc=config.crowd_radius_arc)

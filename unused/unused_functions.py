@@ -8,7 +8,9 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.wcs import WCS
 import numpy as np
+import matplotlib.pyplot as plt
 
+"""Get two catalogs and return flux and snr (flux / e_flux)"""
 def get_catalog_matched_flux(cat1, cat2, thres_arc=2):
     idx_cat1, idx_cat2 = match_catalogs_2D([cat1, cat2], thres_arc=thres_arc)
 
