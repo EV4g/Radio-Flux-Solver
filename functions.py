@@ -87,7 +87,7 @@ def get_overlapping_files(ref_file, files):
 
 """Get spectral index based on two fluxes and two frequencies"""
 def get_spectral_index(S1, S2, v1, v2, fallback_value=0):
-    if not v1 == v2:
+    if v1 != v2:
         return (np.log(S1) - np.log(S2)) / (np.log(v1) - np.log(v2))
     else:
         return fallback_value

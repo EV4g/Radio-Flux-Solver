@@ -45,7 +45,7 @@ manual_catalogs = Catalog_set([
     Catalog("/data/raw/cygnus_mosaic_reconvolved.fits",       144.6e6,    "lofar_cygnus_53", scale=1, table=False),
 ])
 
-racs_gal, racs_low, racs_mid, racs_high, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3, apertif, lofar, cygnus, lofar_cygnus_20 = all_catalogs.catalogs
+racs_gal, racs_low, racs_mid, racs_high, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3, apertif, lofar, cygnus, lofar_cygnus_20_old = all_catalogs.catalogs
 lofar_cygnus_20, lofar_cygnus_53 = manual_catalogs.catalogs
 
 #### available configurations
