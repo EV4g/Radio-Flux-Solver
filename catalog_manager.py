@@ -5,7 +5,8 @@ from scipy.spatial import cKDTree
 from pathlib import Path
 import bdsf
 from joblib import Parallel, delayed
-
+from time import perf_counter
+        
 base_path = Path(__file__).resolve().parent
 
 # wrapper class for incoming Table data
@@ -183,14 +184,12 @@ class Config:
         
     def setup(self):
         # load the data per catalog
-        def setup(self):
-            from time import perf_counter
-            for i, cat in enumerate(self.catalogs):
-                t0 = perf_counter()
-                cat.load()
-                print(f"  {cat.name:14s} load+threshold: {(perf_counter()-t0):.2f}s ({len(cat.ra) if cat.ra is not None else 0:>8d} rows)")
+        for i, cat in enumerate(self.catalogs):
+            t0 = perf_counter()
+            cat.load()
+            n_rows = len(cat.ra) if cat.ra is not None else 0
+            print(f"  {cat.name:14s} load+threshold: {(perf_counter()-t0):.2f}s ({n_rows:>8d} rows)")
 
-            
             # if reference file, remove all points outside of that
             if self.reference_file is not None:
                 valid = sources_in_fits(cat.ra, cat.dec, self.reference_file)
@@ -203,10 +202,15 @@ class Config:
                 self.anchor_catalog = next(c for c in self.catalogs if c.name == anchor_name)
             except StopIteration:
                 raise ValueError(f"Anchor_catalog '{anchor_name}' not found in config.catalogs")
-        
-        # Precompute xyz/tree for each catalog
-        for cat in self.catalogs:
-            cat.precompute_match_arrays()
+
+        # Parallel precompute: radec_to_xyz and cKDTree both release the GIL,
+        # so threading speeds this up without race risk. Mutations on the shared
+        # cat objects (setting cat._xyz, cat._tree) are visible to the main thread.
+        t0 = perf_counter()
+        Parallel(n_jobs=-1, backend='threading')(
+            delayed(cat.precompute_match_arrays)() for cat in self.catalogs
+        )
+        print(f"  precompute_match_arrays (threaded): {(perf_counter()-t0):.2f}s")
 
 class Output:
     def __init__(self, spx=None, cur=None, snr=None, cor=None, flux=None, sep=None, pmatch=None, ncrowd=None, ra=None, dec=None):
