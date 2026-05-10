@@ -66,7 +66,7 @@ lofar_dr3_config = Config(spectral_damping_factor = 5,
                           minimum_points = 3,
                           crowd_radius_arc = None,
                           minimum_frequency_spacing = 0,
-                          catalogs = [racs_low, racs_gal, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3],
+                          catalogs = [racs_gal, racs_low, racs_mid, racs_high, meerkat, vlssr, tgss, gleam_300, gleam_xgp, nvss, wenss, lofar_dr3, apertif],
                           reference_file = None,
                           anchor_catalog = lofar_dr3,
                           )
@@ -113,10 +113,10 @@ test_config = Config(spectral_damping_factor = 5,
 
 #### Parameters
 debug = False
-inspection_plots = True
+inspection_plots = False
 
 #### setup
-config = test_config
+config = lofar_dr3_config#test_config
 config.setup()
 output = Output()
 
