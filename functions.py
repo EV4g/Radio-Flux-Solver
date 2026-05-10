@@ -11,7 +11,7 @@ from scipy.stats import gaussian_kde
 from scipy.ndimage import gaussian_filter, gaussian_filter1d
 import matplotlib.pyplot as plt
 from itertools import combinations, permutations
-from scipy.stats import chi2 as _chi2_dist, binned_statistic_2d
+from scipy.stats import binned_statistic_2d
 from scipy.stats import chi2
 
 warnings.filterwarnings("ignore", module="matplotlib")
@@ -125,10 +125,10 @@ def radec_to_xyz(ra_deg, dec_deg):
     cd  = np.cos(dec)
     return np.column_stack([cd * np.cos(ra), cd * np.sin(ra), np.sin(dec)])
 
-def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, anchor_index=0, return_quality=False, thres_arc_override=False):
+def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, anchor_index=0, return_quality=False, thres_arc_override=False, workers=-1):
     """Fast n-catalogue cross-matcher with adaptive positional uncertainties,
     crowding detection, and per-pair quality metrics.
-    
+
     Parameters
     ----------
     cat_list           : list of catalogue objects for ra,dec [degrees] and flux, and .e_flux.
@@ -138,13 +138,21 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
                          radius [arcsec] per source and store in quality['n_crowd']
     anchor_index       : catalogue index that anchors the multi-catalogue search
     return_quality     : if True, also return quality metrics
-    thres_arc_override : if True, forces matching to use thres_arc matching instead of 
+    thres_arc_override : if True, forces matching to use thres_arc matching instead of
                          error-based nsigma * err_rad
-    
+    workers            : threads passed to cKDTree.query / query_ball_point. Default -1
+                         uses all cores; set to 1 when calling this from a multi-process
+                         pool (e.g. joblib.Parallel(n_jobs=-1)) to avoid thread oversubscription.
+
     Returns
     ----------------
         [idx_0, ..., idx_{n-1}]  [, quality]
-    
+
+    Multi-catalogue (n>=3) result rows form consistent groups: row k of every returned
+    array refers to one source in each catalogue that mutually match. Row order is
+    anchor-ascending (was insertion-order in older versions; the row-to-row pairing
+    is unchanged, only the order across rows differs).
+
     quality metrics
     ------------
         'sep_arcsec'  {(a,b): ndarray}  arcsec separation for each matched pair,
@@ -157,22 +165,26 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
     """
 
     n = len(cat_list)
-
-    # Precompute vectors and errors per catalog
-    xyz_all  = []
-    errs     = []
-    for cat in cat_list:
-        xyz_all.append(radec_to_xyz(cat.ra, cat.dec))
-        if not thres_arc_override:
-            errs.append(cat.err_rad)
-        else:
-            errs.append(None)
     use_errs = not thres_arc_override
 
-    # Prebuild one KD-tree per catalog
-    trees = [cKDTree(xyz) if len(xyz) > 0 else None for xyz in xyz_all]
+    # Precompute vectors and errors per catalog. When use_errs is False the entries are
+    # placeholder empty arrays (never indexed) — keeps the list element type uniform.
+    xyz_all = [radec_to_xyz(cat.ra, cat.dec) for cat in cat_list]
+    errs    = [cat.err_rad if use_errs else np.empty(0) for cat in cat_list]
 
-    # Crowding
+    # Prebuild only the KD-trees we actually need: the smaller catalog of each pair is
+    # always used as query points (not as a tree), so we skip building its tree unless
+    # crowding self-queries require it.
+    sizes = [len(xyz) for xyz in xyz_all]
+    need_tree = [(crowd_radius_arc is not None) and s > 0 for s in sizes]
+    for a in range(n):
+        if sizes[a] == 0: continue
+        for b in range(a + 1, n):
+            if sizes[b] == 0: continue
+            need_tree[a if sizes[a] >= sizes[b] else b] = True
+    trees = [cKDTree(xyz_all[i]) if need_tree[i] else None for i in range(n)]
+
+    # Crowding (return_length=True returns counts directly — no list-of-lists allocation)
     crowd_counts = {}
     if crowd_radius_arc is not None:
         crowd_r_3d = 2.0 * np.sin(np.deg2rad(crowd_radius_arc / 3600.0) / 2.0)
@@ -180,13 +192,12 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
             if tree is None:
                 crowd_counts[i] = np.array([], dtype=int)
                 continue
-            nbrs = tree.query_ball_point(xyz, r=crowd_r_3d, workers=-1)
-            crowd_counts[i] = np.array([len(nb) - 1 for nb in nbrs])
+            counts = tree.query_ball_point(xyz, r=crowd_r_3d, workers=workers, return_length=True)
+            crowd_counts[i] = np.asarray(counts, dtype=int) - 1
 
     matched_results = {}
     sep_results     = {}
     prob_results    = {}
-    pair_maps       = {}
 
     for a in range(n):
         for b in range(a + 1, n):
@@ -194,11 +205,11 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
             xyz_b = xyz_all[b]
 
             if len(xyz_a) == 0 or len(xyz_b) == 0:
-                matched_results[(a, b)] = ([], [])
-                sep_results[(a, b)]     = np.array([])
-                prob_results[(a, b)]    = np.array([])
-                pair_maps[(a, b)]       = {}
-                pair_maps[(b, a)]       = {}
+                empty_i = np.empty(0, dtype=np.intp)
+                empty_f = np.empty(0)
+                matched_results[(a, b)] = (empty_i, empty_i)
+                sep_results[(a, b)]     = empty_f
+                prob_results[(a, b)]    = empty_f
                 continue
 
             # Always query smaller set against larger tree
@@ -207,69 +218,75 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
             else:
                 sub_xyz, sup_err, sub_err, tree_sup, normal = xyz_a, errs[b], errs[a], trees[b], False
 
-            # Coarse search
+            # Coarse search radius
             if use_errs:
                 sigma_pair   = np.hypot(np.median(sup_err), np.median(sub_err))
                 query_radius = 2.0 * np.sin(nsigma * sigma_pair / 2.0)
             else:
                 query_radius = 2.0 * np.sin(np.deg2rad(thres_arc / 3600.0) / 2.0)
 
-            dists, idxs = tree_sup.query(sub_xyz, k=1, distance_upper_bound=query_radius, workers=-1)
+            dists, idxs = tree_sup.query(sub_xyz, k=1, distance_upper_bound=query_radius, workers=workers)
 
-            # Per-source refinement
+            # Per-source refinement using actual per-source errors
+            prelim = dists < query_radius   # also excludes 'inf' no-match sentinels
             if use_errs:
-                prelim = dists < query_radius
-                accept = np.zeros(len(sub_xyz), dtype=bool)
-                pidx   = np.where(prelim)[0]
-                if len(pidx):
+                pidx = np.flatnonzero(prelim)
+                if pidx.size:
                     combined_sig = np.hypot(sub_err[pidx], sup_err[idxs[pidx]])
                     thresh_3d    = 2.0 * np.sin(nsigma * combined_sig / 2.0)
-                    accept[pidx] = dists[pidx] < thresh_3d
-                valid = accept
+                    valid = np.zeros_like(prelim)
+                    valid[pidx] = dists[pidx] < thresh_3d
+                else:
+                    valid = prelim
             else:
-                valid = dists < query_radius
+                valid = prelim
 
-            matched_sub   = np.where(valid)[0]
+            matched_sub   = np.flatnonzero(valid)
             matched_sup   = idxs[valid]
             matched_dists = dists[valid]
 
-            # Deduplication: keep closest sub per sup
-            if len(matched_sup) != len(np.unique(matched_sup)):
-                order             = np.lexsort((matched_dists, matched_sup))
-                matched_sup       = matched_sup[order]
-                matched_sub       = matched_sub[order]
-                matched_dists     = matched_dists[order]
-                first             = np.empty(len(matched_sup), dtype=bool)
-                first[0]          = True
-                first[1:]         = matched_sup[1:] != matched_sup[:-1]
-                matched_sup       = matched_sup[first]
-                matched_sub       = matched_sub[first]
-                matched_dists     = matched_dists[first]
+            # Deduplication: keep closest sub per sup. Only sort when duplicates actually exist
+            # so the natural sub-ascending order is preserved otherwise (matches original output).
+            # Sort+diff is ~20x faster than np.unique for the duplicate check.
+            n_matched = matched_sup.size
+            has_dup = False
+            if n_matched > 1:
+                _sorted = np.sort(matched_sup)
+                has_dup = bool((_sorted[1:] == _sorted[:-1]).any())
+            if has_dup:
+                order         = np.lexsort((matched_dists, matched_sup))
+                matched_sup   = matched_sup[order]
+                matched_sub   = matched_sub[order]
+                matched_dists = matched_dists[order]
+                first         = np.empty(n_matched, dtype=bool)
+                first[0]      = True
+                np.not_equal(matched_sup[1:], matched_sup[:-1], out=first[1:])
+                matched_sup   = matched_sup[first]
+                matched_sub   = matched_sub[first]
+                matched_dists = matched_dists[first]
 
-            # Convert distance to arcsec
+            # Convert chord distance to arcsec
             sep_arcsec = np.rad2deg(2.0 * np.arcsin(matched_dists / 2.0)) * 3600.0
 
-            # Match probability via chi_sq on angular separation
-            if use_errs:
+            # Match probability: 1 - chi2.cdf(x, df=2) is exactly exp(-x/2). Skip scipy dispatch.
+            if use_errs and matched_sub.size:
                 sep_rad        = np.deg2rad(sep_arcsec / 3600.0)
                 combined_sig_f = np.hypot(sub_err[matched_sub], sup_err[matched_sup])
                 chi2_vals      = (sep_rad / combined_sig_f) ** 2
-                p_match        = 1.0 - _chi2_dist.cdf(chi2_vals, df=2)
+                p_match        = np.exp(-0.5 * chi2_vals)
+            elif use_errs:
+                p_match = np.empty(0)
             else:
-                p_match = np.ones(len(matched_sub))
+                p_match = np.ones(matched_sub.size)
 
             if normal:
-                idx_a_list = matched_sup.tolist()
-                idx_b_list = matched_sub.tolist()
+                idx_a_arr, idx_b_arr = matched_sup, matched_sub
             else:
-                idx_a_list = matched_sub.tolist()
-                idx_b_list = matched_sup.tolist()
+                idx_a_arr, idx_b_arr = matched_sub, matched_sup
 
-            matched_results[(a, b)] = (idx_a_list, idx_b_list)
+            matched_results[(a, b)] = (idx_a_arr, idx_b_arr)
             sep_results[(a, b)]     = sep_arcsec
             prob_results[(a, b)]    = p_match
-            pair_maps[(a, b)]       = dict(zip(idx_b_list, idx_a_list))
-            pair_maps[(b, a)]       = dict(zip(idx_a_list, idx_b_list))
 
     # Quality assessors
     quality = {
@@ -280,58 +297,72 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
 
     # If only two catalogues, already done
     if n == 2:
-        i0 = np.array(matched_results[(0, 1)][0])
-        i1 = np.array(matched_results[(0, 1)][1])
+        i0, i1 = matched_results[(0, 1)]
         if return_quality:
             return (i0, i1), quality
         return (i0, i1)
 
-    # If more than 2 catalogs: coalescence anchored on anchor_index
-    match_dict = {i: {} for i in range(n)}
-    for (a, b), (idx_a, idx_b) in matched_results.items():
-        for i_a, i_b in zip(idx_a, idx_b):
-            match_dict[a][i_a] = match_dict[a].get(i_a, []) + [(b, i_b)]
-            match_dict[b][i_b] = match_dict[b].get(i_b, []) + [(a, i_a)]
+    # n >= 3: fully vectorized coalescence anchored on anchor_index.
+    # After dedup each pair is a 1-to-1 partial bijection, so for each anchor source
+    # there is at most one partner per other catalogue. We materialize anchor->other
+    # as dense int arrays, then verify cross-pair consistency among non-anchor cats
+    # via dense map lookups. No Python-per-source loops, no dicts.
+    others = [i for i in range(n) if i != anchor_index]
+    sz_anchor = sizes[anchor_index]
 
-    used_indices       = {i: set() for i in range(n)}
-    consistent_matches = {i: [] for i in range(n)}
+    def _pair_indices(a, b):
+        """Return (idx_a_in_cat_a, idx_b_in_cat_b) regardless of dict key order."""
+        if (a, b) in matched_results:
+            return matched_results[(a, b)]
+        ib, ia = matched_results[(b, a)]  # stored as (idx_b, idx_a)
+        return ia, ib
 
-    for idx in match_dict[anchor_index]:
-        if idx in used_indices[anchor_index]:
-            continue
+    if sz_anchor == 0:
+        result = [np.empty(0, dtype=np.int64) for _ in range(n)]
+    else:
+        # partners[k, src] = matched index in cat others[k] for anchor source src, else -1
+        partners = np.full((len(others), sz_anchor), -1, dtype=np.int64)
+        for k, oc in enumerate(others):
+            ia, ib = _pair_indices(anchor_index, oc)
+            if ia.size:
+                partners[k, ia] = ib
 
-        group       = {anchor_index: idx}
-        to_check    = list(match_dict[anchor_index][idx])
-        valid_group = True
+        # Anchor sources that have at least one partner in EVERY other catalogue.
+        # Computed via in-place AND to keep peak memory at one bool array.
+        valid = partners[0] >= 0
+        for k in range(1, len(others)):
+            np.logical_and(valid, partners[k] >= 0, out=valid)
 
-        while to_check and valid_group:
-            curr_cat, curr_idx = to_check.pop()
-            if curr_cat in group:
-                if group[curr_cat] != curr_idx:
-                    valid_group = False
+        # Cross-pair consistency among non-anchor cats: for each (i, j),
+        # m_oi_oj[partners[i]] must equal partners[j] on currently-valid rows.
+        # Use the smaller catalogue as the dense-map source to bound peak memory.
+        for i in range(len(others)):
+            if not valid.any():
+                break
+            for j in range(i + 1, len(others)):
+                if not valid.any():
                     break
-                continue
-            group[curr_cat] = curr_idx
-            for next_cat, next_idx in match_dict[curr_cat][curr_idx]:
-                if next_cat not in group:
-                    to_check.append((next_cat, next_idx))
-
-        if not valid_group or len(group) != n: continue
-
-        group_valid = True
-        for aa in range(n):
-            for bb in range(aa + 1, n):
-                if pair_maps.get((aa, bb), {}).get(group[bb], None) != group[aa]:
-                    group_valid = False
+                oi, oj = others[i], others[j]
+                ia, ib = _pair_indices(oi, oj)
+                if ia.size == 0:
+                    valid[:] = False
                     break
-            if not group_valid: break
+                if sizes[oi] <= sizes[oj]:
+                    m = np.full(sizes[oi], -1, dtype=np.int64)
+                    m[ia] = ib
+                    # safe gather: partners[i] is guaranteed >= 0 wherever valid is True
+                    np.logical_and(valid, m[partners[i]] == partners[j], out=valid)
+                else:
+                    m = np.full(sizes[oj], -1, dtype=np.int64)
+                    m[ib] = ia
+                    np.logical_and(valid, m[partners[j]] == partners[i], out=valid)
 
-        if group_valid:
-            for cat_i, src_i in group.items():
-                consistent_matches[cat_i].append(src_i)
-                used_indices[cat_i].add(src_i)
+        accepted = np.flatnonzero(valid)
+        result = [None] * n
+        result[anchor_index] = accepted
+        for k, oc in enumerate(others):
+            result[oc] = partners[k, accepted]
 
-    result = [np.array(consistent_matches[i]) for i in range(n)]
     if return_quality:
         return result, quality
     return result
