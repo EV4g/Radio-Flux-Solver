@@ -1,7 +1,8 @@
 import numpy as np
 from astropy.table import Table
 import copy
-from functions import sources_in_fits, get_pos_err_deg, get_beam_size
+from functions import sources_in_fits, get_pos_err_deg, get_beam_size, radec_to_xyz
+from scipy.spatial import cKDTree
 from pathlib import Path
 import bdsf
 
@@ -24,6 +25,9 @@ class Catalog:
         self.flux = self.e_flux = self.flux_unit = None
         self.ra = self.dec = self.e_ra = self.e_dec = None
         self.err_rad = None
+        
+        self._xyz  = None
+        self._tree = None
     
     def load(self):
         if self.table:
@@ -102,7 +106,23 @@ class Catalog:
         if self.e_ra  is not None: subset.e_ra  = self.e_ra[valid]
         if self.e_dec is not None: subset.e_dec = self.e_dec[valid]
         if self.err_rad is not None: subset.err_rad = self.err_rad[valid]
+        # Drop cached match arrays — ra/dec changed, so xyz/tree are now stale.
+        subset._xyz  = None
+        subset._tree = None
         return subset
+    
+    def precompute_match_arrays(self):
+        """Build the unit-sphere xyz vectors and KD-tree once so match_catalogs_2D
+        can reuse them across many calls. Should be called after load() on every catalog 
+        that will participate in cross-matching."""
+        if self.ra is None or len(self.ra) == 0:
+            self._xyz  = None
+            self._tree = None
+            return
+        if self._xyz is None:
+            self._xyz = radec_to_xyz(self.ra, self.dec)
+        if self._tree is None:
+            self._tree = cKDTree(self._xyz)
 
 class Catalog_set:
     """Registry of catalogs, accessible by name or as an ordered list."""
@@ -158,7 +178,7 @@ class Config:
         # load the data per catalog
         for i, cat in enumerate(self.catalogs):
             cat.load()
-        
+            
             # if reference file, remove all points outside of that
             if self.reference_file is not None:
                 valid = sources_in_fits(cat.ra, cat.dec, self.reference_file)
@@ -171,6 +191,10 @@ class Config:
                 self.anchor_catalog = next(c for c in self.catalogs if c.name == anchor_name)
             except StopIteration:
                 raise ValueError(f"Anchor_catalog '{anchor_name}' not found in config.catalogs")
+        
+        # Precompute xyz/tree for each catalog
+        for cat in self.catalogs:
+            cat.precompute_match_arrays()
 
 class Output:
     def __init__(self, spx=None, cur=None, snr=None, cor=None, flux=None, sep=None, pmatch=None, ncrowd=None, ra=None, dec=None):

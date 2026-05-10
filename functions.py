@@ -177,14 +177,20 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
     n = len(cat_list)
     use_errs = not thres_arc_override
 
-    # Precompute vectors and errors per catalog. When use_errs is False the entries are
-    # placeholder empty arrays (never indexed) — keeps the list element type uniform.
-    xyz_all = [radec_to_xyz(cat.ra, cat.dec) for cat in cat_list]
-    errs    = [cat.err_rad if use_errs else np.empty(0) for cat in cat_list]
+    # Precompute (or reuse cached) xyz vectors per catalog. When the same catalog is
+    # cross-matched repeatedly (e.g. an anchor used across many combos) the caller can
+    # set cat._xyz / cat._tree once up-front to avoid rebuilding on every call.
+    xyz_all = []
+    for cat in cat_list:
+        xyz = getattr(cat, '_xyz', None)
+        if xyz is None:
+            xyz = radec_to_xyz(cat.ra, cat.dec)
+        xyz_all.append(xyz)
+    errs = [cat.err_rad if use_errs else np.empty(0) for cat in cat_list]
 
     # Prebuild only the KD-trees we actually need: the smaller catalog of each pair is
     # always used as query points (not as a tree), so we skip building its tree unless
-    # crowding self-queries require it.
+    # crowding self-queries require it. Reuses cat._tree if the caller pre-built it.
     sizes = [len(xyz) for xyz in xyz_all]
     need_tree = [(crowd_radius_arc is not None) and s > 0 for s in sizes]
     for a in range(n):
@@ -192,7 +198,12 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
         for b in range(a + 1, n):
             if sizes[b] == 0: continue
             need_tree[a if sizes[a] >= sizes[b] else b] = True
-    trees = [cKDTree(xyz_all[i]) if need_tree[i] else None for i in range(n)]
+    trees = []
+    for i in range(n):
+        if not need_tree[i]:
+            trees.append(None); continue
+        cached = getattr(cat_list[i], '_tree', None)
+        trees.append(cached if cached is not None else cKDTree(xyz_all[i]))
 
     # Crowding (return_length=True returns counts directly — no list-of-lists allocation)
     crowd_counts = {}

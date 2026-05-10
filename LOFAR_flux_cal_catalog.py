@@ -150,7 +150,13 @@ output_width = len(str(len(all_combinations)))
 print(f"Found {len(all_combinations)} valid combinations")
 print("------------------------------------------------")
 
-outputs = Parallel(n_jobs=-1)(delayed(compute_flux_correction_factor)([config.catalogs[j] for j in combo], config, workers=1) for combo in all_combinations)
+#outputs = Parallel(n_jobs=-1)(delayed(compute_flux_correction_factor)([config.catalogs[j] for j in combo], config, workers=1) for combo in all_combinations)
+
+outputs = Parallel(n_jobs=-1, backend='threading')(
+    delayed(compute_flux_correction_factor)(
+        [config.catalogs[j] for j in combo], config
+    ) for combo in all_combinations
+)
 
 for i, (combo, out) in enumerate(zip(all_combinations, outputs)):
     local_cats = [config.catalogs[j] for j in combo]
