@@ -125,6 +125,16 @@ def radec_to_xyz(ra_deg, dec_deg):
     cd  = np.cos(dec)
     return np.column_stack([cd * np.cos(ra), cd * np.sin(ra), np.sin(dec)])
 
+def angsep_arcsec(ra1_deg, dec1_deg, ra2_deg, dec2_deg):
+    """Per-row angular separation in arcsec using the haversine formula.
+    Replacement for SkyCoord.separation(); faster because it skips astropy."""
+    r1 = np.deg2rad(ra1_deg);  d1 = np.deg2rad(dec1_deg)
+    r2 = np.deg2rad(ra2_deg);  d2 = np.deg2rad(dec2_deg)
+    sd = np.sin(0.5 * (d2 - d1))
+    sr = np.sin(0.5 * (r2 - r1))
+    a  = sd * sd + np.cos(d1) * np.cos(d2) * sr * sr
+    return np.rad2deg(2.0 * np.arcsin(np.sqrt(a))) * 3600.0
+
 def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, anchor_index=0, return_quality=False, thres_arc_override=False, workers=-1):
     """Fast n-catalogue cross-matcher with adaptive positional uncertainties,
     crowding detection, and per-pair quality metrics.
@@ -672,10 +682,10 @@ def solve_flux_scales_band(ratio_slice, weight_slice, normalize=True):
 
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
-def compute_flux_correction_factor(cats, config, debug=False, anchor_override=None, precomputed_indices=None, precomputed_quality=None):
+def compute_flux_correction_factor(cats, config, debug=False, anchor_override=None, precomputed_indices=None, precomputed_quality=None, workers=-1):
     # allow for pre-computed inputs, to skip match_catalogs_2D
     if precomputed_indices is None and precomputed_quality is None:
-        indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma, thres_arc_override=config.thres_arc_override, crowd_radius_arc=config.crowd_radius_arc)
+        indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma, thres_arc_override=config.thres_arc_override, crowd_radius_arc=config.crowd_radius_arc, workers=workers)
     else:
         indices = np.array(precomputed_indices)
         quality = np.array(precomputed_quality)
@@ -712,17 +722,18 @@ def compute_flux_correction_factor(cats, config, debug=False, anchor_override=No
     cats = [cat.create_subset(indices[index]) for index, cat in enumerate(cats)]
 
     # all pairwise separations, then take per-source maximum
-    coords = [SkyCoord(ra=cat.ra * u.deg, dec=cat.dec * u.deg) for cat in cats]
-    sig    = [np.rad2deg(cat.err_rad) * 3600 for cat in cats]   # arcsec per-source
+    sig = [np.rad2deg(cat.err_rad) * 3600 for cat in cats]   # arcsec per-source
 
-    # pair probability weighting
+    # pair probability weighting. Direct haversine + closed-form chi2 SF (df=2) avoid
+    # heavy SkyCoord.separation and scipy.stats dispatch on every matched pair.
     pair_seps = {}
     p_weight  = np.ones(len(cats[0].ra))
     n_pairs   = len(cats) * (len(cats) - 1) // 2
     for a, b in combinations(range(len(cats)), 2):
-        sep = coords[a].separation(coords[b]).arcsec
+        sep = angsep_arcsec(cats[a].ra, cats[a].dec, cats[b].ra, cats[b].dec)
         pair_seps[(a, b)] = sep
-        p_weight *= 1.0 - chi2.cdf((sep / np.hypot(sig[a], sig[b])) ** 2, df=2)
+        chi2_vals = (sep / np.hypot(sig[a], sig[b])) ** 2
+        p_weight *= np.exp(-0.5 * chi2_vals)
     p_weight = p_weight ** (1 / n_pairs) # geometric mean of probabilities as normalization
     
     # maximum separation of each matched pair
