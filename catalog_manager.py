@@ -184,9 +184,12 @@ class Config:
     def setup(self):
         # load the data per catalog
         def setup(self):
-            Parallel(n_jobs=-1, backend='threading')(
-                delayed(cat.load)() for cat in self.catalogs
-            )
+            from time import perf_counter
+            for i, cat in enumerate(self.catalogs):
+                t0 = perf_counter()
+                cat.load()
+                print(f"  {cat.name:14s} load+threshold: {(perf_counter()-t0):.2f}s ({len(cat.ra) if cat.ra is not None else 0:>8d} rows)")
+
             
             # if reference file, remove all points outside of that
             if self.reference_file is not None:
