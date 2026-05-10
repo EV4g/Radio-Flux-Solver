@@ -1,6 +1,5 @@
 import numpy as np
 from astropy.table import Table
-import copy
 from functions import sources_in_fits, get_pos_err_deg, get_beam_size, radec_to_xyz
 from scipy.spatial import cKDTree
 from pathlib import Path
@@ -100,13 +99,20 @@ class Catalog:
             
     
     def create_subset(self, valid):
-        subset = copy.deepcopy(self)
-        for attribute in ('flux', 'e_flux', 'ra', 'dec'):
-            setattr(subset, attribute, getattr(self, attribute)[valid])
-        if self.e_ra  is not None: subset.e_ra  = self.e_ra[valid]
-        if self.e_dec is not None: subset.e_dec = self.e_dec[valid]
-        if self.err_rad is not None: subset.err_rad = self.err_rad[valid]
-        # Drop cached match arrays — ra/dec changed, so xyz/tree are now stale.
+        """Return a new Catalog containing only rows selected by `valid`
+        (boolean mask or integer index array. Avoids copy or deepcopy"""
+        subset = self.__class__.__new__(self.__class__)
+        subset.__dict__.update(self.__dict__)  # shallow copy of every attribute
+        
+        # Re-bind every per-source array to an independent indexed copy.
+        for attr in ('flux', 'e_flux', 'ra', 'dec', 'e_ra', 'e_dec', 'err_rad'):
+            v = getattr(self, attr, None)
+            if v is not None:
+                setattr(subset, attr, v[valid])
+        
+        # Cached match arrays: __dict__.update copied them by reference, but
+        # they're stale (ra/dec just changed). Drop them so match_catalogs_2D
+        # rebuilds the tree on first use of this subset.
         subset._xyz  = None
         subset._tree = None
         return subset

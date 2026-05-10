@@ -819,9 +819,11 @@ def calculate_correction_factor_weight(output, config, sigma_cutoff=6):
 
 """Return median of an array with value weights"""
 def weighted_median(val, w):
+    # searchsorted on the cumulative weight avoids the O(N) bool-mask + indexed-array
+    # allocations that the previous "val[np.cumsum(w) >= w.sum()/2][0]" version did.
     idx = np.argsort(val)
-    val, w = val[idx], w[idx]
-    return float(val[np.cumsum(w) >= w.sum() / 2][0])
+    cw  = np.cumsum(w[idx])
+    return float(val[idx[np.searchsorted(cw, 0.5 * cw[-1])]])
 
 """Return biweight location statistic for determining the center of a distribution"""
 def biweight_location(arr1, arr2, arr3, weights=None, c=None, max_iter=30, tol=1e-9):
@@ -847,10 +849,11 @@ def biweight_location(arr1, arr2, arr3, weights=None, c=None, max_iter=30, tol=1
     
     # initial guess from simple weighted median
     mu = np.array([weighted_median(X[:, j], w) for j in range(3)])
-    
+
     # iterative re-weighted least-square loop
     for _ in range(max_iter):
-        # median absolute deviation
+        # median absolute deviation per axis (per-axis loop is more cache-friendly
+        # than batching to a (3, N) matrix at large N — the intermediates blow L3)
         mad   = np.array([weighted_median(np.abs(X[:, j] - mu[j]), w) for j in range(3)])
         scale = np.where(mad > 0, mad, 1.0)
         
