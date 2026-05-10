@@ -4,6 +4,7 @@ from functions import sources_in_fits, get_pos_err_deg, get_beam_size, radec_to_
 from scipy.spatial import cKDTree
 from pathlib import Path
 import bdsf
+from joblib import Parallel, delayed
 
 base_path = Path(__file__).resolve().parent
 
@@ -182,8 +183,10 @@ class Config:
         
     def setup(self):
         # load the data per catalog
-        for i, cat in enumerate(self.catalogs):
-            cat.load()
+        def setup(self):
+            Parallel(n_jobs=-1, backend='threading')(
+                delayed(cat.load)() for cat in self.catalogs
+            )
             
             # if reference file, remove all points outside of that
             if self.reference_file is not None:
