@@ -130,7 +130,7 @@ class Catalog:
         if self._xyz is None:
             self._xyz = radec_to_xyz(self.ra, self.dec)
         if self._tree is None:
-            self._tree = cKDTree(self._xyz)
+            self._tree = cKDTree(self._xyz, compact_nodes=False, balanced_tree=False)
 
 class Catalog_set:
     """Registry of catalogs, accessible by name or as an ordered list."""
