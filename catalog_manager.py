@@ -203,9 +203,7 @@ class Config:
             except StopIteration:
                 raise ValueError(f"Anchor_catalog '{anchor_name}' not found in config.catalogs")
 
-        # Parallel precompute: radec_to_xyz and cKDTree both release the GIL,
-        # so threading speeds this up without race risk. Mutations on the shared
-        # cat objects (setting cat._xyz, cat._tree) are visible to the main thread.
+        # parallel _xyz and _tree precompute
         t0 = perf_counter()
         Parallel(n_jobs=-1, backend='threading')(
             delayed(cat.precompute_match_arrays)() for cat in self.catalogs
