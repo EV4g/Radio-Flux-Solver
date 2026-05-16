@@ -187,6 +187,19 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
             xyz = radec_to_xyz(cat.ra, cat.dec)
         xyz_all.append(xyz)
     errs = [cat.err_rad if use_errs else np.empty(0) for cat in cat_list]
+    # Cached medians per catalog (computed once in precompute_match_arrays)
+    err_medians = [0.0] * n
+    if use_errs:
+        for i, cat in enumerate(cat_list):
+            m = getattr(cat, '_err_rad_median', None)
+            if m is None and errs[i].size:
+                m = float(np.median(errs[i]))
+                try:
+                    cat._err_rad_median = m
+                except AttributeError:
+                    pass
+            if m is not None:
+                err_medians[i] = float(m)
 
     # Prebuild only the KD-trees we actually need: the smaller catalog of each pair is
     # always used as query points (not as a tree), so we skip building its tree unless
@@ -236,12 +249,15 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
             # Always query smaller set against larger tree
             if len(xyz_a) >= len(xyz_b):
                 sub_xyz, sup_err, sub_err, tree_sup, normal = xyz_b, errs[a], errs[b], trees[a], True
+                sup_med, sub_med = err_medians[a], err_medians[b]
             else:
                 sub_xyz, sup_err, sub_err, tree_sup, normal = xyz_a, errs[b], errs[a], trees[b], False
+                sup_med, sub_med = err_medians[b], err_medians[a]
 
-            # Coarse search radius
+            # Coarse search radius (reuse cached medians; avoid redundant median work
+            # when the same catalog appears in many pairs)
             if use_errs:
-                sigma_pair   = np.hypot(np.median(sup_err), np.median(sub_err))
+                sigma_pair   = np.hypot(sup_med, sub_med)
                 query_radius = 2.0 * np.sin(nsigma * sigma_pair / 2.0)
             else:
                 query_radius = 2.0 * np.sin(np.deg2rad(thres_arc / 3600.0) / 2.0)
@@ -755,7 +771,7 @@ def compute_flux_correction_factor(cats, config, debug=False, anchor_override=No
     uncorrected_flux_error = cats[anchor_index].e_flux
     
     # setup a spectral curvature array, will remain theoretical value if not fitted for
-    spectral_curvature = np.zeros_like(uncorrected_flux) + config.spectral_curvature_theory
+    spectral_curvature = np.full_like(uncorrected_flux, config.spectral_curvature_theory)
     
     # calculate spectral indices based on available data
     match len(cats):

@@ -29,7 +29,8 @@ class Catalog:
         
         self._xyz  = None
         self._tree = None
-    
+        self._err_rad_median = None  # cached median(err_rad), reused per pair by match_catalogs_2D
+
     def load(self):
         if self.table:
             if self.ra is not None: return # already loaded
@@ -114,23 +115,31 @@ class Catalog:
         
         # Cached match arrays: __dict__.update copied them by reference, but
         # they're stale (ra/dec just changed). Drop them so match_catalogs_2D
-        # rebuilds the tree on first use of this subset.
-        subset._xyz  = None
-        subset._tree = None
+        # rebuilds the tree on first use of this subset. Err-median is also
+        # potentially stale (different rows selected).
+        subset._xyz             = None
+        subset._tree            = None
+        subset._err_rad_median  = None
         return subset
-    
+
     def precompute_match_arrays(self):
-        """Build the unit-sphere xyz vectors and KD-tree once so match_catalogs_2D
-        can reuse them across many calls. Should be called after load() on every catalog 
-        that will participate in cross-matching."""
+        """Build the unit-sphere xyz vectors, KD-tree, and cached err_rad median
+        once so match_catalogs_2D can reuse them.
+
+        Tree options balanced_tree=False, compact_nodes=False, make building 
+        much faster at the cost of minimal increase in query time.
+        """
         if self.ra is None or len(self.ra) == 0:
-            self._xyz  = None
-            self._tree = None
+            self._xyz             = None
+            self._tree            = None
+            self._err_rad_median  = None
             return
         if self._xyz is None:
             self._xyz = radec_to_xyz(self.ra, self.dec)
         if self._tree is None:
-            self._tree = cKDTree(self._xyz)
+            self._tree = cKDTree(self._xyz, balanced_tree=False, compact_nodes=False)
+        if self._err_rad_median is None and self.err_rad is not None:
+            self._err_rad_median = float(np.median(self.err_rad))
 
 class Catalog_set:
     """Registry of catalogs, accessible by name or as an ordered list."""
