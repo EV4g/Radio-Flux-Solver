@@ -422,14 +422,9 @@ def calculate_contour_statistics(x, y, c, logx=False, logy=False, n=1000):
     sigma_y = (n_data**(-0.2) * np.std(y)) / ((y.max() - y.min()) / n)
     Zi = gaussian_filter(H.T, sigma=(sigma_y, sigma_x))
 
-    # Minimizer starting point
+    # Peak from the smoothed weighted-histogram grid
     peak_idx         = np.argmax(Zi)
     peak_x0, peak_y0 = Xi.ravel()[peak_idx], Yi.ravel()[peak_idx]
-
-    # KDE on subset
-    kde    = gaussian_kde(np.vstack([x, y]), weights=c)
-    result = minimize(lambda p: -kde(p)[0], x0=[peak_x0, peak_y0], method='Nelder-Mead', options={'xatol': 1e-5, 'fatol': 1e-10})
-    peak_x0, peak_y0 = result.x
 
     if logx: Xi = 10**Xi; peak_x0 = 10**peak_x0
     if logy: Yi = 10**Yi; peak_y0 = 10**peak_y0
