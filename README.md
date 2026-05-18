@@ -1,5 +1,5 @@
-# LOFAR and MeerKAT
+# Radio Flux Solver
 
-Repo for SNR analysis with LOFAR and MeerKAT
+Code for calibrating Radio catalog or image flux based on reference data.
 
-Also contains code for flux calibration based on other available catalogs
+Takes care of finding, matching, and calibrating sources based on spectral index analysis. 
