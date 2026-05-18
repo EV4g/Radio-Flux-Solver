@@ -1,1 +1,0 @@
-wget -r -np -nd -A "*.I.fits.gz" https://www.cv.nrao.edu/vlss/MAPS/
