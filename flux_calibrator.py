@@ -112,9 +112,9 @@ test_config = Config(spectral_damping_factor = 5,
                      )
 
 #### Parameters
-DEBUG_MODE       = False
-INSPECTION_PLOTS = True
-SAVE_PLOTS       = False
+DEBUG_MODE       = False    # per matched combination correction-factor plots
+INSPECTION_PLOTS = True     # additional ra-dec plots
+SAVE_PLOTS       = False    # save plots to disk
 
 #### setup
 config = lofar_dr3_config#test_config
@@ -208,12 +208,15 @@ ras, decs, correction_factor, spectral_index, spectral_curvature, fitted_flux, s
 mspx, mcor, mcur = biweight_location(spectral_index, np.log10(correction_factor), spectral_curvature, weights=total_weighting_factor)
 mcor = 10**mcor
 
-plot_statistics(spectral_index, correction_factor, total_weighting_factor, logy=True,
+plot_statistics(spectral_index, correction_factor, total_weighting_factor,
+                logy=True, 
+                save=SAVE_PLOTS,
                 xlabel=r"Fitted spectral index $\alpha$",
                 ylabel="Correction factor",
                 title="Correction factor as function of fitted spectral index\nall catalogs")
 
 plot_statistics(spectral_index, spectral_curvature, total_weighting_factor,
+                save=SAVE_PLOTS,
                 xlabel=r"Fitted spectral index $\alpha$",
                 ylabel="Spectral curvature",
                 title="Spectral curvature as function of fitted spectral index\nall catalogs")
