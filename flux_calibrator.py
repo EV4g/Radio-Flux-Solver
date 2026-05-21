@@ -112,15 +112,16 @@ test_config = Config(spectral_damping_factor = 5,
                      )
 
 #### Parameters
-debug = False
-inspection_plots = False
+DEBUG_MODE       = False
+INSPECTION_PLOTS = True
+SAVE_PLOTS       = False
 
 #### setup
 config = lofar_dr3_config#test_config
 config.setup()
 output = Output()
 
-if debug:    
+if DEBUG_MODE:
     # cutdown catalog plot
     for cat in config.catalogs:
         plt.hist(np.log10(cat.flux), alpha=0.6, bins=25, label=cat.name)
@@ -148,7 +149,7 @@ all_combinations = get_combinations(config.catalogs, size=3, required_index=conf
 output_width = len(str(len(all_combinations)))
 
 print(f"Found {len(all_combinations)} valid combinations")
-print("------------------------------------------------")
+print("--------------------------------------------------------")
 
 # multithread the main flux correction factor loop
 outputs = Parallel(n_jobs=-1, backend='threading')(
@@ -164,7 +165,7 @@ for i, (combo, out) in enumerate(zip(all_combinations, outputs)):
         output.add(*out)
         spx, curv, snr, cor, flux, max_sep, p_weight, n_crowd, ra, dec = out
         
-        if debug:
+        if DEBUG_MODE:
             # compare spectral_index_theory assumption versus fitted spectral indices
             plt.scatter(flux, cor, c=spx)
             plt.yscale('log')
@@ -173,6 +174,7 @@ for i, (combo, out) in enumerate(zip(all_combinations, outputs)):
             plt.xlabel(f"{config.anchor_catalog.name} fitted flux (Jy)")
             plt.ylabel("Correction factor")
             plt.title(f"{config.anchor_catalog.name} "+r"flux, $\alpha$=-"+f"{config.spectral_index_theory} vs fitted")
+            if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_flux.png")
             plt.show()
             
             # compare fitted spectral index with correction factor
@@ -184,6 +186,7 @@ for i, (combo, out) in enumerate(zip(all_combinations, outputs)):
             plt.ylabel("Flux correction factor")
             plt.xlabel(r"Spectral index $\alpha$")
             plt.title("Flux correction as function of spectral index")
+            if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_spx.png")
             plt.show()
         
     else:
@@ -215,14 +218,14 @@ plot_statistics(spectral_index, spectral_curvature, total_weighting_factor,
                 ylabel="Spectral curvature",
                 title="Spectral curvature as function of fitted spectral index\nall catalogs")
 
-print("------------------------------------------------")
+print("--------------------------------------------------------")
 print(f"Spectral index: {mspx:.3f}, correction factor: {mcor:.3f}, curvature: {mcur:.3f}, total matches: {len(correction_factor)}")
-print("------------------------------------------------")
+print("--------------------------------------------------------")
 
 ##########################
 #### inspection plots ####
 ##########################
-if inspection_plots:
+if INSPECTION_PLOTS:
     #### position dependant correction factor
     #o = np.argsort(correction_factor)
     f = (correction_factor > 1e-2) & (correction_factor < 1e2)
@@ -230,6 +233,7 @@ if inspection_plots:
     plt.colorbar(label='Correction factor')
     plt.ylabel("DEC (deg)")
     plt.xlabel("RA (deg)")
+    if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_pos.png")
     plt.show()
     
     #### correction factor as function of total weighting factor
@@ -241,6 +245,7 @@ if inspection_plots:
     plt.ylabel("Correction factor")
     plt.xlabel("Total weighting factor")
     plt.legend()
+    if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_weightfac.png")
     plt.show()
     
     #### correction factor as function of ra and dec separately
@@ -266,6 +271,7 @@ if inspection_plots:
     ax2.legend()
     fig.suptitle('Weighted correction factor')
     plt.tight_layout()
+    if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_weightfac_radec_dual.png")
     plt.show()
     
     #### correction factor as function of [ra, dec] in 2D
@@ -292,6 +298,7 @@ if inspection_plots:
     
     fig.suptitle('Correction factor map')
     plt.tight_layout()
+    if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_pos_2d_hist.png")
     plt.show()
 
     #### plot point densities per catalog
