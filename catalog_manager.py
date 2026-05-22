@@ -142,9 +142,11 @@ class Catalog:
             self._err_rad_median = float(np.median(self.err_rad))
 
 class Catalog_set:
+    registry = {}
     """Registry of catalogs, accessible by name or as an ordered list."""
     def __init__(self, catalogs):
         self._registry = {cat.name: cat for cat in catalogs}
+        Catalog_set.registry.update(self._registry)
 
     def __getattr__(self, name):
         reg = object.__getattribute__(self, '_registry')
@@ -169,8 +171,10 @@ class Config:
                  crowd_radius_arc              = None,
                  minimum_frequency_spacing     = None,
                  catalogs                      = None,
+                 catalog_names                 = None,
                  reference_file                = None,
                  anchor_catalog                = None,
+                 anchor_catalog_name           = None,
                  thres_arc                     = 2,
                  thres_arc_override            = False,
                  spectral_curvature_theory     = 0):
@@ -183,15 +187,40 @@ class Config:
         self.nsigma                     = nsigma
         self.crowd_radius_arc           = crowd_radius_arc
         self.minimum_frequency_spacing  = minimum_frequency_spacing
-        self.catalogs                   = list(catalogs) if catalogs is not None else []
-        self.catalog_names              = [cat.name for cat in self.catalogs] if catalogs is not None else []
-        self.reference_file             = reference_file
-        self.anchor_catalog             = anchor_catalog
-        self.anchor_catalog_index       = self.catalogs.index(anchor_catalog) if catalogs is not None else None
+
+        if catalogs is not None:
+            self.catalogs = list(catalogs)
+            self.catalog_names = [cat.name for cat in self.catalogs]
+        else:
+            self.catalogs = []
+            self.catalog_names = list(catalog_names) if catalog_names is not None else []
+        
+        if anchor_catalog is not None:
+            self.anchor_catalog = anchor_catalog
+            self.anchor_catalog_name = anchor_catalog.name
+            self.anchor_catalog_index = self.catalogs.index(anchor_catalog) if catalogs is not None else None
+        else:
+            self.anchor_catalog = None
+            self.anchor_catalog_name = anchor_catalog_name
+            self.anchor_catalog_index = None
+        
+        self.reference_file = reference_file
         self.thres_arc_override         = thres_arc_override
         self.spectral_curvature_theory  = spectral_curvature_theory
         
     def setup(self):
+        # Resolve catalog names to Catalog objects from the global registry
+        if self.catalog_names and not self.catalogs:
+            self.catalogs = [Catalog_set.registry[name] for name in self.catalog_names]
+        
+        # Resolve anchor catalog name to object
+        if self.anchor_catalog_name is not None and self.anchor_catalog is None:
+            self.anchor_catalog = Catalog_set.registry[self.anchor_catalog_name]
+        
+        # Recompute anchor_catalog_index now that self.catalogs is resolved
+        if self.anchor_catalog is not None:
+            self.anchor_catalog_index = self.catalogs.index(self.anchor_catalog)
+        
         # load the data per catalog
         for i, cat in enumerate(self.catalogs):
             t0 = perf_counter()
