@@ -105,10 +105,12 @@ test_config = Config(spectral_damping_factor = 5,
                      )
 
 #### Parameters
-DEBUG_MODE       = False    # per matched combination correction-factor plots
-INSPECTION_PLOTS = True     # additional ra-dec plots
-SAVE_PLOTS       = False    # save plots to disk
-COMBINATION_SIZE = 3        # number of catalogs to combine per cross-match step [2,3,4]
+DEBUG_MODE          = False # per matched combination correction-factor plots
+INSPECTION_PLOTS    = True  # additional ra-dec plots
+SAVE_PLOTS          = False # save plots to disk
+COMBINATION_SIZE    = 3     # number of catalogs to combine per cross-match step [2,3,4]
+HIGHER_ORDER_SIMPLE         = False # (wip) instead of using higher order cross-matches to fit spectral index, assume theory and average resulting fluxes
+HIGHER_ORDER_SIMPLE_SPACING = None  # (wip) set higher-order-simple minimum frequency spacing above which it is SIMPLE=True
 
 #### setup
 config = test_config
@@ -190,9 +192,9 @@ print(f"Flux compute done at {(perf_counter() - start):.2f} seconds")
 
 output.concatenate()
 total_weighting_factor = calculate_correction_factor_weight(output, config)
-mask = total_weighting_factor > 0
-output.apply_mask(mask)
-total_weighting_factor = total_weighting_factor[mask]
+weight_mask = total_weighting_factor > 0
+output.apply_mask(weight_mask)
+total_weighting_factor = total_weighting_factor[weight_mask]
 
 ras, decs, correction_factor, spectral_index, spectral_curvature, fitted_flux, signal_to_noise, max_separation, point_probability, crowding_parameter = output.return_values()
 
@@ -223,14 +225,15 @@ print("--------------------------------------------------------")
 #### inspection plots ####
 ##########################
 if INSPECTION_PLOTS:
-    #### position dependant correction factor
-    #o = np.argsort(correction_factor)
-    f = (correction_factor > 1e-2) & (correction_factor < 1e2)
-    plt.scatter(ras[f], decs[f], c=correction_factor[f], s=2, norm='log')
-    plt.colorbar(label='Correction factor')
+    mask = (correction_factor > 0.1) & (correction_factor < 10) #(correction_factor != np.nan)
+
+    #### weight density as function of location
+    fig, ax = plt.subplots(figsize=(7.5, 5))
+    plt.hist2d(ras, decs, weights=total_weighting_factor/np.max(total_weighting_factor), bins=(75, 50), cmap='Blues')
+    plt.colorbar(label='Cummulative weight / max weight')
     plt.ylabel("DEC (deg)")
     plt.xlabel("RA (deg)")
-    if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_pos.png")
+    if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_weight_density_vs_pos.png")
     plt.show()
     
     #### correction factor as function of total weighting factor
@@ -245,25 +248,20 @@ if INSPECTION_PLOTS:
     if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_weightfac.png")
     plt.show()
     
-    #### correction factor as function of ra and dec separately
-    mask = (correction_factor < 10) & (correction_factor > 0.1)
-    
-    cmean = np.average(correction_factor[mask], weights=total_weighting_factor[mask])
-    cstd = np.std(correction_factor[mask])
-    cmin, cmax = max(0.1, cmean - 3 * cstd), cmean + 3 * cstd
-    mask &= (correction_factor > cmin) & (correction_factor < cmax) & (total_weighting_factor > 0)
-    
+    #### correction factor as function of ra and dec separately    
     dec_c, dec_mn, dec_std = weighted_bin_stats(decs[mask], correction_factor[mask], total_weighting_factor[mask], n_bins=50)
     ra_c,  ra_mn,  ra_std  = weighted_bin_stats(ras[mask],  correction_factor[mask], total_weighting_factor[mask], n_bins=50)
     
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
     ax1.plot(dec_c, dec_mn, color='steelblue', lw=2, label='Weighted mean')
     ax1.fill_between(dec_c, dec_mn - dec_std, dec_mn + dec_std, alpha=0.25, color='steelblue', label='±1σ (weighted)')
+    ax1.axhline(1, ls='--', color='black', alpha=0.7)
     ax1.set_xlabel('Dec (deg)')
     ax1.set_ylabel('Correction factor')
     ax1.legend()
     ax2.plot(ra_c, ra_mn, color='tomato', lw=2, label='Weighted mean')
     ax2.fill_between(ra_c, ra_mn - ra_std, ra_mn + ra_std, alpha=0.25, color='tomato', label='±1σ (weighted)')
+    ax2.axhline(1, ls='--', color='black', alpha=0.7)
     ax2.set_xlabel('RA (deg)')
     ax2.legend()
     fig.suptitle('Weighted correction factor')
@@ -272,36 +270,57 @@ if INSPECTION_PLOTS:
     plt.show()
     
     #### correction factor as function of [ra, dec] in 2D
-    ra_c2, dec_c2, wmean_2d, wstd_2d = weighted_bin_stats_2d(
-        ras[mask], decs[mask],
-        correction_factor[mask],
-        total_weighting_factor[mask],
-        n_bins=400, m_bins=100
-    )
+    fig, ax = plt.subplots(figsize=(12, 5))
+
+    n_pts_2d = np.sum(mask)
+    if n_pts_2d < 5000:
+        # voronoi plot
+        from scipy.spatial import Voronoi
+        from matplotlib.patches import Polygon
+
+        points_2d = np.column_stack([ras[mask], decs[mask]])
+        values_2d = correction_factor[mask]
+
+        vor = Voronoi(points_2d)
+
+        ra_min, ra_max = ras[mask].min(), ras[mask].max()
+        dec_min, dec_max = decs[mask].min(), decs[mask].max()
+
+        log_values = np.log10(values_2d)
+        max_log_dev = np.max(np.abs(log_values))
+
+        for point_idx, region_idx in enumerate(vor.point_region):
+            region = vor.regions[region_idx]
+            if -1 in region or len(region) == 0:
+                continue
+            vertices = vor.vertices[region]
+            vertices = np.clip(vertices, [ra_min, dec_min], [ra_max, dec_max])
+
+            log_val = log_values[point_idx]
+            color_norm = 0.5 + (log_val / (2 * max_log_dev))
+            color_norm = np.clip(color_norm, 0, 1)
+
+            poly = Polygon(vertices, facecolor=plt.cm.RdYlGn_r(color_norm), edgecolor='gray', linewidth=0.2, alpha=0.7)
+            ax.add_patch(poly)
+
+        scatter = ax.scatter(ras[mask], decs[mask], c=log_values, cmap='RdYlGn_r', vmin=-max_log_dev, vmax=max_log_dev, s=30, edgecolors='black', linewidth=0.5, zorder=5)
+        cbar = fig.colorbar(scatter, ax=ax, label='log10(Correction factor)')
+
+    else:
+        # hexbin fallback
+        log_cf = np.log10(correction_factor[mask])
+        max_log_dev = np.max(np.abs(log_cf))
+
+        hb = ax.hexbin(ras[mask], decs[mask], C=log_cf, gridsize=200, cmap='RdYlGn_r', vmin=-max_log_dev, vmax=max_log_dev, alpha=0.8)
+        cbar = fig.colorbar(hb, ax=ax, label='log10(Correction factor)')
     
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
-    
-    im1 = ax1.pcolormesh(ra_c2, dec_c2, wmean_2d.T, cmap='RdYlGn_r', shading='auto')
-    fig.colorbar(im1, ax=ax1, label='Correction factor')
-    ax1.set_xlabel('RA (deg)')
-    ax1.set_ylabel('Dec (deg)')
-    ax1.set_title('Weighted mean')
-    
-    im2 = ax2.pcolormesh(ra_c2, dec_c2, wstd_2d.T, cmap='plasma', shading='auto')
-    fig.colorbar(im2, ax=ax2, label='Std')
-    ax2.set_xlabel('RA (deg)')
-    ax2.set_ylabel('Dec (deg)')
-    ax2.set_title('Weighted ±1σ')
-    
-    fig.suptitle('Correction factor map')
-    plt.tight_layout()
-    if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_pos_2d_hist.png")
+    ax.set_xlim(ras[mask].min(), ras[mask].max())
+    ax.set_ylim(decs[mask].min(), decs[mask].max())
+    ax.set_xlabel('RA (deg)')
+    ax.set_ylabel('Dec (deg)')
+    ax.set_title('Correction factor map')
+    if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_pos_2d.png")
     plt.show()
 
-    #### plot point densities per catalog
-    # for cat in config.catalogs:
-    #     plt.hist2d(-cat.ra, cat.dec, bins=(400, 100))
-    #     plt.title(cat.name)
-    #     plt.show()
 
 print(f"Done at: {(perf_counter() - start):.2f} s")
