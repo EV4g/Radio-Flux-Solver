@@ -237,6 +237,7 @@ if INSPECTION_PLOTS:
     plt.show()
     
     #### correction factor as function of total weighting factor
+    fig, ax = plt.subplots(figsize=(6, 6))
     plt.scatter(total_weighting_factor, correction_factor, s=1.5, alpha=0.2)
     plt.yscale('log')
     plt.xscale('log')
