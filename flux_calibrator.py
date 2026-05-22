@@ -115,6 +115,7 @@ test_config = Config(spectral_damping_factor = 5,
 DEBUG_MODE       = False    # per matched combination correction-factor plots
 INSPECTION_PLOTS = True     # additional ra-dec plots
 SAVE_PLOTS       = False    # save plots to disk
+COMBINATION_SIZE = 3        # number of catalogs to combine per cross-match step [2,3,4]
 
 #### setup
 config = lofar_dr3_config#test_config
@@ -142,10 +143,10 @@ if DEBUG_MODE:
 
 print(f"Setup done at: {(perf_counter() - start):.2f} s")
 
-###################################################
-#### catalog three-way combination auto-looper ####
-###################################################
-all_combinations = get_combinations(config.catalogs, size=3, required_index=config.anchor_catalog_index, minimum_spacing=config.minimum_frequency_spacing)
+#########################################
+#### catalog combination auto-looper ####
+#########################################
+all_combinations = get_combinations(config.catalogs, size=COMBINATION_SIZE, required_index=config.anchor_catalog_index, minimum_spacing=config.minimum_frequency_spacing)
 output_width = len(str(len(all_combinations)))
 
 print(f"Found {len(all_combinations)} valid combinations")
@@ -311,47 +312,3 @@ if INSPECTION_PLOTS:
     #     plt.show()
 
 print(f"Done at: {(perf_counter() - start):.2f} s")
-
-
-###################################################
-#### catalog four-way combination auto-looper ####
-###################################################
-# output_quad = Output()
-
-# all_combinations = get_combinations(config.catalogs, size=3, required_index=config.anchor_catalog_index, minimum_spacing=config.minimum_frequency_spacing)
-# output_width = len(str(len(all_combinations)))
-
-# outputs = Parallel(n_jobs=-1)(delayed(compute_flux_correction_factor)([config.catalogs[j] for j in combo], config) for combo in all_combinations)
-
-# for i, (combo, out) in enumerate(zip(all_combinations, outputs)):
-#     local_cats = [config.catalogs[j] for j in combo]
-
-#     if out is not None:
-#         print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",f"Matches: {len(out[0])}")
-        
-#         output.add(*out)
-        
-#         if debug:
-#             # compare -0.7 assumption versus fitted spectral indices
-#             plt.scatter(output.fitted_flux, output.correction_factor, c=output.spectral_index)
-#             plt.yscale('log')
-#             plt.xscale('log')
-#             plt.colorbar(label = r"Spectral index $\alpha$")
-#             plt.xlabel(f"{config.anchor_catalog.name} fitted flux (Jy)")
-#             plt.ylabel("Correction factor")
-#             plt.title(f"{config.anchor_catalog.name} "+r"flux, $\alpha$=-0.7 vs fitted")
-#             plt.show()
-            
-#             # compare fitted spectral index with correction factor
-#             plt.scatter(output.spectral_index, output.correction_factor, c=output.fitted_flux, norm='log')
-#             plt.yscale('log')
-#             plt.axvline(-0.7, ls='--', c='k')
-#             plt.axhline(1, ls='--', c='k')
-#             plt.colorbar(label='Flux (Jy)')
-#             plt.ylabel("Flux correction factor")
-#             plt.xlabel(r"Spectral index $\alpha$")
-#             plt.title("Flux correction as function of spectral index")
-#             plt.show()
-        
-#     else:
-#         print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]","Matches:", colored("None", "yellow"))
