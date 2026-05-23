@@ -24,15 +24,15 @@ start = perf_counter()
 
 #### all available catalogs
 all_catalogs = Catalog_set([
-    Catalog("/catalogs/vlssr/vlssr_clean.fits",              50e6,   "50m",   scale=1),
-    Catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits", 100e6,  "100m",  scale=1),
-    Catalog("/catalogs/tgss/tgss_clean.fits",                200e6,  "200m",  scale=1),
-    Catalog("/catalogs/gleam_300/gleam_300_clean.fits",      300e6,  "300m",  scale=1),
-    Catalog("/catalogs/wenss/wenss_clean.fits",              400e6,  "400m",  scale=1),
-    Catalog("/catalogs/racs/racs_low_clean.fits",            500e6,  "500m",  scale=1),
-    Catalog("/catalogs/racs/racs_mid_clean.fits",            1000e6, "1000m", scale=1),
-    Catalog("/catalogs/racs/racs_high_clean.fits",           1500e6, "1500m", scale=1),
-    Catalog("/catalogs/nvss/nvss_clean.fits",                2000e6, "2000m", scale=1),
+    Catalog("catalogs/vlssr/vlssr_clean.fits",              50e6,   "50m",   scale=1),
+    Catalog("catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits", 100e6,  "100m",  scale=1),
+    Catalog("catalogs/tgss/tgss_clean.fits",                200e6,  "200m",  scale=1),
+    Catalog("catalogs/gleam_300/gleam_300_clean.fits",      300e6,  "300m",  scale=1),
+    Catalog("catalogs/wenss/wenss_clean.fits",              400e6,  "400m",  scale=1),
+    Catalog("catalogs/racs/racs_low_clean.fits",            500e6,  "500m",  scale=1),
+    Catalog("catalogs/racs/racs_mid_clean.fits",            1000e6, "1000m", scale=1),
+    Catalog("catalogs/racs/racs_high_clean.fits",           1500e6, "1500m", scale=1),
+    Catalog("catalogs/nvss/nvss_clean.fits",                2000e6, "2000m", scale=1),
     ])
 
 #### available configurations

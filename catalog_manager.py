@@ -6,13 +6,23 @@ from pathlib import Path
 import bdsf
 from joblib import Parallel, delayed
 from time import perf_counter
-        
-base_path = Path(__file__).resolve().parent
+
+_PROJECT_ROOT = Path(__file__).resolve().parent
+
+def resolve_catalog_path(path: str | Path) -> Path:
+    p = Path(path)
+    if p.is_absolute() and p.parent.exists():
+        return p.resolve()
+    clean = str(p).lstrip("/") if p.is_absolute() else str(p)
+    return (_PROJECT_ROOT / clean).resolve()
+
+def resolve_glob(pattern: str) -> list[Path]:
+    return sorted(_PROJECT_ROOT.glob(pattern))
 
 # wrapper class for incoming Table data
 class Catalog:
     def __init__(self, path=None, freq_hz=None, name=None, flux_lim=0, scale=1, table=True):
-        self.path      = base_path / path.lstrip("/") if path is not None else None
+        self.path      = resolve_catalog_path(path) if path is not None else None
         self.dir       = self.path.parent if self.path is not None else None
         self.path_stem = self.path.stem if self.path is not None else None
         self.freq      = freq_hz    # central frequency
@@ -77,7 +87,7 @@ class Catalog:
                 outdir='/tmp'
             )
             
-            image_catalog_path = f"{self.dir}/{self.path_stem}_catalog.fits"
+            image_catalog_path = self.dir / f"{self.path_stem}_catalog.fits"
             image.write_catalog(outfile=image_catalog_path, catalog_type='srl', format='fits', clobber=True)
             image_catalog = Table.read(image_catalog_path)
 
@@ -204,7 +214,7 @@ class Config:
             self.anchor_catalog_name = anchor_catalog_name
             self.anchor_catalog_index = None
         
-        self.reference_file = reference_file
+        self.reference_file = resolve_catalog_path(reference_file) if reference_file is not None else None
         self.thres_arc_override         = thres_arc_override
         self.spectral_curvature_theory  = spectral_curvature_theory
         

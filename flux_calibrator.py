@@ -1,8 +1,6 @@
 import warnings
 import numpy as np
 import matplotlib.pyplot as plt
-import glob
-import os
 #from tqdm import tqdm
 from functions import plot_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d
 from functions import compute_flux_correction_factor, calculate_correction_factor_weight, biweight_location
@@ -21,54 +19,54 @@ start = perf_counter()
 
 #### all currently implemented survey catalogs
 all_catalogs = Catalog_set([
-    Catalog("/catalogs/vlssr/vlssr_clean.fits",                73.8e6,     "vlssr",      scale=1.2008),
-    Catalog("/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",   144.6e6,    "lofar_dr3",  scale=1.0466),
-    Catalog("/catalogs/tgss/tgss_clean.fits",                  150e6,      "tgss",       scale=1.1158),
-    Catalog("/catalogs/gleam_x_gp/gleam_x_gp_clean.fits",      200e6,      "gleam_xgp",  scale=1.0716),
-    Catalog("/catalogs/gleam_300/gleam_300_clean.fits",        300e6,      "gleam_300",  scale=1.1578),
-    Catalog("/catalogs/wenss/wenss_clean.fits",                325e6,      "wenss",      scale=1.0426),
-    Catalog("/catalogs/racs/racs_low_gal_clean.fits",          887.5e6,    "racs_gal",   scale=0.9068),  # the galactic portion of the racs-low survey
-    Catalog("/catalogs/racs/racs_low_clean.fits",              887.5e6,    "racs_low",   scale=0.8852),  # the rest of the racs-low survey
-    Catalog("/catalogs/apertif/apertif_clean.fits",            1355e6,     "apertif",    scale=0.9624),
-    Catalog("/catalogs/meerkat/meerkat_clean.fits",            1359.7e6,   "meerkat",    scale=0.8525),
-    Catalog("/catalogs/racs/racs_mid_clean.fits",              1367.5e6,   "racs_mid",   scale=0.9430),
-    Catalog("/catalogs/nvss/nvss_clean.fits",                  1400e6,     "nvss",       scale=1),
-    Catalog("/catalogs/racs/racs_high_clean.fits",             1655.5e6,   "racs_high",  scale=0.9860),
+    Catalog("catalogs/vlssr/vlssr_clean.fits",                73.8e6,     "vlssr",      scale=1.2008),
+    Catalog("catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",   144.6e6,    "lofar_dr3",  scale=1.0466),
+    Catalog("catalogs/tgss/tgss_clean.fits",                  150e6,      "tgss",       scale=1.1158),
+    Catalog("catalogs/gleam_x_gp/gleam_x_gp_clean.fits",      200e6,      "gleam_xgp",  scale=1.0716),
+    Catalog("catalogs/gleam_300/gleam_300_clean.fits",        300e6,      "gleam_300",  scale=1.1578),
+    Catalog("catalogs/wenss/wenss_clean.fits",                325e6,      "wenss",      scale=1.0426),
+    Catalog("catalogs/racs/racs_low_gal_clean.fits",          887.5e6,    "racs_gal",   scale=0.9068),  # the galactic portion of the racs-low survey
+    Catalog("catalogs/racs/racs_low_clean.fits",              887.5e6,    "racs_low",   scale=0.8852),  # the rest of the racs-low survey
+    Catalog("catalogs/apertif/apertif_clean.fits",            1355e6,     "apertif",    scale=0.9624),
+    Catalog("catalogs/meerkat/meerkat_clean.fits",            1359.7e6,   "meerkat",    scale=0.8525),
+    Catalog("catalogs/racs/racs_mid_clean.fits",              1367.5e6,   "racs_mid",   scale=0.9430),
+    Catalog("catalogs/nvss/nvss_clean.fits",                  1400e6,     "nvss",       scale=1),
+    Catalog("catalogs/racs/racs_high_clean.fits",             1655.5e6,   "racs_high",  scale=0.9860),
 ])
 
 #### catalogs based on pointings or cutouts
 pointing_catalogs = Catalog_set([
-    Catalog("/data/raw/catalogs/avgtest-MFS-image_pbcor_catalog.fits",  1284e6,     "meerkat_L_cat",  scale=1),       # meerkat L-band
-    Catalog("/catalogs/lofar/lofar_sources_pipeline.fits",              144.6e6,    "lofar",          scale=1),       # LOFAR P282+00
-    Catalog("/catalogs/other/cygnus_clean.fits",                        336e6,      "cygnus",         scale=1),       # vla cygnus region
-    Catalog("/data/raw/catalogs/lofar_cygnus_6arcsec_catalog.fits",     144.6e6,    "cygnus_6",       scale=1),       # lofar cygnus region 6"
-    Catalog("/data/raw/catalogs/lofar_cygnus_20arcsec_catalog.fits",    144.6e6,    "cygnus_20",      scale=1),       # lofar cygnus region 20"
-    Catalog("/data/raw/catalogs/lofar_cygnus_53arcsec_catalog.fits",    144.6e6,    "cygnus_53",      scale=1),       # lofar cygnus region 53"
-    Catalog("/data/raw/catalogs/lofar_cygnus_53arcsec_int_catalog.fits",144.6e6,    "P312+31",        scale=1),       # lofar cygnus region 53" int
+    Catalog("data/raw/catalogs/avgtest-MFS-image_pbcor_catalog.fits",  1284e6,     "meerkat_L_cat",  scale=1),       # meerkat L-band
+    Catalog("catalogs/lofar/lofar_sources_pipeline.fits",              144.6e6,    "lofar",          scale=1),       # LOFAR P282+00
+    Catalog("catalogs/other/cygnus_clean.fits",                        336e6,      "cygnus",         scale=1),       # vla cygnus region
+    Catalog("data/raw/catalogs/lofar_cygnus_6arcsec_catalog.fits",     144.6e6,    "cygnus_6",       scale=1),       # lofar cygnus region 6"
+    Catalog("data/raw/catalogs/lofar_cygnus_20arcsec_catalog.fits",    144.6e6,    "cygnus_20",      scale=1),       # lofar cygnus region 20"
+    Catalog("data/raw/catalogs/lofar_cygnus_53arcsec_catalog.fits",    144.6e6,    "cygnus_53",      scale=1),       # lofar cygnus region 53"
+    Catalog("data/raw/catalogs/lofar_cygnus_53arcsec_int_catalog.fits",144.6e6,    "P312+31",        scale=1),       # lofar cygnus region 53" int
 ])
 
 #### catalgos based on manual .fits files
 manual_catalogs = Catalog_set([
-    Catalog("/data/raw/avgtest-MFS-image_pbcor.fits",          1284e6,     "meerkat_L-avgm",      scale=1, table=False),
-#    Catalog("/data/raw/test-MFS-image_pbcor.fits",             1284e6,     "meerkat-L-band",      scale=1, table=False),
-#    Catalog("/data/raw/lofar_cygnus_6arcsec.fits",             144.6e6,    "lofar_cygnus_6",      scale=1, table=False),
-#    Catalog("/data/raw/lofar_cygnus_20arcsec.fits",            144.6e6,    "lofar_cygnus_20",     scale=1, table=False),
-#    Catalog("/data/raw/lofar_cygnus_53arcsec.fits",            144.6e6,    "lofar_cygnus_53",     scale=1, table=False),
-#    Catalog("/data/raw/P312+31_6arcsec.fits",                  144.6e6,    "P312+31",             scale=1, table=False),
-#    Catalog("/data/raw/lofar_cygnus_53arcsec_int.fits",        144.6e6,    "lofar_cygnus_53_int", scale=1, table=False),
+    Catalog("data/raw/avgtest-MFS-image_pbcor.fits",          1284e6,     "meerkat_L-avgm",      scale=1, table=False),
+#    Catalog("data/raw/test-MFS-image_pbcor.fits",             1284e6,     "meerkat-L-band",      scale=1, table=False),
+#    Catalog("data/raw/lofar_cygnus_6arcsec.fits",             144.6e6,    "lofar_cygnus_6",      scale=1, table=False),
+#    Catalog("data/raw/lofar_cygnus_20arcsec.fits",            144.6e6,    "lofar_cygnus_20",     scale=1, table=False),
+#    Catalog("data/raw/lofar_cygnus_53arcsec.fits",            144.6e6,    "lofar_cygnus_53",     scale=1, table=False),
+#    Catalog("data/raw/P312+31_6arcsec.fits",                  144.6e6,    "P312+31",             scale=1, table=False),
+#    Catalog("data/raw/lofar_cygnus_53arcsec_int.fits",        144.6e6,    "lofar_cygnus_53_int", scale=1, table=False),
 ])
 
 #### available configurations
 lofar_dr3_config = Config(spectral_damping_factor = 5,
-                          snr_lower_limit = 7,
-                          nsigma = 2.5,
-                          minimum_points = 3,
-                          crowd_radius_arc = None,
-                          minimum_frequency_spacing = 0,
-                          catalog_names = ["racs_gal", "racs_low", "racs_mid", "racs_high", "meerkat", "vlssr", "tgss", "gleam_300", "gleam_xgp", "nvss", "wenss", "lofar_dr3", "apertif"],
-                          reference_file = None,
-                          anchor_catalog_name = "lofar_dr3",
-                          )
+                           snr_lower_limit = 7,
+                           nsigma = 2.5,
+                           minimum_points = 3,
+                           crowd_radius_arc = None,
+                           minimum_frequency_spacing = 0,
+                           catalog_names = ["racs_gal", "racs_low", "racs_mid", "racs_high", "meerkat", "vlssr", "tgss", "gleam_300", "gleam_xgp", "nvss", "wenss", "lofar_dr3", "apertif"],
+                           reference_file = None,
+                           anchor_catalog_name = "lofar_dr3",
+                           )
 
 default_config = Config(spectral_damping_factor = 5,
                         snr_lower_limit = 7,
@@ -77,7 +75,7 @@ default_config = Config(spectral_damping_factor = 5,
                         crowd_radius_arc = None,
                         minimum_frequency_spacing = 0,
                         catalog_names = ["racs_gal", "meerkat", "tgss", "gleam_300", "gleam_xgp", "lofar"],
-                        reference_file = np.sort(glob.glob(os.getcwd()+"/data/lofar/*.fits"))[0],
+                        reference_file = None,
                         anchor_catalog_name = "lofar",
                         )
 
@@ -88,7 +86,7 @@ cygnus_config = Config(spectral_damping_factor = 5,
                        crowd_radius_arc = None,
                        minimum_frequency_spacing = 0,
                        catalog_names = ["racs_low", "vlssr", "tgss", "gleam_300", "nvss", "wenss", "lofar_dr3", "cygnus"],
-                       reference_file = np.sort(glob.glob(os.getcwd()+"/data/other/*.fits"))[0],
+                       reference_file = None,
                        anchor_catalog_name = "cygnus",
                        )
 
@@ -100,7 +98,7 @@ test_config = Config(spectral_damping_factor = 5,
                      crowd_radius_arc = None,
                      minimum_frequency_spacing = 0,#50e6,
                      catalog_names = ["vlssr", "tgss", "gleam_300", "gleam_xgp", "wenss", "racs_low", "nvss", "racs_mid", "racs_high", "apertif", "meerkat_L_cat"],
-                     reference_file = os.getcwd()+"/data/raw/avgtest-MFS-image_pbcor.fits",
+                     reference_file = "data/raw/avgtest-MFS-image_pbcor.fits",
                      anchor_catalog_name = "meerkat_L_cat",
                      )
 
