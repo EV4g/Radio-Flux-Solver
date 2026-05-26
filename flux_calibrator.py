@@ -107,8 +107,6 @@ DEBUG_MODE          = False # per matched combination correction-factor plots
 INSPECTION_PLOTS    = True  # additional ra-dec plots
 SAVE_PLOTS          = False # save plots to disk
 COMBINATION_SIZE    = 3     # number of catalogs to combine per cross-match step [2,3,4]
-HIGHER_ORDER_SIMPLE         = False # (wip) instead of using higher order cross-matches to fit spectral index, assume theory and average resulting fluxes
-HIGHER_ORDER_SIMPLE_SPACING = None  # (wip) set higher-order-simple minimum frequency spacing above which it is SIMPLE=True
 
 #### setup
 config = test_config

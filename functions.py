@@ -485,7 +485,7 @@ def fits_to_png(fits_path, output_path, hdu_index=0, vmin=None, vmax=None, cmap=
     plt.imsave(output_path, data, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
 
 """Return indices of catalog of all unique, non-double, <size> combinations with the optional condition f[i] < f[i+1]"""
-def get_combinations(cats, size=3, required_index=None, skip_index=None, only_sorted=True, minimum_spacing=0):
+def get_combinations(cats, size=3, required_index=None, skip_index=None, only_sorted=True, minimum_spacing=0, maximum_spacing=np.inf):
     freqs = [cat.freq for cat in cats]
     indexed = sorted(enumerate(zip(freqs, cats)), key=lambda x: x[1][0])
     
@@ -499,6 +499,7 @@ def get_combinations(cats, size=3, required_index=None, skip_index=None, only_so
 
         if (freqs_c != sorted(freqs_c)) and only_sorted:        continue
         if np.any(np.diff(sorted(freqs_c)) < minimum_spacing):  continue
+        if np.any(np.diff(sorted(freqs_c)) > maximum_spacing):  continue
         if required and not required.issubset(indices):         continue
         if skip     and any(i in skip for i in indices):        continue
 
@@ -705,7 +706,7 @@ def solve_flux_scales_band(ratio_slice, weight_slice, normalize=True):
 
 """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
 which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
-def compute_flux_correction_factor(cats, config, debug=False, anchor_override=None, precomputed_indices=None, precomputed_quality=None, workers=-1):
+def compute_flux_correction_factor(cats, config, anchor_override=None, precomputed_indices=None, precomputed_quality=None, workers=-1):
     # allow for pre-computed inputs, to skip match_catalogs_2D
     if precomputed_indices is None and precomputed_quality is None:
         indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma, thres_arc_override=config.thres_arc_override, crowd_radius_arc=config.crowd_radius_arc, workers=workers)
@@ -766,28 +767,36 @@ def compute_flux_correction_factor(cats, config, debug=False, anchor_override=No
     uncorrected_flux = cats[anchor_index].flux
     uncorrected_flux_error = cats[anchor_index].e_flux
     
-    # setup a spectral curvature array, will remain theoretical value if not fitted for
+    # setup spectral index and curvature arrays, will remain theoretical value if not fitted for
     spectral_curvature = np.full_like(uncorrected_flux, config.spectral_curvature_theory)
-    
-    # calculate spectral indices based on available data
-    match len(cats):
-        case 2:
-            spectral_indices = np.ones_like(cats[0].flux) * config.spectral_index_theory
-            flux_ref = cats[other_index[0]].flux
-            freq_ref = cats[other_index[0]].freq
-        case 3:
-            spectral_indices = get_spectral_index(cats[other_index[0]].flux, cats[other_index[1]].flux, cats[other_index[0]].freq, cats[other_index[1]].freq, fallback_value=np.nan)
-            flux_ref = cats[other_index[0]].flux
-            freq_ref = cats[other_index[0]].freq
-        case 4:
-            scale, spectral_indices, spectral_curvature, freq_ref = fit_log_parabola([cats[i].freq for i in other_index], [cats[i].flux for i in other_index])
-            flux_ref = np.exp(scale)
-        case _:
-            print(colored(f"Case N={len(cats)} not yet implemented", "light_red"))
-            return None
+    spectral_indices   = np.full_like(uncorrected_flux, config.spectral_index_theory)
+
+    # simple case is equal to the N=2 case
+    # use theory value and extrapolate. For N>2, average those values per source --> (flux_ref, freq_ref) are each lists
+    if config.higher_order_simple or len(cats) == 2:
+        flux_ref = [cats[idx].flux for idx in other_index]
+        freq_ref = [cats[idx].freq for idx in other_index]
+    else:
+        # calculate spectral indices based on available data
+        match len(cats):
+            case 3:
+                # use the other two data points to calculate a spectral index
+                # extrapolated flux line goes through both ref points, thus (flux_ref, freq_ref) can be single values
+                spectral_indices = get_spectral_index(cats[other_index[0]].flux, cats[other_index[1]].flux, cats[other_index[0]].freq, cats[other_index[1]].freq, fallback_value=np.nan)
+                flux_ref = [cats[other_index[0]].flux]
+                freq_ref = [cats[other_index[0]].freq]
+            case 4:
+                # use the other three data points to calculate spectral index and spectral curvature
+                # # extrapolated flux line goes through all ref points, thus (flux_ref, freq_ref) can be single values
+                scale, spectral_indices, spectral_curvature, freq_ref = fit_log_parabola([cats[i].freq for i in other_index], [cats[i].flux for i in other_index])
+                flux_ref = [np.exp(scale)]
+                freq_ref = [freq_ref]
+            case _:
+                print(colored(f"Case N={len(cats)} not yet implemented", "light_red"))
+                return None
 
     # fit is based on measuring between two points, linear is average between assuming theoretical extragalactic value for both
-    extrapolated_flux_fit = predict_flux(cats[anchor_index].freq, freq_ref, flux_ref, spectral_indices, spectral_curvature)
+    extrapolated_flux_fit = np.average([predict_flux(cats[anchor_index].freq, freq, flux, spectral_indices, spectral_curvature) for (freq, flux) in zip(freq_ref, flux_ref)], axis=0)
     
     # correction factor is the factor to multiply the anchor_catalog flux by to get what it should be, based on the other catalogs
     correction_factor = extrapolated_flux_fit / uncorrected_flux

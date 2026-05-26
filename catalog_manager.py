@@ -179,7 +179,8 @@ class Config:
                  minimum_points                = 2,
                  nsigma                        = 3,
                  crowd_radius_arc              = None,
-                 minimum_frequency_spacing     = None,
+                 minimum_frequency_spacing     = 0,
+                 maximum_frequency_spacing     = np.inf,
                  catalogs                      = None,
                  catalog_names                 = None,
                  reference_file                = None,
@@ -187,17 +188,20 @@ class Config:
                  anchor_catalog_name           = None,
                  thres_arc                     = 2,
                  thres_arc_override            = False,
-                 spectral_curvature_theory     = 0):
+                 spectral_curvature_theory     = 0,
+                 higher_order_simple           = False):
         
-        self.thres_arc                  = thres_arc
-        self.spectral_damping_factor    = spectral_damping_factor
-        self.snr_lower_limit            = snr_lower_limit
-        self.minimum_points             = minimum_points
-        self.spectral_index_theory      = spectral_index_theory
-        self.nsigma                     = nsigma
-        self.crowd_radius_arc           = crowd_radius_arc
-        self.minimum_frequency_spacing  = minimum_frequency_spacing
-
+        self.thres_arc                 = thres_arc
+        self.spectral_damping_factor   = spectral_damping_factor
+        self.snr_lower_limit           = snr_lower_limit
+        self.minimum_points            = minimum_points
+        self.spectral_index_theory     = spectral_index_theory
+        self.nsigma                    = nsigma
+        self.crowd_radius_arc          = crowd_radius_arc
+        self.minimum_frequency_spacing = minimum_frequency_spacing if minimum_frequency_spacing is not None else 0
+        self.maximum_frequency_spacing = maximum_frequency_spacing if maximum_frequency_spacing is not None else np.inf
+        self.higher_order_simple       = higher_order_simple
+        
         if catalogs is not None:
             self.catalogs = list(catalogs)
             self.catalog_names = [cat.name for cat in self.catalogs]
