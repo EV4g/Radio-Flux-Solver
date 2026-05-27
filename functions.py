@@ -110,7 +110,7 @@ def get_beam_size(file):
     header = hdul[0].header
     try:
         return header['BMAJ'], header['BMIN'], header['BPA']
-    except:
+    except KeyError:
         return header['CLEANBMJ'], header['CLEANBMN'], header['CLEANBPA']
     return None
 

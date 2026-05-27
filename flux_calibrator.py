@@ -109,7 +109,7 @@ SAVE_PLOTS          = False # save plots to disk
 COMBINATION_SIZE    = 3     # number of catalogs to combine per cross-match step [2,3,4]
 
 #### setup
-config = test_config
+config = lofar_dr3_config
 config.setup()
 output = Output()
 
