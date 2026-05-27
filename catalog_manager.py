@@ -23,6 +23,8 @@ def resolve_glob(pattern: str) -> list[Path]:
 class Catalog:
     def __init__(self, path=None, freq_hz=None, name=None, flux_lim=0, scale=1, table=True):
         self.path      = resolve_catalog_path(path) if path is not None else None
+        if self.path is None: raise ValueError(f"Valid catalog path is required\nPath: {path} is not valid")
+        
         self.dir       = self.path.parent if self.path is not None else None
         self.path_stem = self.path.stem if self.path is not None else None
         self.freq      = freq_hz    # central frequency
