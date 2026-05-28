@@ -175,8 +175,13 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
     """
 
     n = len(cat_list)
-    use_errs = not thres_arc_override
 
+    # if thres_arc_override == True, then we ignore the X^2 error matching
+    # if any of the err_rad indices are None (improper catalog), also ignore them
+    missing_errors = any(cat.err_rad is None for cat in cat_list)
+    use_errs = not (thres_arc_override or missing_errors)
+    if missing_errors: print(colored("Warning: some catalogs have missing error values, ignoring X^2 error matching", "red"))
+    
     # Precompute (or reuse cached) xyz vectors per catalog. When the same catalog is
     # cross-matched repeatedly (e.g. an anchor used across many combos) the caller can
     # set cat._xyz / cat._tree once up-front to avoid rebuilding on every call.

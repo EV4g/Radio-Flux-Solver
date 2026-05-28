@@ -25,8 +25,8 @@ class Catalog:
         self.path      = resolve_catalog_path(path) if path is not None else None
         if self.path is None: raise ValueError(f"Valid catalog path is required\nPath: {path} is not valid")
         
-        self.dir       = self.path.parent if self.path is not None else None
-        self.path_stem = self.path.stem if self.path is not None else None
+        self.dir       = self.path.parent
+        self.path_stem = self.path.stem
         self.freq      = freq_hz    # central frequency
         self.freq_unit = 'Hz'       # frequency unit
         self.name      = name       # survey name
@@ -70,7 +70,7 @@ class Catalog:
                 self.e_ra[np.where(np.isnan(self.e_ra))] = 0   # sanitize NaNs
                 self.e_dec[np.where(np.isnan(self.e_dec))] = 0 # sanitize NaNs
                 self.err_rad = np.deg2rad(get_pos_err_deg(self))
-            except Exception:
+            except KeyError:
                 self.e_ra = self.e_dec = self.err_rad = None
 
         # if not table, then we assume it to be an image
