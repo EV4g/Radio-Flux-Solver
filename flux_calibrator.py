@@ -32,6 +32,7 @@ all_catalogs = Catalog_set([
     Catalog("catalogs/racs/racs_mid_clean.fits",              1367.5e6,   "racs_mid",   scale=0.9430),
     Catalog("catalogs/nvss/nvss_clean.fits",                  1400e6,     "nvss",       scale=1),
     Catalog("catalogs/racs/racs_high_clean.fits",             1655.5e6,   "racs_high",  scale=0.9860),
+    Catalog("catalogs/vlass/vlass_clean.fits",                3000e6,     "vlass",      scale=1),       # vlass
 ])
 
 #### catalogs based on pointings or cutouts
@@ -63,7 +64,7 @@ lofar_dr3_config = Config(spectral_damping_factor = 5,
                            minimum_points = 3,
                            crowd_radius_arc = None,
                            minimum_frequency_spacing = 0,
-                           catalog_names = ["racs_gal", "racs_low", "racs_mid", "racs_high", "meerkat", "vlssr", "tgss", "gleam_300", "gleam_xgp", "nvss", "wenss", "lofar_dr3", "apertif"],
+                           catalog_names = ["racs_gal", "racs_low", "racs_mid", "racs_high", "meerkat", "vlssr", "tgss", "gleam_300", "gleam_xgp", "nvss", "wenss", "lofar_dr3", "apertif", "vlass"],
                            reference_file = None,
                            anchor_catalog_name = "lofar_dr3",
                            )
@@ -97,9 +98,10 @@ test_config = Config(spectral_damping_factor = 5,
                      minimum_points = 10,
                      crowd_radius_arc = None,
                      minimum_frequency_spacing = 0,#50e6,
-                     catalog_names = ["vlssr", "tgss", "gleam_300", "gleam_xgp", "wenss", "racs_low", "nvss", "racs_mid", "racs_high", "apertif", "meerkat_L_cat"],
-                     reference_file = "data/raw/avgtest-MFS-image_pbcor.fits",
-                     anchor_catalog_name = "meerkat_L_cat",
+                     catalog_names = ["vlssr", "tgss", "gleam_300", "gleam_xgp", "wenss", "racs_low", "nvss", "racs_mid", "racs_high", "apertif", "vlass"],
+                     #catalog_names = ['vlssr', "vlass", "nvss"],
+                     reference_file = None,
+                     anchor_catalog_name = "lofar_dr3",
                      )
 
 #### Parameters

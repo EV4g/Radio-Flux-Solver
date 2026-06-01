@@ -19,8 +19,34 @@
 # cygnus    = Table.read(os.getcwd()+'/catalogs/other/cygnus_sources.fits')
 # racs_mid  = Table.read(os.getcwd()+"/catalogs/racs/RACS-mid1_sources.xml")
 # racs_high = Table.read(os.getcwd()+"/catalogs/racs/RACS-high_sources.xml")
-
 # apertif   = Table.read(os.getcwd()+"/catalogs/apertif/apertif.fits")
+# vlass = Table.read(os.getcwd()+"/catalogs/vlass/vlass.fit")
+
+#### vlass
+# vlass.rename_column("RAJ2000", "ra")
+# vlass.rename_column("DEJ2000", "dec")
+# vlass.rename_column("e_RAJ2000", "e_ra")
+# vlass.rename_column("e_DEJ2000", "e_dec")
+# vlass.rename_column("Ftot", "flux_jy")
+# vlass.rename_column("e_Ftot", "e_flux_jy")
+
+# if str(vlass['flux_jy'].unit) == 'mJy':
+#     vlass['flux_jy'] *= 1e-3
+#     vlass['e_flux_jy'] *= 1e-3
+#     vlass['flux_jy'].unit = 'Jy'
+#     vlass['e_flux_jy'].unit = 'Jy'
+
+# if str(vlass['e_ra'].unit) == 'arcsec':
+#     vlass['e_ra'] /= 3600
+#     vlass['e_ra'].unit = 'deg'
+# if str(vlass['e_dec'].unit) == 'arcsec':
+#     vlass['e_dec'] /= 3600
+#     vlass['e_dec'].unit = 'deg'
+
+# assert str(vlass['ra'].unit) == 'deg' and str(vlass['dec'].unit) == 'deg'
+# assert str(vlass['flux_jy'].unit) == 'Jy' and str(vlass['e_flux_jy'].unit) == 'Jy'
+
+# vlass.write("vlass_clean.fits", overwrite=True)
 
 #### apertif
 # apertif.rename_column("RAICRS", "ra")
