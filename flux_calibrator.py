@@ -19,20 +19,22 @@ start = perf_counter()
 
 #### all currently implemented survey catalogs
 all_catalogs = Catalog_set([
-    Catalog("catalogs/vlssr/vlssr_clean.fits",                73.8e6,     "vlssr",      scale=1.2008),
-    Catalog("catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",   144.6e6,    "lofar_dr3",  scale=1.0466),
-    Catalog("catalogs/tgss/tgss_clean.fits",                  150e6,      "tgss",       scale=1.1158),
-    Catalog("catalogs/gleam_x_gp/gleam_x_gp_clean.fits",      200e6,      "gleam_xgp",  scale=1.0716),
-    Catalog("catalogs/gleam_300/gleam_300_clean.fits",        300e6,      "gleam_300",  scale=1.1578),
-    Catalog("catalogs/wenss/wenss_clean.fits",                325e6,      "wenss",      scale=1.0426),
-    Catalog("catalogs/racs/racs_low_gal_clean.fits",          887.5e6,    "racs_gal",   scale=0.9068),  # the galactic portion of the racs-low survey
-    Catalog("catalogs/racs/racs_low_clean.fits",              887.5e6,    "racs_low",   scale=0.8852),  # the rest of the racs-low survey
-    Catalog("catalogs/apertif/apertif_clean.fits",            1355e6,     "apertif",    scale=0.9624),
+    Catalog("catalogs/vlssr/vlssr_clean.fits",                73.8e6,     "vlssr",      scale=1.1733),
+    Catalog("catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",   144.6e6,    "lofar_dr3",  scale=1.0564),
+    Catalog("catalogs/tgss/tgss_clean.fits",                  150e6,      "tgss",       scale=1.1125),
+    Catalog("catalogs/gleam_x_gp/gleam_x_gp_clean.fits",      200e6,      "gleam_xgp",  scale=1.1337),
+    Catalog("catalogs/gleam_300/gleam_300_clean.fits",        300e6,      "gleam_300",  scale=1.1337),
+    Catalog("catalogs/wenss/wenss_clean.fits",                325e6,      "wenss",      scale=1.0484),
+    Catalog("catalogs/vcss/vcss_clean.fits",                  340e6,      "vcss",       scale=0.9815),
+    Catalog("catalogs/txs/txs_clean.fits",                    365e6,      "txs",        scale=0.9524),
+    Catalog("catalogs/racs/racs_low_gal_clean.fits",          887.5e6,    "racs_gal",   scale=0.8879),  # the galactic portion of the racs-low survey
+    Catalog("catalogs/racs/racs_low_clean.fits",              887.5e6,    "racs_low",   scale=0.8879),  # the rest of the racs-low survey
+    Catalog("catalogs/apertif/apertif_clean.fits",            1355e6,     "apertif",    scale=0.9765),
     Catalog("catalogs/meerkat/meerkat_clean.fits",            1359.7e6,   "meerkat",    scale=0.8525),
-    Catalog("catalogs/racs/racs_mid_clean.fits",              1367.5e6,   "racs_mid",   scale=0.9430),
+    Catalog("catalogs/racs/racs_mid_clean.fits",              1367.5e6,   "racs_mid",   scale=0.9486),
     Catalog("catalogs/nvss/nvss_clean.fits",                  1400e6,     "nvss",       scale=1),
-    Catalog("catalogs/racs/racs_high_clean.fits",             1655.5e6,   "racs_high",  scale=0.9860),
-    Catalog("catalogs/vlass/vlass_clean.fits",                3000e6,     "vlass",      scale=1),       # vlass
+    Catalog("catalogs/racs/racs_high_clean.fits",             1655.5e6,   "racs_high",  scale=0.9901),
+    Catalog("catalogs/vlass/vlass_clean.fits",                3000e6,     "vlass",      scale=0.9915),  # vlass
 ])
 
 #### catalogs based on pointings or cutouts
@@ -64,7 +66,7 @@ lofar_dr3_config = Config(spectral_damping_factor = 5,
                            minimum_points = 3,
                            crowd_radius_arc = None,
                            minimum_frequency_spacing = 0,
-                           catalog_names = ["racs_gal", "racs_low", "racs_mid", "racs_high", "meerkat", "vlssr", "tgss", "gleam_300", "gleam_xgp", "nvss", "wenss", "lofar_dr3", "apertif", "vlass"],
+                           catalog_names = ["racs_gal", "racs_low", "racs_mid", "racs_high", "meerkat", "vlssr", "tgss", "gleam_300", "gleam_xgp", "nvss", "wenss", "lofar_dr3", "apertif", "vlass", "vcss"],
                            reference_file = None,
                            anchor_catalog_name = "lofar_dr3",
                            )
@@ -98,10 +100,10 @@ test_config = Config(spectral_damping_factor = 5,
                      minimum_points = 10,
                      crowd_radius_arc = None,
                      minimum_frequency_spacing = 0,#50e6,
-                     catalog_names = ["vlssr", "tgss", "gleam_300", "gleam_xgp", "wenss", "racs_low", "nvss", "racs_mid", "racs_high", "apertif", "vlass"],
+                     catalog_names = ["vlssr", "tgss", "gleam_300", "gleam_xgp", "wenss", "racs_low", "nvss", "racs_mid", "racs_high", "apertif", "vlass", "vcss"],
                      #catalog_names = ['vlssr', "vlass", "nvss"],
                      reference_file = None,
-                     anchor_catalog_name = "lofar_dr3",
+                     anchor_catalog_name = "vcss",
                      )
 
 #### Parameters
