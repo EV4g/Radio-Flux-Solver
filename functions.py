@@ -538,19 +538,24 @@ def weighted_bin_stats(x, y, w, n_bins=200):
     centers = 0.5 * (edges[:-1] + edges[1:])
     mn  = np.full(n_bins, np.nan)
     std = np.full(n_bins, np.nan)
+    sem = np.full(n_bins, np.nan)
 
     for i in range(n_bins):
         in_bin = (x >= edges[i]) & (x < edges[i + 1])
         if in_bin.sum() <= 2: continue
         y_b, w_b = y[in_bin], w[in_bin]
         w_sum = w_b.sum()
+        w2_sum = (w_b**2).sum()
         if w_sum == 0: continue
         wmean    = np.dot(w_b, y_b) / w_sum
+        var      = np.dot(w_b, (y_b - wmean) ** 2) / w_sum
         mn[i]    = wmean
-        std[i]   = np.sqrt(np.dot(w_b, (y_b - wmean) ** 2) / w_sum)
-
+        std[i]   = np.sqrt(var)
+        n_eff    = w_sum**2 / w2_sum
+        sem[i]   = np.sqrt(var / n_eff)
+        
     ok = ~np.isnan(mn)
-    return centers[ok], mn[ok], std[ok]
+    return centers[ok], mn[ok], std[ok], sem[ok]
 
 """"""
 def weighted_bin_stats_2d(x, y, z, w, n_bins=50, m_bins=50):
@@ -578,6 +583,14 @@ def weighted_bin_stats_2d(x, y, z, w, n_bins=50, m_bins=50):
     wstd = np.sqrt(wstd) 
 
     return 0.5*(xe[:-1]+xe[1:]), 0.5*(ye[:-1]+ye[1:]), wmean, wstd
+
+def weighted_percentile(data, weights, percentiles):
+    """Weighted percentiles via CDF interpolation"""
+    sorter = np.argsort(data)
+    data_sorted = data[sorter]
+    weights_sorted = weights[sorter]
+    cdf = np.cumsum(weights_sorted) / weights_sorted.sum()
+    return np.interp(percentiles, cdf, data_sorted)
 
 """Given arrays of RA/Dec (degrees) and a FITS file, return a boolean array of which sources fall within the image footprint."""
 def sources_in_fits(ra_deg, dec_deg, fn):

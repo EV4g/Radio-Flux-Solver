@@ -2,7 +2,7 @@ import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 #from tqdm import tqdm
-from functions import plot_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d
+from functions import plot_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d, predict_flux
 from functions import compute_flux_correction_factor, calculate_correction_factor_weight, biweight_location
 from time import perf_counter
 from catalog_manager import Catalog, Config, Catalog_set, Output
@@ -225,7 +225,8 @@ print("--------------------------------------------------------")
 #### inspection plots ####
 ##########################
 if INSPECTION_PLOTS:
-    mask = (correction_factor > 0.1) & (correction_factor < 10) #(correction_factor != np.nan)
+    min_cor, max_cor = 0.25, 4.0
+    mask = (correction_factor > min_cor) & (correction_factor < max_cor) #(correction_factor != np.nan)
 
     #### weight density as function of location
     fig, ax = plt.subplots(figsize=(7.5, 5))
@@ -235,6 +236,7 @@ if INSPECTION_PLOTS:
     plt.xlabel("RA (deg)")
     if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_weight_density_vs_pos.png")
     plt.show()
+
     
     #### correction factor as function of total weighting factor
     fig, ax = plt.subplots(figsize=(6, 6))
@@ -248,20 +250,24 @@ if INSPECTION_PLOTS:
     plt.legend()
     if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_weightfac.png")
     plt.show()
+
     
     #### correction factor as function of ra and dec separately    
-    dec_c, dec_mn, dec_std = weighted_bin_stats(decs[mask], correction_factor[mask], total_weighting_factor[mask], n_bins=50)
-    ra_c,  ra_mn,  ra_std  = weighted_bin_stats(ras[mask],  correction_factor[mask], total_weighting_factor[mask], n_bins=50)
+    dec_c, dec_mn, dec_std, dec_sem = weighted_bin_stats(decs[mask], correction_factor[mask], total_weighting_factor[mask], n_bins=50)
+    ra_c,  ra_mn,  ra_std,  ra_sem  = weighted_bin_stats(ras[mask],  correction_factor[mask], total_weighting_factor[mask], n_bins=50)
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
     ax1.plot(dec_c, dec_mn, color='steelblue', lw=2, label='Weighted mean')
-    ax1.fill_between(dec_c, dec_mn - dec_std, dec_mn + dec_std, alpha=0.25, color='steelblue', label='±1σ (weighted)')
+    ax1.fill_between(dec_c, dec_mn - dec_std, dec_mn + dec_std, alpha=0.10, color='steelblue', label='±1σ (weighted)')
+    ax1.fill_between(dec_c, dec_mn - dec_sem, dec_mn + dec_sem, alpha=0.35, color='steelblue', label='±1μ_err')
     ax1.axhline(1, ls='--', color='black', alpha=0.7)
     ax1.set_xlabel('Dec (deg)')
     ax1.set_ylabel('Correction factor')
     ax1.legend()
+
     ax2.plot(ra_c, ra_mn, color='tomato', lw=2, label='Weighted mean')
-    ax2.fill_between(ra_c, ra_mn - ra_std, ra_mn + ra_std, alpha=0.25, color='tomato', label='±1σ (weighted)')
+    ax2.fill_between(ra_c, ra_mn - ra_std, ra_mn + ra_std, alpha=0.10, color='tomato', label='±1σ (weighted)')
+    ax2.fill_between(ra_c, ra_mn - ra_sem, ra_mn + ra_sem, alpha=0.35, color='tomato', label='±1μ_err')
     ax2.axhline(1, ls='--', color='black', alpha=0.7)
     ax2.set_xlabel('RA (deg)')
     ax2.legend()
@@ -269,10 +275,14 @@ if INSPECTION_PLOTS:
     plt.tight_layout()
     if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_weightfac_radec_dual.png")
     plt.show()
+
     
     #### correction factor as function of [ra, dec] in 2D
     fig, ax = plt.subplots(figsize=(12, 5))
 
+    real_ticks = np.geomspace(min_cor, max_cor, 5, dtype=float)
+    log_ticks  = np.log10(real_ticks).tolist()
+    
     n_pts_2d = np.sum(mask)
     if n_pts_2d < 5000:
         # voronoi plot
@@ -314,6 +324,9 @@ if INSPECTION_PLOTS:
 
         hb = ax.hexbin(ras[mask], decs[mask], C=log_cf, gridsize=200, cmap='RdYlGn_r', vmin=-max_log_dev, vmax=max_log_dev, alpha=0.8)
         cbar = fig.colorbar(hb, ax=ax, label='log10(Correction factor)')
+
+    cbar.set_ticks(log_ticks)
+    cbar.set_ticklabels([f"{t:.2f}" for t in real_ticks])
     
     ax.set_xlim(ras[mask].min(), ras[mask].max())
     ax.set_ylim(decs[mask].min(), decs[mask].max())
@@ -322,6 +335,57 @@ if INSPECTION_PLOTS:
     ax.set_title('Correction factor map')
     if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_pos_2d.png")
     plt.show()
+
+
+    #### flux as a function of frequency
+    MHz = 1e9
+    n_plot = min(1000, len(fitted_flux))
+    rng = np.random.default_rng(42)
+    idx = rng.choice(len(fitted_flux), n_plot, replace=False)
+
+    min_freq = np.min([cat.freq for cat in config.catalogs])
+    max_freq = np.max([cat.freq for cat in config.catalogs])
+    freqs = np.logspace(np.log10(min_freq), np.log10(max_freq), 100) / MHz
+    freq0 = config.anchor_catalog.freq / MHz
+    freq_pivot = 100e6 / MHz
+
+    fig, ax = plt.subplots(figsize=(9, 6))
+
+    # individual source spectra
+    for i in idx:
+        si = spectral_index[i]
+        ci = spectral_curvature[i]
+        f0 = fitted_flux[i]
+        if not np.isfinite(si) or f0 <= 0:
+            continue
+
+        # back-compute flux at the log-parabola pivot, then predict full spectrum
+        ln_scale = np.log(f0) - (si * np.log(freq0 / freq_pivot) + ci * np.log(freq0 / freq_pivot)**2)
+        flux_spec = predict_flux(freqs, freq_pivot, np.exp(ln_scale), si, curvature=ci)
+        ax.loglog(freqs, flux_spec, lw=0.3, alpha=0.15, color='gray')
+
+    # aggregate power-law (curvature = 0)
+    flux_pl = predict_flux(freqs, freq_pivot, np.exp(np.log(np.median(fitted_flux)) - (mspx * np.log(freq0 / freq_pivot))), mspx, curvature=0)
+    ax.loglog(freqs, flux_pl, lw=2.5, color='steelblue', label=f'Power law:  α = {mspx:.3f}')
+
+    # aggregate curved fit
+    if np.isfinite(mcur) and abs(mcur) > 1e-6:
+        ln_scale_mn = np.log(np.median(fitted_flux)) - (mspx * np.log(freq0 / freq_pivot) + mcur * np.log(freq0 / freq_pivot)**2)
+        flux_cv = predict_flux(freqs, freq_pivot, np.exp(ln_scale_mn), mspx, curvature=mcur)
+        ax.loglog(freqs, flux_cv, lw=2, ls='--', color='tomato', label=f'Curved:  α = {mspx:.3f},  β = {mcur:.3f}')
+
+    # catalog frequencies
+    for cat in config.catalogs:
+        ax.axvline(cat.freq / MHz, ls=':', alpha=0.25, color='gray')
+        ax.text(cat.freq / MHz, ax.get_ylim()[0] * 1.1, cat.name, rotation=45, fontsize=7, alpha=0.5, ha='right')
+
+    ax.set_xlabel('Frequency (MHz)')
+    ax.set_ylabel('Flux (Jy)')
+    ax.set_title(f'Reconstructed spectra ({n_plot} sources) {config.anchor_catalog.name}')
+    ax.legend(fontsize=9)
+    if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_flux_vs_freq.png")
+    plt.show()
+
 
 
 print(f"Done at: {(perf_counter() - start):.2f} s")
