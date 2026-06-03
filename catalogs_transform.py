@@ -20,7 +20,52 @@
 # racs_mid  = Table.read(os.getcwd()+"/catalogs/racs/RACS-mid1_sources.xml")
 # racs_high = Table.read(os.getcwd()+"/catalogs/racs/RACS-high_sources.xml")
 # apertif   = Table.read(os.getcwd()+"/catalogs/apertif/apertif.fits")
-# vlass = Table.read(os.getcwd()+"/catalogs/vlass/vlass.fit")
+# vlass     = Table.read(os.getcwd()+"/catalogs/vlass/vlass.fit")
+# txs       = Table.read(os.getcwd()+"/catalogs/txs/TXS.fit")
+# vcss      = Table.read(os.getcwd()+"/catalogs/vcss/VCSS.fit")
+
+
+#### vcss
+# vcss.rename_column("RAJ2000", "ra")
+# vcss.rename_column("DEJ2000", "dec")
+# vcss.rename_column("e_RAJ2000", "e_ra")
+# vcss.rename_column("e_DEJ2000", "e_dec")
+# vcss.rename_column("Ftotc", "flux_jy")
+# vcss.rename_column("e_Ftot", "e_flux_jy")
+
+# if str(vcss['flux_jy'].unit) == 'mJy':
+#     vcss['flux_jy'] *= 1e-3
+#     vcss['flux_jy'].unit = 'Jy'
+#     vcss['e_flux_jy'] *= 1e-3
+#     vcss['e_flux_jy'].unit = 'Jy'
+
+# assert str(vcss['ra'].unit) == 'deg' and str(vcss['dec'].unit) == 'deg'
+# assert str(vcss['flux_jy'].unit) == 'Jy' and str(vcss['e_flux_jy'].unit) == 'Jy'
+
+# vcss.write(os.getcwd()+"/catalogs/vcss/vcss_clean.fits", overwrite=True)
+
+#### txs
+# txs.rename_column("_RAJ2000", "ra")
+# txs.rename_column("_DEJ2000", "dec")
+# txs.rename_column("e_RA1950", "e_ra")
+# txs.rename_column("e_DE1950", "e_dec")
+# txs.rename_column("S365", "flux_jy")
+# txs.rename_column("e_S365", "e_flux_jy")
+
+# if str(txs['e_ra'].unit) == 's':
+#     txs['e_ra'] *= 15 / 3600
+#     txs['e_ra'].unit = 'deg'
+# if str(txs['e_dec'].unit) == 'arcsec':
+#     txs['e_dec'] /= 3600
+#     txs['e_dec'].unit = 'deg'
+
+# txs.keep_columns(['ra', 'dec', 'e_ra', 'e_dec', 'flux_jy', 'e_flux_jy'])
+
+# assert str(txs['ra'].unit) == 'deg' and str(txs['dec'].unit) == 'deg'
+# assert str(txs['e_ra'].unit) == 'deg' and str(txs['e_dec'].unit) == 'deg'
+# assert str(txs['flux_jy'].unit) == 'Jy' and str(txs['e_flux_jy'].unit) == 'Jy'
+
+# txs.write(os.getcwd()+"/catalogs/txs/txs_clean.fits", overwrite=True)
 
 #### vlass
 # vlass.rename_column("RAJ2000", "ra")
@@ -392,11 +437,17 @@
 # nvss      = Table.read(os.getcwd()+"/catalogs/nvss/nvss_clean.fits")
 # wenss     = Table.read(os.getcwd()+"/catalogs/wenss/wenss_clean.fits")
 # lofar_dr3 = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits")
-# lofar = Table.read(os.getcwd()+'/catalogs/lofar/lofar_sources_pipeline.fits')
-# cygnus = Table.read(os.getcwd()+'/catalogs/other/cygnus_clean.fits')
+# lofar     = Table.read(os.getcwd()+'/catalogs/lofar/lofar_sources_pipeline.fits')
+# cygnus    = Table.read(os.getcwd()+'/catalogs/other/cygnus_clean.fits')
+# racs_mid  = Table.read(os.getcwd()+"/catalogs/racs/racs_mid_clean.fits")
+# racs_high = Table.read(os.getcwd()+"/catalogs/racs/racs_high_clean.fits")
+# apertif   = Table.read(os.getcwd()+"/catalogs/apertif/apertif_clean.fits")
+# vlass     = Table.read(os.getcwd()+"/catalogs/vlass/vlass_clean.fits")
+# txs       = Table.read(os.getcwd()+"/catalogs/txs/txs_clean.fits")
+# vcss       = Table.read(os.getcwd()+"/catalogs/vcss/vcss_clean.fits")
 
-# cats = [racs, meerkat, vlssr, tgss, gleam, gleam_xgp, nvss, wenss, lofar_dr3, lofar, cygnus]
-# name = ['racs', 'meerkat', 'vlssr', 'tgss', 'gleam_300', 'gleam_xgp', 'nvss', 'wenss', 'lofar_dr3', 'lofar_pipe', 'cygnus']
+# cats = [apertif, vlass, txs, vcss, racs_mid, racs_high, meerkat, vlssr, tgss, gleam, gleam_xgp, nvss, wenss, lofar_dr3, lofar, cygnus]
+# name = ['apertif', 'vlass', 'txs', 'vcss', 'racs_mid', 'racs_high', 'meerkat', 'vlssr', 'tgss', 'gleam_300', 'gleam_xgp', 'nvss', 'wenss', 'lofar_dr3', 'lofar_pipe', 'cygnus']
 
 # for i, cat in enumerate(cats):
 #     assert "flux_jy" in cat.colnames
