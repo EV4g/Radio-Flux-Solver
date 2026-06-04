@@ -338,7 +338,7 @@ if INSPECTION_PLOTS:
 
 
     #### flux as a function of frequency
-    MHz = 1e9
+    MHz = 1e6
     n_plot = min(1000, len(fitted_flux))
     rng = np.random.default_rng(42)
     idx = rng.choice(len(fitted_flux), n_plot, replace=False)
