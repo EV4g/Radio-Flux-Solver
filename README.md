@@ -4,10 +4,11 @@ Code for calibrating (low-frequency) Radio catalog-or-image flux, based on refer
 
 End-to-end; takes care of the finding, matching, and calibration of sources based on spectral index analysis.
 
-#### Modes
-- Catalog flux scale check
-- Image flux scale check
-- Fixed powerlaw extrapolation / two-point spectral index fitting / three-or-more-point index + curvature estimation
+#### Features
+- Both catalog and image file support for flux validation
+- Overview plots to showcase and filter for location/beam dependant effects
+- Fixed powerlaw extrapolation in the basic mode
+- Either two-point spectral index fitting or three-or-more-point index + curvature estimation advanced modes
 
 #### Currently nicluded reference survey catalogs
 
