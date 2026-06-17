@@ -1,6 +1,6 @@
 # Radio Flux Solver
 
-Code for calibrating (low-frequency) Radio catalog-or-image flux, based on reference survey data.
+Code for calibrating/validating (low-frequency) radio flux data, based on reference surveys.
 
 End-to-end; takes care of the finding, matching, and calibration of sources based on spectral index analysis.
 
