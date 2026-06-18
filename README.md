@@ -10,7 +10,7 @@ End-to-end; takes care of the finding, matching, and calibration of sources base
 - Fixed powerlaw extrapolation in the basic mode
 - Either two-point spectral index fitting or three-or-more-point index + curvature estimation advanced modes
 
-#### Currently nicluded reference survey catalogs
+#### Currently included reference survey catalogs
 
 | Catalog Name  | Frequency (MHz) |
 |---------------|-----------------|
