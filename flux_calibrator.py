@@ -66,7 +66,7 @@ lofar_dr3_config = Config(spectral_damping_factor = 5,
                            minimum_points = 3,
                            crowd_radius_arc = None,
                            minimum_frequency_spacing = 0,
-                           catalog_names = ["racs_gal", "racs_low", "racs_mid", "racs_high", "meerkat", "vlssr", "tgss", "gleam_300", "gleam_xgp", "nvss", "wenss", "lofar_dr3", "apertif", "vlass", "vcss"],
+                           catalog_names = [cat.name for cat in all_catalogs],
                            reference_file = None,
                            anchor_catalog_name = "lofar_dr3",
                            )
