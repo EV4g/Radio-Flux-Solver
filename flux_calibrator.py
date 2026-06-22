@@ -98,15 +98,15 @@ cygnus_config = Config(spectral_damping_factor = 5,
 test_config = Config(spectral_damping_factor = 5,
                      spectral_index_theory=-0.8,
                      snr_lower_limit = 7,
-                     nsigma = 2,
+                     nsigma = 3,
                      minimum_points = 3,
                      crowd_radius_arc = None,
                      minimum_frequency_spacing = 50e6,
-                     catalog_names = ["tgss", "gleam_300", "gleam_xgp", "meerkat", "racs_mid", "racs_high", "lofar"],
-                     #catalog_names = ["tgss", "gleam_300", "gleam_xgp", "meerkat_w44", "racs_gal", "racs_mid", "racs_high"],
+                     #catalog_names = ["tgss", "gleam_300", "gleam_xgp", "meerkat", "racs_mid", "racs_high", "lofar"],
+                     catalog_names = ["tgss", "gleam_300", "gleam_xgp", "meerkat_w44", "racs_gal", "racs_mid", "racs_high"],
                      reference_file = None,
-                     anchor_catalog_name = "lofar"
-                     #anchor_catalog_name = "meerkat_w44",
+                     #anchor_catalog_name = "lofar"
+                     anchor_catalog_name = "meerkat_w44",
                      )
 
 #### Parameters

@@ -1,5 +1,10 @@
+import os
+import tempfile
 import numpy as np
 from astropy.table import Table
+from astropy.io import fits
+from astropy.wcs import WCS
+from astropy.coordinates import SkyCoord
 from functions import sources_in_fits, get_pos_err_deg, get_beam_size, radec_to_xyz
 from scipy.spatial import cKDTree
 from pathlib import Path
@@ -9,14 +14,42 @@ from time import perf_counter
 
 _PROJECT_ROOT = Path(__file__).resolve().parent
 
-def resolve_catalog_path(path: str | Path) -> Path:
+def _extract_plane(path):
+    """Return a 2-D celestial-plane FITS path; write a temp file only for N-D images."""
+    with fits.open(path) as hdul:
+        data = hdul[0].data
+        hdr = hdul[0].header
+    if data is None or data.ndim <= 2:
+        return path
+    plane = data[(0,) * (data.ndim - 2) + (slice(None), slice(None))]
+    plane = np.ascontiguousarray(plane.squeeze())
+    outhdr = WCS(hdr).celestial.to_header()
+    for key in ('BUNIT', 'BMAJ', 'BMIN', 'BPA', 'CLEANBMJ', 'CLEANBMN', 'CLEANBPA'):
+        if key in hdr:
+            outhdr[key] = hdr[key]
+    fd, tmp = tempfile.mkstemp(suffix='.fits', prefix=f'{path.stem}_2d_', dir='/tmp')
+    os.close(fd)
+    fits.writeto(tmp, plane, outhdr, overwrite=True)
+    return Path(tmp)
+
+def _to_icrs(original_path, table):
+    """If the original image is Galactic, rotate PyBDSF l/b columns to ICRS in place."""
+    with fits.open(original_path) as hdul:
+        ctype = WCS(hdul[0].header).celestial.wcs.ctype
+    if not any('GLON' in c.upper() or 'GLAT' in c.upper() for c in ctype):
+        return
+    c = SkyCoord(l=table['ra'], b=table['dec'], unit='deg', frame='galactic').icrs
+    table['ra'] = c.ra.deg
+    table['dec'] = c.dec.deg
+
+def resolve_catalog_path(path):
     p = Path(path)
     if p.is_absolute() and p.parent.exists():
         return p.resolve()
     clean = str(p).lstrip("/") if p.is_absolute() else str(p)
     return (_PROJECT_ROOT / clean).resolve()
 
-def resolve_glob(pattern: str) -> list[Path]:
+def resolve_glob(pattern):
     return sorted(_PROJECT_ROOT.glob(pattern))
 
 # wrapper class for incoming Table data
@@ -84,32 +117,39 @@ class Catalog:
                 image_catalog = Table.read(image_catalog_path)
             else:
                 print(f"Running PyBDSF source finding on {self.path_stem}")
-                
-                image = bdsf.process_image(
-                    #img_path,
-                    self.path,
-                    thresh_isl=3.0,                   # island threshold (sigma)
-                    thresh_pix=5.0,                   # peak detection threshold (sigma)
-                    rms_box=(200, 50),                # (box_size, step_size) for rms map; tune to your image
-                    beam=(get_beam_size(self.path)),  # (maj_deg, min_deg, PA)
-                    frequency = self.freq,
-                    quiet=True,
-                    blank_limit=1e-6,                 # internal mask; values below this (Jy) get ignored
-                    outdir='/tmp'
-                )
-                
-                # write pybdsf catalog to file
-                image.write_catalog(outfile=str(image_catalog_path), catalog_type='srl', format='fits', clobber=True)
-                image_catalog = Table.read(image_catalog_path)
-                
-                # stick to convention and overwrite (PyBDSF does not offer column renaming internally)
-                image_catalog.rename_columns(
-                    ['RA',  'DEC',  'E_RA', 'E_DEC', 'Total_flux', 'E_Total_flux'],
-                    ['ra',  'dec',  'e_ra', 'e_dec', 'flux_jy',    'e_flux_jy']
-                )
-                image_catalog.write(image_catalog_path, overwrite=True)
-                
-                print(f"Catalog written to {image_catalog_path}\n")
+
+                img_path = _extract_plane(self.path)
+                try:
+                    image = bdsf.process_image(
+                        img_path,
+                        thresh_isl=3.0,                   # island threshold (sigma)
+                        thresh_pix=5.0,                   # peak detection threshold (sigma)
+                        rms_box=(200, 50),                # (box_size, step_size) for rms map; tune to your image
+                        beam=(get_beam_size(self.path)),  # (maj_deg, min_deg, PA)
+                        frequency = self.freq,
+                        quiet=True,
+                        blank_limit=1e-6,                 # internal mask; values below this (Jy) get ignored
+                        outdir='/tmp'
+                    )
+
+                    # write pybdsf catalog to file
+                    image.write_catalog(outfile=str(image_catalog_path), catalog_type='srl', format='fits', clobber=True)
+                    image_catalog = Table.read(image_catalog_path)
+
+                    # stick to convention and overwrite (PyBDSF does not offer column renaming internally)
+                    image_catalog.rename_columns(
+                        ['RA',  'DEC',  'E_RA', 'E_DEC', 'Total_flux', 'E_Total_flux'],
+                        ['ra',  'dec',  'e_ra', 'e_dec', 'flux_jy',    'e_flux_jy']
+                    )
+
+                    _to_icrs(self.path, image_catalog)
+
+                    image_catalog.write(image_catalog_path, overwrite=True)
+
+                    print(f"Catalog written to {image_catalog_path}\n")
+                finally:
+                    if img_path != self.path:
+                        img_path.unlink(missing_ok=True)
 
             # set data based on image data
             self.ra       = np.array(image_catalog['ra'])      # degrees
