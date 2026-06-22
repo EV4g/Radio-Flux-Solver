@@ -99,7 +99,7 @@ test_config = Config(spectral_damping_factor = 5,
                      spectral_index_theory=-0.8,
                      snr_lower_limit = 7,
                      nsigma = 2,
-                     minimum_points = 10,
+                     minimum_points = 3,
                      crowd_radius_arc = None,
                      minimum_frequency_spacing = 50e6,
                      catalog_names = ["tgss", "gleam_300", "gleam_xgp", "meerkat", "racs_mid", "racs_high", "lofar"],
@@ -116,7 +116,7 @@ SAVE_PLOTS          = False # save plots to disk
 COMBINATION_SIZE    = 3     # number of catalogs to combine per cross-match step [2,3,4]
 
 #### setup
-config = lofar_dr3_config
+config = test_config #lofar_dr3_config
 config.setup()
 output = Output()
 
