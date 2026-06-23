@@ -84,27 +84,28 @@ def _is_table_catalog(path):
 def _build_parser():
     p = argparse.ArgumentParser(description="Calibrate a radio image or table catalog against reference catalogs.")
     p.add_argument("catalog",                     help="Path to FITS image or table catalog (the anchor / unknown).")
-    p.add_argument("--scale",                     type=float, default=1, help="Scale values in the anchor catalog by this amount")
-    p.add_argument("--catalogs",                  default="default",     help='Preset name (all, default) or comma-separated catalog list.')
-    p.add_argument("--anchor-name",               default=None,          help="Registry name for the anchor (default: input filename stem).")
-    p.add_argument("--freq",                      type=float, default=None, help="Central frequency in --freq-unit; for images, inferred from the FITS FREQ axis when present.")
+    p.add_argument("--scale",                     type=float, default=1,     help="Scale values in the anchor catalog by this amount")
+    p.add_argument("--catalogs",                  default="default",         help='Preset name (all, default) or comma-separated catalog list.')
+    p.add_argument("--anchor-name",               default=None,              help="Registry name for the anchor (default: input filename stem).")
+    p.add_argument("--freq",                      type=float, default=None,  help="Central frequency in --freq-unit; for images, inferred from the FITS FREQ axis when present.")
     p.add_argument("--freq-unit",                 choices=list(_FREQ_UNIT_SCALE), default="Hz")
-    p.add_argument("--combination-size",          type=int,   default=3, help="Set matching complexity as well as fitting D.O.F.")
-    p.add_argument("--spectral_damping_factor",   type=float, default=5, help="Dampen unphysical spectral index outliers")
-    p.add_argument("--nsigma",                    type=float, default=3)
-    p.add_argument("--snr-lower-limit",           type=float, default=7)
-    p.add_argument("--minimum-points",            type=int,   default=3)
-    p.add_argument("--spectral-index-theory",     type=float, default=-0.7)
+    p.add_argument("--combination-size",          type=int,   default=3,     help="Set matching complexity as well as fitting D.O.F.")
+    p.add_argument("--spectral_damping_factor",   type=float, default=5,     help="Dampen unphysical spectral index outliers")
+    p.add_argument("--nsigma",                    type=float, default=2,     help="Sigma range to use for error based matching (default: 2)")
+    p.add_argument("--snr-lower-limit",           type=float, default=7,     help="Ignore sources below this SNR limit (default: 7)")
+    p.add_argument("--minimum-points",            type=int,   default=3,     help="Ignore matched catalogs sets with matches below this limit (default: 3)")
+    p.add_argument("--spectral-index-theory",     type=float, default=-0.8,  help="Theoretical value for spectral index for desired source (default: -0.8)")
     p.add_argument("--minimum-frequency-spacing", type=float, default=100e6, help="Ignore catalog matching with a spacing below threshold (Hz)")
     p.add_argument("--reference-file",            default=None,              help="Provide reference cutout when giving a large catalog to speed up matching")
+    p.add_argument("--spatial-filter",            action="store_true",       help="Pre-filter reference catalogs to the anchor's spatial coverage (with 10% margin).")
     p.add_argument("--no-reload-cache",           action="store_true",       help="Force PyBDSF to re-run on the anchor image.")
-    p.add_argument("--save-plots",                action="store_true")
-    p.add_argument("--debug",                     action="store_true")
-    p.add_argument("--thres-arc",                 default=None,           help="Override error based matching with simple thresholding (arcsec)")
-    p.add_argument("--n-jobs",                    type=int, default=-1,   help="Number of cores to use, defaults to all of them")
-    p.add_argument("--logging",                   action="store_true",  help="Write all output to a log file in --output-dir instead of the terminal.")
-    p.add_argument("--output-dir",                default=None,         help="Directory to write plots and logs into (default: current working directory).")
-    p.add_argument("--seed",                      type=int, default=None, help="Seed for the spectra-plot random sample (default: random).")
+    p.add_argument("--save-plots",                action="store_true",       help="Save inspection plots to disk")
+    p.add_argument("--debug",                     action="store_true",       help="Store debug plots per set of matches (slow)")
+    p.add_argument("--thres-arc",                 default=None,              help="Override error based matching with simple thresholding (arcsec)")
+    p.add_argument("--n-jobs",                    type=int, default=-1,      help="Number of cores to use, defaults to all of them")
+    p.add_argument("--logging",                   action="store_true",       help="Write all output to a log file in --output-dir instead of the terminal.")
+    p.add_argument("--output-dir",                default=None,              help="Directory to write plots and logs into (default: current working directory).")
+    p.add_argument("--seed",                      type=int, default=None,    help="Seed for the spectra-plot random sample (default: random).")
     return p
 
 def main():
@@ -176,6 +177,7 @@ def main():
         catalogs=all_cats,
         anchor_catalog=anchor_cat,
         reference_file=args.reference_file,
+        spatial_filter=args.spatial_filter,
         thres_arc=args.thres_arc if args.thres_arc is not None else 2,
         thres_arc_override=True  if args.thres_arc is not None else False
     )

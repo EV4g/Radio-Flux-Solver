@@ -228,6 +228,46 @@ class Catalog_set:
     def catalogs(self):
         return list(self._registry.values())
 
+def compute_footprint_box(ra_deg, dec_deg, margin_fraction=0.1):
+    """Return (ra_min, ra_max, dec_min, dec_max) covering the given positions,
+    expanded by margin_fraction of the span on each side. Handles RA wraparound."""
+    ra  = np.asarray(ra_deg,  dtype=float)
+    dec = np.asarray(dec_deg, dtype=float)
+    ra_sorted = np.sort(ra)
+
+    # find the largest gap between consecutive RAs (with wraparound at 360°)
+    gaps         = np.diff(ra_sorted)
+    wrap_gap     = (ra_sorted[0] + 360.0) - ra_sorted[-1]
+    largest_gap  = max(gaps.max() if len(gaps) else 0, wrap_gap)
+    wraparound   = largest_gap >= 180.0
+
+    if wraparound:
+        # bounds run from the end of the largest gap to the start of it
+        gap_idx = int(np.argmax(gaps)) if gaps.max() >= wrap_gap else len(ra_sorted) - 1
+        ra_min = ra_sorted[(gap_idx + 1) % len(ra_sorted)]
+        ra_max = ra_sorted[gap_idx]
+    else:
+        ra_min, ra_max = float(ra_sorted[0]), float(ra_sorted[-1])
+
+    dec_min, dec_max = float(dec.min()), float(dec.max())
+
+    # expand by margin; convert angular RA margin to degrees via cos(dec)
+    ra_span  = (ra_max - ra_min) % 360.0
+    dec_span = dec_max - dec_min
+    dec_mid  = 0.5 * (dec_min + dec_max)
+    ra_margin  = margin_fraction * ra_span  / max(np.cos(np.radians(dec_mid)), 1e-3)
+    dec_margin = margin_fraction * dec_span
+    if ra_span < 1.0:  # essentially full-sky; keep bounds as [0, 360) so the filter is a no-op
+        ra_min, ra_max = 0.0, 360.0
+    else:
+        ra_min  = (ra_min  - ra_margin) % 360.0
+        ra_max  = (ra_max  + ra_margin) % 360.0
+    dec_min = max(dec_min - dec_margin, -90.0)
+    dec_max = min(dec_max + dec_margin,  90.0)
+
+    return (ra_min, ra_max, dec_min, dec_max)
+
+
 # wrapper class for passable parameters
 class Config:
     def __init__(self, spectral_damping_factor = 5,
@@ -241,13 +281,15 @@ class Config:
                  catalogs                      = None,
                  catalog_names                 = None,
                  reference_file                = None,
+                 footprint_box                 = None,
+                 spatial_filter                = False,
                  anchor_catalog                = None,
                  anchor_catalog_name           = None,
                  thres_arc                     = 2,
                  thres_arc_override            = False,
                  spectral_curvature_theory     = 0,
                  higher_order_simple           = False):
-        
+
         self.thres_arc                 = thres_arc
         self.spectral_damping_factor   = spectral_damping_factor
         self.snr_lower_limit           = snr_lower_limit
@@ -258,14 +300,14 @@ class Config:
         self.minimum_frequency_spacing = minimum_frequency_spacing if minimum_frequency_spacing is not None else 0
         self.maximum_frequency_spacing = maximum_frequency_spacing if maximum_frequency_spacing is not None else np.inf
         self.higher_order_simple       = higher_order_simple
-        
+
         if catalogs is not None:
             self.catalogs = list(catalogs)
             self.catalog_names = [cat.name for cat in self.catalogs]
         else:
             self.catalogs = []
             self.catalog_names = list(catalog_names) if catalog_names is not None else []
-        
+
         if anchor_catalog is not None:
             self.anchor_catalog = anchor_catalog
             self.anchor_catalog_name = anchor_catalog.name
@@ -274,11 +316,13 @@ class Config:
             self.anchor_catalog = None
             self.anchor_catalog_name = anchor_catalog_name
             self.anchor_catalog_index = None
-        
+
         self.reference_file = resolve_catalog_path(reference_file) if reference_file is not None else None
+        self.footprint_box  = footprint_box
+        self.spatial_filter = spatial_filter
         self.thres_arc_override         = thres_arc_override
         self.spectral_curvature_theory  = spectral_curvature_theory
-        
+
     def setup(self):
         # Resolve catalog names to Catalog objects from the global registry
         if self.catalog_names and not self.catalogs:
@@ -292,6 +336,16 @@ class Config:
         if self.anchor_catalog is not None:
             self.anchor_catalog_index = self.catalogs.index(self.anchor_catalog)
 
+            # auto-spatial-filter reference catalogs to the anchor's coverage
+            if self.spatial_filter and self.reference_file is None and self.footprint_box is None:
+                if self.anchor_catalog.table is False:
+                    self.reference_file = str(self.anchor_catalog.path)
+                else:
+                    self.anchor_catalog.load()
+                    self.footprint_box = compute_footprint_box(
+                        self.anchor_catalog.ra, self.anchor_catalog.dec, margin_fraction=0.1
+                    )
+
         # load the data per catalog
         for i, cat in enumerate(self.catalogs):
             t0 = perf_counter()
@@ -304,6 +358,16 @@ class Config:
             if self.reference_file is not None:
                 valid = sources_in_fits(cat.ra, cat.dec, self.reference_file)
                 self.catalogs[i] = cat.create_subset(valid)
+            elif self.footprint_box is not None:
+                ra_min, ra_max, dec_min, dec_max = self.footprint_box
+                if ra_max < ra_min:  # box crosses the 0/360° RA seam
+                    valid = ((cat.ra >= ra_min) | (cat.ra <= ra_max)) & (cat.dec >= dec_min) & (cat.dec <= dec_max)
+                else:
+                    valid = ((cat.ra >= ra_min) & (cat.ra <= ra_max) & (cat.dec >= dec_min) & (cat.dec <= dec_max))
+                self.catalogs[i] = cat.create_subset(valid)
+            if self.reference_file is not None or self.footprint_box is not None:
+                if cat is not self.anchor_catalog:
+                    print(f"  {cat.name:14s} spatial-filter: {len(self.catalogs[i].ra):>8d} rows kept")
 
         # re-bind anchor to the exact same object now sitting in self.catalogs
         if self.anchor_catalog is not None:
