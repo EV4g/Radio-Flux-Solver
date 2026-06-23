@@ -436,7 +436,7 @@ def calculate_contour_statistics(x, y, c, logx=False, logy=False, n=1000):
 
     return Xi, Yi, Zi, peak_x0, peak_y0
 
-def plot_statistics(x, y, weights=None, bins=(50, 50), contour_levels='auto', contour_resolution=1000, percentile_cut=5, show_peaks=True, logx=False, logy=False, xlabel="", ylabel="", title="", save=False):
+def plot_statistics(x, y, weights=None, bins=(50, 50), contour_levels='auto', contour_resolution=1000, percentile_cut=5, show_peaks=True, logx=False, logy=False, xlabel="", ylabel="", title="", save=False, path=None, show=True):
     # set min max based on percentile cut
     percentile_cut = np.clip(percentile_cut, 0, 50)
     xmin, xmax = np.percentile(x, percentile_cut), np.percentile(x, 100 - percentile_cut)
@@ -479,9 +479,12 @@ def plot_statistics(x, y, weights=None, bins=(50, 50), contour_levels='auto', co
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_title(title)
-    if save: plt.savefig(f"{title}.png")
-    plt.show()
-
+    if save:
+        plt.savefig(path if path else f"{title}.png")
+    if show:
+        plt.show()
+    else:
+        plt.close()
 """A simple way to save fits files to png"""
 def fits_to_png(fits_path, output_path, hdu_index=0, vmin=None, vmax=None, cmap="viridis"):
     with fits.open(fits_path) as hdul:

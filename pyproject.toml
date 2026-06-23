@@ -17,6 +17,19 @@ dependencies = [
     "tqdm>=4.67.3",
 ]
 
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["flux_calibrator_cli", "flux_calibrator", "functions", "catalog_manager"]
+
+[project.scripts]
+flux-calibrator = "flux_calibrator_cli:main"
+
+[tool.uv]
+package = true
+
 [tool.ty.rules]
 unresolved-attribute = "ignore"
 unresolved-import = "ignore"
