@@ -97,7 +97,7 @@ def _build_parser():
     p.add_argument("--spectral-index-theory",     type=float, default=-0.8,  help="Theoretical value for spectral index for desired source (default: -0.8)")
     p.add_argument("--minimum-frequency-spacing", type=float, default=100e6, help="Ignore catalog matching with a spacing below threshold (Hz)")
     p.add_argument("--reference-file",            default=None,              help="Provide reference cutout when giving a large catalog to speed up matching")
-    p.add_argument("--spatial-filter",            action="store_true",       help="Pre-filter reference catalogs to the anchor's spatial coverage (with 10% margin).")
+    p.add_argument("--spatial-filter",            action="store_true",       help="Pre-filter reference catalogs to the anchor's spatial coverage (with 10%% margin).")
     p.add_argument("--no-reload-cache",           action="store_true",       help="Force PyBDSF to re-run on the anchor image.")
     p.add_argument("--save-plots",                action="store_true",       help="Save inspection plots to disk")
     p.add_argument("--debug",                     action="store_true",       help="Store debug plots per set of matches (slow)")
