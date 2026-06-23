@@ -12,6 +12,12 @@ import bdsf
 from joblib import Parallel, delayed
 from time import perf_counter
 
+try:
+    from termcolor import colored
+except ImportError:
+    print("termcolor not found, ignoring color")
+    def colored(str, col): return str
+
 _PROJECT_ROOT = Path(__file__).resolve().parent
 
 def _extract_plane(path):
@@ -113,10 +119,10 @@ class Catalog:
             image_catalog_path = self.dir / f"{self.path_stem}_catalog.fits"
 
             if self.reload_cache and image_catalog_path.exists():
-                print(f"Loading cached catalog for {self.path_stem}")
+                print(colored(f"  Loading cached catalog for {self.path_stem}", "yellow"))
                 image_catalog = Table.read(image_catalog_path)
             else:
-                print(f"Running PyBDSF source finding on {self.path_stem}")
+                print(colored(f"  Running PyBDSF source finding on {self.path_stem}", "yellow"))
 
                 img_path = _extract_plane(self.path)
                 try:
@@ -277,21 +283,22 @@ class Config:
         # Resolve catalog names to Catalog objects from the global registry
         if self.catalog_names and not self.catalogs:
             self.catalogs = [Catalog_set.registry[name] for name in self.catalog_names]
-        
+
         # Resolve anchor catalog name to object
         if self.anchor_catalog_name is not None and self.anchor_catalog is None:
             self.anchor_catalog = Catalog_set.registry[self.anchor_catalog_name]
-        
+
         # Recompute anchor_catalog_index now that self.catalogs is resolved
         if self.anchor_catalog is not None:
             self.anchor_catalog_index = self.catalogs.index(self.anchor_catalog)
-        
+
         # load the data per catalog
         for i, cat in enumerate(self.catalogs):
             t0 = perf_counter()
             cat.load()
             n_rows = len(cat.ra) if cat.ra is not None else 0
-            print(f"  {cat.name:14s} load+threshold: {(perf_counter()-t0):.2f}s ({n_rows:>8d} rows)")
+            if True:
+                print(f"  {cat.name:14s} load+threshold: {(perf_counter()-t0):.2f}s ({n_rows:>8d} rows)")
 
             # if reference file, remove all points outside of that
             if self.reference_file is not None:
@@ -311,7 +318,8 @@ class Config:
         Parallel(n_jobs=-1, backend='threading')(
             delayed(cat.precompute_match_arrays)() for cat in self.catalogs
         )
-        print(f"  precompute_match_arrays (threaded): {(perf_counter()-t0):.2f}s")
+        if True:
+            print(f"  precompute_match_arrays (threaded): {(perf_counter()-t0):.2f}s")
 
 class Output:
     def __init__(self, spx=None, cur=None, snr=None, cor=None, flux=None, sep=None, pmatch=None, ncrowd=None, ra=None, dec=None):

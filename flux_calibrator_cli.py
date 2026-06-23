@@ -99,13 +99,11 @@ def _build_parser():
     p.add_argument("--reference-file",            default=None,              help="Provide reference cutout when giving a large catalog to speed up matching")
     p.add_argument("--no-reload-cache",           action="store_true",       help="Force PyBDSF to re-run on the anchor image.")
     p.add_argument("--save-plots",                action="store_true")
-    p.add_argument("--no-plots",                  action="store_true")
     p.add_argument("--debug",                     action="store_true")
     p.add_argument("--thres-arc",                 default=None,           help="Override error based matching with simple thresholding (arcsec)")
     p.add_argument("--n-jobs",                    type=int, default=-1,   help="Number of cores to use, defaults to all of them")
-    p.add_argument("--logging",                   action="store_true",    help="Also write all stdout output to a log file in --output-dir.")
-    p.add_argument("--output-dir",                default=None,           help="Directory to write plots and logs into (default: current working directory).")
-    p.add_argument("--quiet",                     action="store_true",    help="Suppress per-combination progress prints.")
+    p.add_argument("--logging",                   action="store_true",  help="Write all output to a log file in --output-dir instead of the terminal.")
+    p.add_argument("--output-dir",                default=None,         help="Directory to write plots and logs into (default: current working directory).")
     p.add_argument("--seed",                      type=int, default=None, help="Seed for the spectra-plot random sample (default: random).")
     return p
 
@@ -141,7 +139,7 @@ def main():
         outdir = Path(".")
 
     if args.logging:
-        sys.stdout = _TeeWriter(sys.stdout, open(outdir / f"{anchor_name}_run.log", "w"))
+        sys.stdout = open(outdir / f"{anchor_name}_run.log", "w")
 
     anchor_cat = Catalog(
         path=str(catalog_path),
@@ -186,7 +184,7 @@ def main():
     output = Output()
 
     DEBUG_MODE       = args.debug
-    INSPECTION_PLOTS = not args.no_plots
+    INSPECTION_PLOTS = True
     SAVE_PLOTS       = args.save_plots
     COMBINATION_SIZE = args.combination_size
 
@@ -211,6 +209,7 @@ def main():
         if SAVE_PLOTS: plt.savefig(outdir / "debug_catalog_positions.png")
         plt.close('all')
 
+
     print(f"Setup done at: {(perf_counter() - start):.2f} s")
 
     #########################################
@@ -218,6 +217,7 @@ def main():
     #########################################
     all_combinations = get_combinations(config.catalogs, size=COMBINATION_SIZE, required_index=config.anchor_catalog_index, minimum_spacing=config.minimum_frequency_spacing)
     output_width = len(str(len(all_combinations)))
+
 
     print(f"Found {len(all_combinations)} valid combinations")
     print("--------------------------------------------------------")
@@ -231,8 +231,8 @@ def main():
         local_cats = [config.catalogs[j] for j in combo]
 
         if out is not None:
-            if not args.quiet:
-                print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",f"Matches: {len(out[0])}")
+
+            print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",f"Matches: {len(out[0])}")
 
             output.add(*out)
             spx, curv, snr, cor, flux, max_sep, p_weight, n_crowd, ra, dec = out
@@ -262,8 +262,9 @@ def main():
                 plt.close('all')
 
         else:
-            if not args.quiet:
-                print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]","Matches:", colored("None", "yellow"))
+
+            print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]","Matches:", colored("None", "yellow"))
+
 
     print(f"Flux compute done at {(perf_counter() - start):.2f} seconds")
 
@@ -466,6 +467,7 @@ def main():
         ax.legend(fontsize=9)
         if SAVE_PLOTS: plt.savefig(outdir / f"{config.anchor_catalog.name}_flux_vs_freq.png")
         plt.close('all')
+
 
 
 
