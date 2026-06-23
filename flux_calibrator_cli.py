@@ -1,4 +1,5 @@
 import argparse
+import sys
 import warnings
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,31 +39,6 @@ all_catalogs = Catalog_set([
     Catalog("catalogs/vlass/vlass_clean.fits",                3000e6,     "vlass",      scale=0.9915),  # vlass
 ])
 
-#### available configurations
-lofar_dr3_config = Config(spectral_damping_factor = 5,
-                           snr_lower_limit = 7,
-                           nsigma = 2.5,
-                           minimum_points = 3,
-                           crowd_radius_arc = None,
-                           minimum_frequency_spacing = 0,
-                           catalog_names = [cat.name for cat in all_catalogs],
-                           reference_file = None,
-                           anchor_catalog_name = "lofar_dr3",
-                           )
-
-default_config = Config(spectral_damping_factor = 5,
-                        snr_lower_limit = 7,
-                        nsigma = 3,
-                        minimum_points = 3,
-                        crowd_radius_arc = None,
-                        minimum_frequency_spacing = 0,
-                        catalog_names = ["racs_gal", "meerkat", "tgss", "gleam_300", "gleam_xgp", "lofar"],
-                        reference_file = None,
-                        anchor_catalog_name = "lofar",
-                        )
-
-
-
 #### Preset -> reference catalog name list
 _PRESETS = {
     "all":      [cat.name for cat in all_catalogs],
@@ -73,57 +49,106 @@ _PRESETS = {
 _FREQ_UNIT_SCALE = {"Hz": 1.0, "MHz": 1e6, "GHz": 1e9}
 _CUNIT3_SCALE    = {"HZ": 1.0, "KHZ": 1e3, "MHZ": 1e6, "GHZ": 1e9}
 
+class _TeeWriter:
+    """Write to multiple streams (e.g. stdout + a log file)."""
+    def __init__(self, *streams):
+        self._streams = streams
+    def write(self, data):
+        for s in self._streams:
+            s.write(data)
+    def flush(self):
+        for s in self._streams:
+            try: s.flush()
+            except Exception: pass
+
 def _resolve_freq(image_path, args_freq, args_freq_unit):
-    """Try CRVAL3 (with CUNIT3 conversion), then --freq + --freq-unit."""
+    """Find the frequency axis (CTYPE contains 'FREQ') and return its CRVAL in Hz.
+    Falls back to --freq + --freq-unit if no frequency axis is present."""
     with fits.open(image_path) as hdul:
         hdr = hdul[0].header
-    if "CRVAL3" in hdr:
-        crval = float(hdr["CRVAL3"])
-        cunit = str(hdr.get("CUNIT3", "Hz")).strip()
-        return crval * _CUNIT3_SCALE.get(cunit.upper(), 1.0)
+    for i in range(1, hdr.get("NAXIS", 0) + 1):
+        ctype = str(hdr.get(f"CTYPE{i}", "")).upper()
+        if "FREQ" in ctype:
+            crval = float(hdr[f"CRVAL{i}"])
+            cunit = str(hdr.get(f"CUNIT{i}", "Hz")).strip()
+            return crval * _CUNIT3_SCALE.get(cunit.upper(), 1.0)
     if args_freq is None:
-        raise SystemExit(f"Cannot infer frequency from {image_path}: no CRVAL3 in header. Use --freq.")
+        raise SystemExit(f"Cannot infer frequency from {image_path}: no axis with CTYPE containing 'FREQ'. Use --freq.")
     return args_freq * _FREQ_UNIT_SCALE[args_freq_unit]
 
+def _is_table_catalog(path):
+    """True if the FITS file contains a BINTABLE HDU (i.e. a table catalog, not an image)."""
+    with fits.open(path) as hdul:
+        return any(hdu.header.get("XTENSION") == "BINTABLE" for hdu in hdul)
+
 def _build_parser():
-    p = argparse.ArgumentParser(description="Calibrate a radio image against reference catalogs.")
-    p.add_argument("image",                       help="Path to FITS file (the anchor / unknown).")
-    p.add_argument("--catalogs",                  default="all", help='Preset name (all, default, lofar_dr3, cygnus, test) or comma-separated catalog list.')
-    p.add_argument("--anchor-name",               default=None,  help="Registry name for the image (default: image filename stem).")
-    p.add_argument("--freq",                      type=float, default=None, help="Central frequency in --freq-unit; required if FITS has no CRVAL3.")
+    p = argparse.ArgumentParser(description="Calibrate a radio image or table catalog against reference catalogs.")
+    p.add_argument("catalog",                     help="Path to FITS image or table catalog (the anchor / unknown).")
+    p.add_argument("--scale",                     type=float, default=1, help="Scale values in the anchor catalog by this amount")
+    p.add_argument("--catalogs",                  default="default",     help='Preset name (all, default) or comma-separated catalog list.')
+    p.add_argument("--anchor-name",               default=None,          help="Registry name for the anchor (default: input filename stem).")
+    p.add_argument("--freq",                      type=float, default=None, help="Central frequency in --freq-unit; for images, inferred from the FITS FREQ axis when present.")
     p.add_argument("--freq-unit",                 choices=list(_FREQ_UNIT_SCALE), default="Hz")
-    p.add_argument("--combination-size",          type=int,   default=3, help="Set matching complexity as well as fittin D.O.F.")
+    p.add_argument("--combination-size",          type=int,   default=3, help="Set matching complexity as well as fitting D.O.F.")
+    p.add_argument("--spectral_damping_factor",   type=float, default=5, help="Dampen unphysical spectral index outliers")
     p.add_argument("--nsigma",                    type=float, default=3)
     p.add_argument("--snr-lower-limit",           type=float, default=7)
     p.add_argument("--minimum-points",            type=int,   default=3)
     p.add_argument("--spectral-index-theory",     type=float, default=-0.7)
     p.add_argument("--minimum-frequency-spacing", type=float, default=100e6, help="Ignore catalog matching with a spacing below threshold (Hz)")
-    p.add_argument("--reference-file",            default=None, help="Provide reference cutout when giving a large catalog to speed up matching")
-    p.add_argument("--no-reload-cache",           action="store_true", help="Force PyBDSF to re-run on the image.")
+    p.add_argument("--reference-file",            default=None,              help="Provide reference cutout when giving a large catalog to speed up matching")
+    p.add_argument("--no-reload-cache",           action="store_true",       help="Force PyBDSF to re-run on the anchor image.")
     p.add_argument("--save-plots",                action="store_true")
     p.add_argument("--no-plots",                  action="store_true")
     p.add_argument("--debug",                     action="store_true")
-    p.add_argument("--thres-arc",                 default=None, help="Override error based matching with simple thresholding (arcsec)")
-    p.add_argument("--n-jobs",                    type=int, default=-1)
+    p.add_argument("--thres-arc",                 default=None,           help="Override error based matching with simple thresholding (arcsec)")
+    p.add_argument("--n-jobs",                    type=int, default=-1,   help="Number of cores to use, defaults to all of them")
+    p.add_argument("--logging",                   action="store_true",    help="Also write all stdout output to a log file in --output-dir.")
+    p.add_argument("--output-dir",                default=None,           help="Directory to write plots and logs into (default: current working directory).")
+    p.add_argument("--quiet",                     action="store_true",    help="Suppress per-combination progress prints.")
+    p.add_argument("--seed",                      type=int, default=None, help="Seed for the spectra-plot random sample (default: random).")
     return p
 
 def main():
     args = _build_parser().parse_args()
     start = perf_counter()
 
-    image_path = Path(args.image)
-    if not image_path.exists():
-        raise SystemExit(f"Image not found: {image_path}")
+    # error when choosing wrong combination size parameter
+    if args.combination_size < 2 or args.combination_size > 4:
+        raise SystemExit(f"--combination-size must be >= 2 and <= 4 (got {args.combination_size}).")
 
-    freq_hz = _resolve_freq(image_path, args.freq, args.freq_unit)
-    anchor_name = args.anchor_name or image_path.stem
+    # check for fits file
+    catalog_path = Path(args.catalog)
+    if not catalog_path.exists():
+        raise SystemExit(f"Catalog not found: {catalog_path}")
 
-    image_cat = Catalog(
-        path=str(image_path),
+    is_table = _is_table_catalog(catalog_path)
+    if is_table:
+        if args.freq is None:
+            raise SystemExit(f"Table catalog {catalog_path} has no FITS frequency axis. Pass --freq.")
+        freq_hz = args.freq * _FREQ_UNIT_SCALE[args.freq_unit]
+    else:
+        freq_hz = _resolve_freq(catalog_path, args.freq, args.freq_unit)
+    anchor_name = args.anchor_name or catalog_path.stem
+
+    if args.output_dir:
+        outdir = Path(args.output_dir)
+        outdir.mkdir(parents=True, exist_ok=True)
+    elif args.save_plots:
+        outdir = Path(f"flux_calibrator_output_{anchor_name}")
+        outdir.mkdir(parents=True, exist_ok=True)
+    else:
+        outdir = Path(".")
+
+    if args.logging:
+        sys.stdout = _TeeWriter(sys.stdout, open(outdir / f"{anchor_name}_run.log", "w"))
+
+    anchor_cat = Catalog(
+        path=str(catalog_path),
         freq_hz=freq_hz,
         name=anchor_name,
-        scale=1,
-        table=False,
+        scale=args.scale,
+        table=is_table,
         reload_cache=not args.no_reload_cache,
     )
 
@@ -140,10 +165,10 @@ def main():
         raise SystemExit("Reference catalog list is empty.")
 
     ref_cats = [Catalog_set.registry[n] for n in ref_names]
-    all_cats = ref_cats + [image_cat]
+    all_cats = ref_cats + [anchor_cat]
 
     config = Config(
-        spectral_damping_factor=5,
+        spectral_damping_factor=args.spectral_damping_factor,
         snr_lower_limit=args.snr_lower_limit,
         spectral_index_theory=args.spectral_index_theory,
         minimum_points=args.minimum_points,
@@ -151,10 +176,12 @@ def main():
         crowd_radius_arc=None,
         minimum_frequency_spacing=args.minimum_frequency_spacing,
         catalogs=all_cats,
-        anchor_catalog=image_cat,
+        anchor_catalog=anchor_cat,
         reference_file=args.reference_file,
-        thres_arc=args.thres_arc,
+        thres_arc=args.thres_arc if args.thres_arc is not None else 2,
+        thres_arc_override=True  if args.thres_arc is not None else False
     )
+    
     config.setup()
     output = Output()
 
@@ -171,7 +198,8 @@ def main():
         plt.ylabel("count")
         plt.yscale('log')
         plt.legend()
-        plt.show()
+        if SAVE_PLOTS: plt.savefig(outdir / "debug_flux_distribution.png")
+        plt.close('all')
 
         # catalog as function of position
         for cat in config.catalogs:
@@ -180,7 +208,8 @@ def main():
         plt.xlabel("RA")
         plt.ylabel("Dec")
         plt.legend(loc='lower left')
-        plt.show()
+        if SAVE_PLOTS: plt.savefig(outdir / "debug_catalog_positions.png")
+        plt.close('all')
 
     print(f"Setup done at: {(perf_counter() - start):.2f} s")
 
@@ -202,7 +231,8 @@ def main():
         local_cats = [config.catalogs[j] for j in combo]
 
         if out is not None:
-            print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",f"Matches: {len(out[0])}")
+            if not args.quiet:
+                print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",f"Matches: {len(out[0])}")
 
             output.add(*out)
             spx, curv, snr, cor, flux, max_sep, p_weight, n_crowd, ra, dec = out
@@ -216,8 +246,8 @@ def main():
                 plt.xlabel(f"{config.anchor_catalog.name} fitted flux (Jy)")
                 plt.ylabel("Correction factor")
                 plt.title(f"{config.anchor_catalog.name} "+r"flux, $\alpha$=-"+f"{config.spectral_index_theory} vs fitted")
-                if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_flux.png")
-                plt.show()
+                if SAVE_PLOTS: plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_flux.png")
+                plt.close('all')
 
                 # compare fitted spectral index with correction factor
                 plt.scatter(spx, cor, c=flux, norm='log')
@@ -228,11 +258,12 @@ def main():
                 plt.ylabel("Flux correction factor")
                 plt.xlabel(r"Spectral index $\alpha$")
                 plt.title("Flux correction as function of spectral index")
-                if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_spx.png")
-                plt.show()
+                if SAVE_PLOTS: plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_spx.png")
+                plt.close('all')
 
         else:
-            print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]","Matches:", colored("None", "yellow"))
+            if not args.quiet:
+                print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]","Matches:", colored("None", "yellow"))
 
     print(f"Flux compute done at {(perf_counter() - start):.2f} seconds")
 
@@ -253,12 +284,16 @@ def main():
     plot_statistics(spectral_index, correction_factor, total_weighting_factor,
                     logy=True,
                     save=SAVE_PLOTS,
+                    path=outdir / "correction_factor_vs_spx.png",
+                    show=False,
                     xlabel=r"Fitted spectral index $\alpha$",
                     ylabel="Correction factor",
                     title="Correction factor as function of fitted spectral index\nall catalogs")
 
     plot_statistics(spectral_index, spectral_curvature, total_weighting_factor,
                     save=SAVE_PLOTS,
+                    path=outdir / "spectral_curvature_vs_spx.png",
+                    show=False,
                     xlabel=r"Fitted spectral index $\alpha$",
                     ylabel="Spectral curvature",
                     title="Spectral curvature as function of fitted spectral index\nall catalogs")
@@ -280,8 +315,8 @@ def main():
         plt.colorbar(label='Cummulative weight / max weight')
         plt.ylabel("DEC (deg)")
         plt.xlabel("RA (deg)")
-        if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_weight_density_vs_pos.png")
-        plt.show()
+        if SAVE_PLOTS: plt.savefig(outdir / f"{config.anchor_catalog.name}_weight_density_vs_pos.png")
+        plt.close('all')
 
 
         #### correction factor as function of total weighting factor
@@ -294,8 +329,8 @@ def main():
         plt.ylabel("Correction factor")
         plt.xlabel("Total weighting factor")
         plt.legend()
-        if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_weightfac.png")
-        plt.show()
+        if SAVE_PLOTS: plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_weightfac.png")
+        plt.close('all')
 
 
         #### correction factor as function of ra and dec separately
@@ -319,8 +354,8 @@ def main():
         ax2.legend()
         fig.suptitle('Weighted correction factor')
         plt.tight_layout()
-        if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_weightfac_radec_dual.png")
-        plt.show()
+        if SAVE_PLOTS: plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_weightfac_radec_dual.png")
+        plt.close('all')
 
 
         #### correction factor as function of [ra, dec] in 2D
@@ -379,14 +414,14 @@ def main():
         ax.set_xlabel('RA (deg)')
         ax.set_ylabel('Dec (deg)')
         ax.set_title('Correction factor map')
-        if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_pos_2d.png")
-        plt.show()
+        if SAVE_PLOTS: plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_pos_2d.png")
+        plt.close('all')
 
 
         #### flux as a function of frequency
         MHz = 1e6
         n_plot = min(1000, len(fitted_flux))
-        rng = np.random.default_rng(42)
+        rng = np.random.default_rng(args.seed)
         idx = rng.choice(len(fitted_flux), n_plot, replace=False)
 
         min_freq = np.min([cat.freq for cat in config.catalogs])
@@ -429,8 +464,8 @@ def main():
         ax.set_ylabel('Flux (Jy)')
         ax.set_title(f'Reconstructed spectra ({n_plot} sources) {config.anchor_catalog.name}')
         ax.legend(fontsize=9)
-        if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_flux_vs_freq.png")
-        plt.show()
+        if SAVE_PLOTS: plt.savefig(outdir / f"{config.anchor_catalog.name}_flux_vs_freq.png")
+        plt.close('all')
 
 
 
