@@ -1,0 +1,440 @@
+import argparse
+import warnings
+import numpy as np
+import matplotlib.pyplot as plt
+#from tqdm import tqdm
+from functions import plot_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d, predict_flux
+from functions import compute_flux_correction_factor, calculate_correction_factor_weight, biweight_location
+from time import perf_counter
+from catalog_manager import Catalog, Config, Catalog_set, Output
+from joblib import Parallel, delayed
+from pathlib import Path
+from astropy.io import fits
+warnings.filterwarnings("ignore", message=".*(non-interactive|tqdm).*")
+
+try:
+    from termcolor import colored
+except ImportError:
+    print("termcolor not found, ignoring color")
+    def colored(str, col): return str
+
+#### all currently implemented survey catalogs
+all_catalogs = Catalog_set([
+    Catalog("catalogs/vlssr/vlssr_clean.fits",                73.8e6,     "vlssr",      scale=1.1733),
+    Catalog("catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",   144.6e6,    "lofar_dr3",  scale=1.0564),
+    Catalog("catalogs/tgss/tgss_clean.fits",                  150e6,      "tgss",       scale=1.1125),
+    Catalog("catalogs/gleam_x_gp/gleam_x_gp_clean.fits",      200e6,      "gleam_xgp",  scale=1.1337),
+    Catalog("catalogs/gleam_300/gleam_300_clean.fits",        300e6,      "gleam_300",  scale=1.1337),
+    Catalog("catalogs/wenss/wenss_clean.fits",                325e6,      "wenss",      scale=1.0484),
+    Catalog("catalogs/vcss/vcss_clean.fits",                  340e6,      "vcss",       scale=0.9815),
+    Catalog("catalogs/txs/txs_clean.fits",                    365e6,      "txs",        scale=0.9524),
+    Catalog("catalogs/racs/racs_low_gal_clean.fits",          887.5e6,    "racs_gal",   scale=0.8879),  # the galactic portion of the racs-low survey
+    Catalog("catalogs/racs/racs_low_clean.fits",              887.5e6,    "racs_low",   scale=0.8879),  # the rest of the racs-low survey
+    Catalog("catalogs/apertif/apertif_clean.fits",            1355e6,     "apertif",    scale=0.9765),
+    Catalog("catalogs/meerkat/meerkat_clean.fits",            1359.7e6,   "meerkat",    scale=0.8525),
+    Catalog("catalogs/racs/racs_mid_clean.fits",              1367.5e6,   "racs_mid",   scale=0.9486),
+    Catalog("catalogs/nvss/nvss_clean.fits",                  1400e6,     "nvss",       scale=1),
+    Catalog("catalogs/racs/racs_high_clean.fits",             1655.5e6,   "racs_high",  scale=0.9901),
+    Catalog("catalogs/vlass/vlass_clean.fits",                3000e6,     "vlass",      scale=0.9915),  # vlass
+])
+
+#### available configurations
+lofar_dr3_config = Config(spectral_damping_factor = 5,
+                           snr_lower_limit = 7,
+                           nsigma = 2.5,
+                           minimum_points = 3,
+                           crowd_radius_arc = None,
+                           minimum_frequency_spacing = 0,
+                           catalog_names = [cat.name for cat in all_catalogs],
+                           reference_file = None,
+                           anchor_catalog_name = "lofar_dr3",
+                           )
+
+default_config = Config(spectral_damping_factor = 5,
+                        snr_lower_limit = 7,
+                        nsigma = 3,
+                        minimum_points = 3,
+                        crowd_radius_arc = None,
+                        minimum_frequency_spacing = 0,
+                        catalog_names = ["racs_gal", "meerkat", "tgss", "gleam_300", "gleam_xgp", "lofar"],
+                        reference_file = None,
+                        anchor_catalog_name = "lofar",
+                        )
+
+
+
+#### Preset -> reference catalog name list
+_PRESETS = {
+    "all":      [cat.name for cat in all_catalogs],
+    "default":  ["vlssr", "lofar_dr3", "tgss", "gleam_300", "wenss", "vcss", "txs", "racs_low", "apertif", "racs_mid", "nvss", "racs_high", "vlass"],
+}
+
+#### Frequency units
+_FREQ_UNIT_SCALE = {"Hz": 1.0, "MHz": 1e6, "GHz": 1e9}
+_CUNIT3_SCALE    = {"HZ": 1.0, "KHZ": 1e3, "MHZ": 1e6, "GHZ": 1e9}
+
+def _resolve_freq(image_path, args_freq, args_freq_unit):
+    """Try CRVAL3 (with CUNIT3 conversion), then --freq + --freq-unit."""
+    with fits.open(image_path) as hdul:
+        hdr = hdul[0].header
+    if "CRVAL3" in hdr:
+        crval = float(hdr["CRVAL3"])
+        cunit = str(hdr.get("CUNIT3", "Hz")).strip()
+        return crval * _CUNIT3_SCALE.get(cunit.upper(), 1.0)
+    if args_freq is None:
+        raise SystemExit(f"Cannot infer frequency from {image_path}: no CRVAL3 in header. Use --freq.")
+    return args_freq * _FREQ_UNIT_SCALE[args_freq_unit]
+
+def _build_parser():
+    p = argparse.ArgumentParser(description="Calibrate a radio image against reference catalogs.")
+    p.add_argument("image",                       help="Path to FITS file (the anchor / unknown).")
+    p.add_argument("--catalogs",                  default="all", help='Preset name (all, default, lofar_dr3, cygnus, test) or comma-separated catalog list.')
+    p.add_argument("--anchor-name",               default=None,  help="Registry name for the image (default: image filename stem).")
+    p.add_argument("--freq",                      type=float, default=None, help="Central frequency in --freq-unit; required if FITS has no CRVAL3.")
+    p.add_argument("--freq-unit",                 choices=list(_FREQ_UNIT_SCALE), default="Hz")
+    p.add_argument("--combination-size",          type=int,   default=3, help="Set matching complexity as well as fittin D.O.F.")
+    p.add_argument("--nsigma",                    type=float, default=3)
+    p.add_argument("--snr-lower-limit",           type=float, default=7)
+    p.add_argument("--minimum-points",            type=int,   default=3)
+    p.add_argument("--spectral-index-theory",     type=float, default=-0.7)
+    p.add_argument("--minimum-frequency-spacing", type=float, default=100e6, help="Ignore catalog matching with a spacing below threshold (Hz)")
+    p.add_argument("--reference-file",            default=None, help="Provide reference cutout when giving a large catalog to speed up matching")
+    p.add_argument("--no-reload-cache",           action="store_true", help="Force PyBDSF to re-run on the image.")
+    p.add_argument("--save-plots",                action="store_true")
+    p.add_argument("--no-plots",                  action="store_true")
+    p.add_argument("--debug",                     action="store_true")
+    p.add_argument("--thres-arc",                 default=None, help="Override error based matching with simple thresholding (arcsec)")
+    p.add_argument("--n-jobs",                    type=int, default=-1)
+    return p
+
+def main():
+    args = _build_parser().parse_args()
+    start = perf_counter()
+
+    image_path = Path(args.image)
+    if not image_path.exists():
+        raise SystemExit(f"Image not found: {image_path}")
+
+    freq_hz = _resolve_freq(image_path, args.freq, args.freq_unit)
+    anchor_name = args.anchor_name or image_path.stem
+
+    image_cat = Catalog(
+        path=str(image_path),
+        freq_hz=freq_hz,
+        name=anchor_name,
+        scale=1,
+        table=False,
+        reload_cache=not args.no_reload_cache,
+    )
+
+    if args.catalogs in _PRESETS:
+        ref_names = _PRESETS[args.catalogs]
+    else:
+        ref_names = [n.strip() for n in args.catalogs.split(",") if n.strip()]
+
+    available = set(Catalog_set.registry)
+    unknown = [n for n in ref_names if n not in available]
+    if unknown:
+        raise SystemExit(f"Unknown catalog(s): {unknown}\nAvailable: {sorted(available)}")
+    if not ref_names:
+        raise SystemExit("Reference catalog list is empty.")
+
+    ref_cats = [Catalog_set.registry[n] for n in ref_names]
+    all_cats = ref_cats + [image_cat]
+
+    config = Config(
+        spectral_damping_factor=5,
+        snr_lower_limit=args.snr_lower_limit,
+        spectral_index_theory=args.spectral_index_theory,
+        minimum_points=args.minimum_points,
+        nsigma=args.nsigma,
+        crowd_radius_arc=None,
+        minimum_frequency_spacing=args.minimum_frequency_spacing,
+        catalogs=all_cats,
+        anchor_catalog=image_cat,
+        reference_file=args.reference_file,
+        thres_arc=args.thres_arc,
+    )
+    config.setup()
+    output = Output()
+
+    DEBUG_MODE       = args.debug
+    INSPECTION_PLOTS = not args.no_plots
+    SAVE_PLOTS       = args.save_plots
+    COMBINATION_SIZE = args.combination_size
+
+    if DEBUG_MODE:
+        # cutdown catalog plot
+        for cat in config.catalogs:
+            plt.hist(np.log10(cat.flux), alpha=0.6, bins=25, label=cat.name)
+        plt.xlabel("log10(flux/Jy)")
+        plt.ylabel("count")
+        plt.yscale('log')
+        plt.legend()
+        plt.show()
+
+        # catalog as function of position
+        for cat in config.catalogs:
+            if len(cat.ra) > 0: plt.scatter(cat.ra, cat.dec, s=1, label=cat.name)
+        plt.gca().set_box_aspect(1)
+        plt.xlabel("RA")
+        plt.ylabel("Dec")
+        plt.legend(loc='lower left')
+        plt.show()
+
+    print(f"Setup done at: {(perf_counter() - start):.2f} s")
+
+    #########################################
+    #### catalog combination auto-looper ####
+    #########################################
+    all_combinations = get_combinations(config.catalogs, size=COMBINATION_SIZE, required_index=config.anchor_catalog_index, minimum_spacing=config.minimum_frequency_spacing)
+    output_width = len(str(len(all_combinations)))
+
+    print(f"Found {len(all_combinations)} valid combinations")
+    print("--------------------------------------------------------")
+
+    # multithread the main flux correction factor loop
+    outputs = Parallel(n_jobs=args.n_jobs, backend='threading')(
+        delayed(compute_flux_correction_factor)([config.catalogs[j] for j in combo], config) for combo in all_combinations
+    )
+
+    for i, (combo, out) in enumerate(zip(all_combinations, outputs)):
+        local_cats = [config.catalogs[j] for j in combo]
+
+        if out is not None:
+            print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",f"Matches: {len(out[0])}")
+
+            output.add(*out)
+            spx, curv, snr, cor, flux, max_sep, p_weight, n_crowd, ra, dec = out
+
+            if DEBUG_MODE:
+                # compare spectral_index_theory assumption versus fitted spectral indices
+                plt.scatter(flux, cor, c=spx)
+                plt.yscale('log')
+                plt.xscale('log')
+                plt.colorbar(label = r"Spectral index $\alpha$")
+                plt.xlabel(f"{config.anchor_catalog.name} fitted flux (Jy)")
+                plt.ylabel("Correction factor")
+                plt.title(f"{config.anchor_catalog.name} "+r"flux, $\alpha$=-"+f"{config.spectral_index_theory} vs fitted")
+                if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_flux.png")
+                plt.show()
+
+                # compare fitted spectral index with correction factor
+                plt.scatter(spx, cor, c=flux, norm='log')
+                plt.yscale('log')
+                plt.axvline(-0.7, ls='--', c='k')
+                plt.axhline(1, ls='--', c='k')
+                plt.colorbar(label='Flux (Jy)')
+                plt.ylabel("Flux correction factor")
+                plt.xlabel(r"Spectral index $\alpha$")
+                plt.title("Flux correction as function of spectral index")
+                if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_spx.png")
+                plt.show()
+
+        else:
+            print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]","Matches:", colored("None", "yellow"))
+
+    print(f"Flux compute done at {(perf_counter() - start):.2f} seconds")
+
+    output.concatenate()
+    total_weighting_factor = calculate_correction_factor_weight(output, config)
+    weight_mask = total_weighting_factor > 0
+    output.apply_mask(weight_mask)
+    total_weighting_factor = total_weighting_factor[weight_mask]
+
+    ras, decs, correction_factor, spectral_index, spectral_curvature, fitted_flux, signal_to_noise, max_separation, point_probability, crowding_parameter = output.return_values()
+
+    ############################################################################
+    #### plotting correction factor based on all previous catalog matchings ####
+    ############################################################################
+    mspx, mcor, mcur = biweight_location(spectral_index, np.log10(correction_factor), spectral_curvature, weights=total_weighting_factor)
+    mcor = 10**mcor
+
+    plot_statistics(spectral_index, correction_factor, total_weighting_factor,
+                    logy=True,
+                    save=SAVE_PLOTS,
+                    xlabel=r"Fitted spectral index $\alpha$",
+                    ylabel="Correction factor",
+                    title="Correction factor as function of fitted spectral index\nall catalogs")
+
+    plot_statistics(spectral_index, spectral_curvature, total_weighting_factor,
+                    save=SAVE_PLOTS,
+                    xlabel=r"Fitted spectral index $\alpha$",
+                    ylabel="Spectral curvature",
+                    title="Spectral curvature as function of fitted spectral index\nall catalogs")
+
+    print("--------------------------------------------------------")
+    print(f"Spectral index: {mspx:.3f}, correction factor: {mcor:.3f}, curvature: {mcur:.3f}, total matches: {len(correction_factor)}")
+    print("--------------------------------------------------------")
+
+    ##########################
+    #### inspection plots ####
+    ##########################
+    if INSPECTION_PLOTS:
+        min_cor, max_cor = 0.25, 4.0
+        mask = (correction_factor > min_cor) & (correction_factor < max_cor) #(correction_factor != np.nan)
+
+        #### weight density as function of location
+        fig, ax = plt.subplots(figsize=(7.5, 5))
+        plt.hist2d(ras, decs, weights=total_weighting_factor/np.max(total_weighting_factor), bins=(75, 50), cmap='Blues')
+        plt.colorbar(label='Cummulative weight / max weight')
+        plt.ylabel("DEC (deg)")
+        plt.xlabel("RA (deg)")
+        if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_weight_density_vs_pos.png")
+        plt.show()
+
+
+        #### correction factor as function of total weighting factor
+        fig, ax = plt.subplots(figsize=(6, 6))
+        plt.scatter(total_weighting_factor, correction_factor, s=1.5, alpha=0.2)
+        plt.yscale('log')
+        plt.xscale('log')
+        plt.axhline(1, ls='--', color='black', alpha=0.5, label='1')
+        plt.axhline(mcor, ls='--', color='tomato', label='Fit')
+        plt.ylabel("Correction factor")
+        plt.xlabel("Total weighting factor")
+        plt.legend()
+        if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_weightfac.png")
+        plt.show()
+
+
+        #### correction factor as function of ra and dec separately
+        dec_c, dec_mn, dec_std, dec_sem = weighted_bin_stats(decs[mask], correction_factor[mask], total_weighting_factor[mask], n_bins=50)
+        ra_c,  ra_mn,  ra_std,  ra_sem  = weighted_bin_stats(ras[mask],  correction_factor[mask], total_weighting_factor[mask], n_bins=50)
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+        ax1.plot(dec_c, dec_mn, color='steelblue', lw=2, label='Weighted mean')
+        ax1.fill_between(dec_c, dec_mn - dec_std, dec_mn + dec_std, alpha=0.10, color='steelblue', label='±1σ (weighted)')
+        ax1.fill_between(dec_c, dec_mn - dec_sem, dec_mn + dec_sem, alpha=0.35, color='steelblue', label='±1μ_err')
+        ax1.axhline(1, ls='--', color='black', alpha=0.7)
+        ax1.set_xlabel('Dec (deg)')
+        ax1.set_ylabel('Correction factor')
+        ax1.legend()
+
+        ax2.plot(ra_c, ra_mn, color='tomato', lw=2, label='Weighted mean')
+        ax2.fill_between(ra_c, ra_mn - ra_std, ra_mn + ra_std, alpha=0.10, color='tomato', label='±1σ (weighted)')
+        ax2.fill_between(ra_c, ra_mn - ra_sem, ra_mn + ra_sem, alpha=0.35, color='tomato', label='±1μ_err')
+        ax2.axhline(1, ls='--', color='black', alpha=0.7)
+        ax2.set_xlabel('RA (deg)')
+        ax2.legend()
+        fig.suptitle('Weighted correction factor')
+        plt.tight_layout()
+        if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_weightfac_radec_dual.png")
+        plt.show()
+
+
+        #### correction factor as function of [ra, dec] in 2D
+        fig, ax = plt.subplots(figsize=(12, 5))
+
+        real_ticks = np.geomspace(min_cor, max_cor, 5, dtype=float)
+        log_ticks  = np.log10(real_ticks).tolist()
+
+        n_pts_2d = np.sum(mask)
+        if n_pts_2d < 5000:
+            # voronoi plot
+            from scipy.spatial import Voronoi
+            from matplotlib.patches import Polygon
+
+            points_2d = np.column_stack([ras[mask], decs[mask]])
+            values_2d = correction_factor[mask]
+
+            vor = Voronoi(points_2d)
+
+            ra_min, ra_max = ras[mask].min(), ras[mask].max()
+            dec_min, dec_max = decs[mask].min(), decs[mask].max()
+
+            log_values = np.log10(values_2d)
+            max_log_dev = np.max(np.abs(log_values))
+
+            for point_idx, region_idx in enumerate(vor.point_region):
+                region = vor.regions[region_idx]
+                if -1 in region or len(region) == 0:
+                    continue
+                vertices = vor.vertices[region]
+                vertices = np.clip(vertices, [ra_min, dec_min], [ra_max, dec_max])
+
+                log_val = log_values[point_idx]
+                color_norm = 0.5 + (log_val / (2 * max_log_dev))
+                color_norm = np.clip(color_norm, 0, 1)
+
+                poly = Polygon(vertices, facecolor=plt.cm.RdYlGn_r(color_norm), edgecolor='gray', linewidth=0.2, alpha=0.7)
+                ax.add_patch(poly)
+
+            scatter = ax.scatter(ras[mask], decs[mask], c=log_values, cmap='RdYlGn_r', vmin=-max_log_dev, vmax=max_log_dev, s=30, edgecolors='black', linewidth=0.5, zorder=5)
+            cbar = fig.colorbar(scatter, ax=ax, label='log10(Correction factor)')
+
+        else:
+            # hexbin fallback
+            log_cf = np.log10(correction_factor[mask])
+            max_log_dev = np.max(np.abs(log_cf))
+
+            hb = ax.hexbin(ras[mask], decs[mask], C=log_cf, gridsize=200, cmap='RdYlGn_r', vmin=-max_log_dev, vmax=max_log_dev, alpha=0.8)
+            cbar = fig.colorbar(hb, ax=ax, label='log10(Correction factor)')
+
+        cbar.set_ticks(log_ticks)
+        cbar.set_ticklabels([f"{t:.2f}" for t in real_ticks])
+
+        ax.set_xlim(ras[mask].min(), ras[mask].max())
+        ax.set_ylim(decs[mask].min(), decs[mask].max())
+        ax.set_xlabel('RA (deg)')
+        ax.set_ylabel('Dec (deg)')
+        ax.set_title('Correction factor map')
+        if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_corr_vs_pos_2d.png")
+        plt.show()
+
+
+        #### flux as a function of frequency
+        MHz = 1e6
+        n_plot = min(1000, len(fitted_flux))
+        rng = np.random.default_rng(42)
+        idx = rng.choice(len(fitted_flux), n_plot, replace=False)
+
+        min_freq = np.min([cat.freq for cat in config.catalogs])
+        max_freq = np.max([cat.freq for cat in config.catalogs])
+        freqs = np.logspace(np.log10(min_freq), np.log10(max_freq), 100) / MHz
+        freq0 = config.anchor_catalog.freq / MHz
+        freq_pivot = 100e6 / MHz
+
+        fig, ax = plt.subplots(figsize=(9, 6))
+
+        # individual source spectra
+        for i in idx:
+            si = spectral_index[i]
+            ci = spectral_curvature[i]
+            f0 = fitted_flux[i]
+            if not np.isfinite(si) or f0 <= 0:
+                continue
+
+            # back-compute flux at the log-parabola pivot, then predict full spectrum
+            ln_scale = np.log(f0) - (si * np.log(freq0 / freq_pivot) + ci * np.log(freq0 / freq_pivot)**2)
+            flux_spec = predict_flux(freqs, freq_pivot, np.exp(ln_scale), si, curvature=ci)
+            ax.loglog(freqs, flux_spec, lw=0.3, alpha=0.15, color='gray')
+
+        # aggregate power-law (curvature = 0)
+        flux_pl = predict_flux(freqs, freq_pivot, np.exp(np.log(np.median(fitted_flux)) - (mspx * np.log(freq0 / freq_pivot))), mspx, curvature=0)
+        ax.loglog(freqs, flux_pl, lw=2.5, color='steelblue', label=f'Power law:  α = {mspx:.3f}')
+
+        # aggregate curved fit
+        if np.isfinite(mcur) and abs(mcur) > 1e-6:
+            ln_scale_mn = np.log(np.median(fitted_flux)) - (mspx * np.log(freq0 / freq_pivot) + mcur * np.log(freq0 / freq_pivot)**2)
+            flux_cv = predict_flux(freqs, freq_pivot, np.exp(ln_scale_mn), mspx, curvature=mcur)
+            ax.loglog(freqs, flux_cv, lw=2, ls='--', color='tomato', label=f'Curved:  α = {mspx:.3f},  β = {mcur:.3f}')
+
+        # catalog frequencies
+        for cat in config.catalogs:
+            ax.axvline(cat.freq / MHz, ls=':', alpha=0.25, color='gray')
+            ax.text(cat.freq / MHz, ax.get_ylim()[0] * 1.1, cat.name, rotation=45, fontsize=7, alpha=0.5, ha='right')
+
+        ax.set_xlabel('Frequency (MHz)')
+        ax.set_ylabel('Flux (Jy)')
+        ax.set_title(f'Reconstructed spectra ({n_plot} sources) {config.anchor_catalog.name}')
+        ax.legend(fontsize=9)
+        if SAVE_PLOTS: plt.savefig(f"{config.anchor_catalog.name}_flux_vs_freq.png")
+        plt.show()
+
+
+
+    print(f"Done at: {(perf_counter() - start):.2f} s")
+
+if __name__ == "__main__":
+    main()
