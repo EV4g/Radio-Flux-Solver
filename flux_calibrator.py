@@ -51,6 +51,7 @@ pointing_catalogs = Catalog_set([
 #### catalgos based on manual .fits files
 manual_catalogs = Catalog_set([
     Catalog("data/raw/P282+00_int.fits",                      144.6e6,    "lofar",       scale=1, table=False, reload_cache=True),
+    # Catalog("data/raw/P282+00_app.fits",                      144.6e6,    "lofar",       scale=1, table=False, reload_cache=True),
     Catalog("data/raw/G035.5+0.0IFx_Mosaic.fits",             1359.7e6,   "meerkat_w44", scale=1, table=False, reload_cache=True),
 #    Catalog("data/raw/avgtest-MFS-image_pbcor.fits",          1284e6,     "meerkat_L-avgm",      scale=1, table=False),
 #    Catalog("data/raw/test-MFS-image_pbcor.fits",             1284e6,     "meerkat-L-band",      scale=1, table=False),
@@ -102,11 +103,11 @@ test_config = Config(spectral_damping_factor = 5,
                      minimum_points = 3,
                      crowd_radius_arc = None,
                      minimum_frequency_spacing = 50e6,
-                     #catalog_names = ["tgss", "gleam_300", "gleam_xgp", "meerkat", "racs_mid", "racs_high", "lofar"],
-                     catalog_names = ["tgss", "gleam_300", "gleam_xgp", "meerkat_w44", "racs_gal", "racs_mid", "racs_high"],
+                     catalog_names = ["tgss", "gleam_300", "gleam_xgp", "meerkat", "racs_mid", "racs_high", "lofar"],
+                     #catalog_names = ["tgss", "gleam_300", "gleam_xgp", "meerkat_w44", "racs_gal", "racs_mid", "racs_high"],
                      reference_file = None,
-                     #anchor_catalog_name = "lofar"
-                     anchor_catalog_name = "meerkat_w44",
+                     anchor_catalog_name = "lofar"
+                     #anchor_catalog_name = "meerkat_w44",
                      )
 
 #### Parameters
