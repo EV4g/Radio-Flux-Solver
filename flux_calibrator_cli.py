@@ -83,7 +83,7 @@ def _is_table_catalog(path):
 
 def _build_parser():
     p = argparse.ArgumentParser(description="Calibrate a radio image or table catalog against reference catalogs.")
-    p.add_argument("catalog",                     help="Path to FITS image or table catalog (the anchor / unknown).")
+    p.add_argument("catalog",                                                help="Path to FITS image or table catalog (the anchor / unknown).")
     p.add_argument("--scale",                     type=float, default=1,     help="Scale values in the anchor catalog by this amount")
     p.add_argument("--catalogs",                  default="default",         help='Preset name (all, default) or comma-separated catalog list.')
     p.add_argument("--anchor-name",               default=None,              help="Registry name for the anchor (default: input filename stem).")
