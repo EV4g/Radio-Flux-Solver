@@ -12,23 +12,24 @@ End-to-end; takes care of the finding, matching, and calibration of sources base
 
 #### Currently included reference survey catalogs
 
-| Catalog Name  | Frequency (MHz) |
-|---------------|-----------------|
-| vlssr         | 73.8            |
-| lofar_dr3     | 144.6           |
-| tgss          | 150             |
-| gleam_x_gp    | 200             |
-| gleam_300     | 300             |
-| wenss         | 325             |
-| vcss          | 340             |
-| txs           | 365             |
-| racs_low      | 887.5           |
-| apertif       | 1355            |
-| meerkat       | 1359.7          |
-| racs_mid      | 1367.5          |
-| nvss          | 1400            |
-| racs_high     | 1655.5          |
-| vlass         | 3000            |
+| Catalog Name  | Frequency (MHz) | Notes   |
+|---------------|-----------------|---------|
+| vlssr         | 73.8            |         |
+| lofar_dr3     | 144.6           |         |
+| tgss          | 150             |         |
+| gleam_x_gp    | 200             |         |
+| gleam_300     | 300             |         |
+| wenss         | 325             |         |
+| vcss          | 340             |         |
+| txs           | 365             |         |
+| racs_gal      | 887.5           | Galactic part of racs_low |
+| racs_low      | 887.5           |         |
+| apertif       | 1355            |         |
+| meerkat       | 1359.7          | SMGPS   |
+| racs_mid      | 1367.5          |         |
+| nvss          | 1400            |         |  
+| racs_high     | 1655.5          |         |
+| vlass         | 3000            |         |
 
 #### Usage
 You can validate a .fits file using:
