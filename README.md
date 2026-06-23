@@ -29,3 +29,17 @@ End-to-end; takes care of the finding, matching, and calibration of sources base
 | nvss          | 1400            |
 | racs_high     | 1655.5          |
 | vlass         | 3000            |
+
+#### Usage
+You can validate a .fits file using:
+```
+uv run flux_calibrator_cli.py path/to/file.fits
+```
+Currently supported arguments are:
+```
+[-h] [--scale SCALE] [--catalogs CATALOGS] [--anchor-name ANCHOR_NAME] [--freq FREQ] [--freq-unit {Hz,MHz,GHz}]
+                              [--combination-size COMBINATION_SIZE] [--spectral_damping_factor SPECTRAL_DAMPING_FACTOR] [--nsigma NSIGMA] [--snr-lower-limit SNR_LOWER_LIMIT]
+                              [--minimum-points MINIMUM_POINTS] [--spectral-index-theory SPECTRAL_INDEX_THEORY] [--minimum-frequency-spacing MINIMUM_FREQUENCY_SPACING]
+                              [--reference-file REFERENCE_FILE] [--spatial-filter] [--no-reload-cache] [--save-plots] [--debug] [--thres-arc THRES_ARC] [--n-jobs N_JOBS]
+                              [--logging] [--output-dir OUTPUT_DIR] [--seed SEED]
+```
