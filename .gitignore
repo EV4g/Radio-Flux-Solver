@@ -1,13 +1,16 @@
-*.fits
-*.fits.gz
-/__pycache__
-*.gz
-*.xml
-catalogs/vlssr/VLSSR.CATALOG.FIT
-*.csv
+# large files
+*.FIT
 *.fit
+*.FITS
+*.fits
+*.gz
+
+/__pycache__
+*.xml
+*.csv
+
 uv.lock
 .python-version
-*.FIT
+
 *.log
 *.json
