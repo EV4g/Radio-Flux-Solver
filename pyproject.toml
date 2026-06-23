@@ -1,6 +1,6 @@
 [project]
 name = "Radio-Flux-Solver"
-version = "0.1.0"
+version = "1.0.0"
 description = "Code to calibrate a given radio catalog or image file to known reference catalogs, using source matching and spectral index analysis."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -9,26 +9,13 @@ dependencies = [
     "bdsf>=1.13.0.post2",
     "joblib>=1.5.3",
     "matplotlib>=3.10.8",
-    "numpy>=2.4.3",
+    "numpy>=2.4.3,<2.5",
     "plotext>=5.3.2",
     "reproject>=0.19.0",
     "scipy>=1.17.1",
     "termcolor>=3.3.0",
     "tqdm>=4.67.3",
 ]
-
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-py-modules = ["flux_calibrator_cli", "flux_calibrator", "functions", "catalog_manager"]
-
-[project.scripts]
-flux-calibrator = "flux_calibrator_cli:main"
-
-[tool.uv]
-package = true
 
 [tool.ty.rules]
 unresolved-attribute = "ignore"

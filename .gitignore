@@ -16,3 +16,8 @@ uv.lock
 # logs and log dirs
 *.log
 *_output_*/
+
+# build artifacts
+*.egg-info/
+build/
+dist/
