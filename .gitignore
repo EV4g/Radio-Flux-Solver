@@ -11,6 +11,8 @@
 
 uv.lock
 .python-version
-
-*.log
 *.json
+
+# logs and log dirs
+*.log
+*_output_*/
