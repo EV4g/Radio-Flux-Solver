@@ -40,6 +40,7 @@
 #     vcss['e_flux_jy'].unit = 'Jy'
 
 # assert str(vcss['ra'].unit) == 'deg' and str(vcss['dec'].unit) == 'deg'
+# assert str(vcss['e_ra'].unit) == 'deg' and str(vcss['e_dec'].unit) == 'deg'
 # assert str(vcss['flux_jy'].unit) == 'Jy' and str(vcss['e_flux_jy'].unit) == 'Jy'
 
 # vcss.write(os.getcwd()+"/catalogs/vcss/vcss_clean.fits", overwrite=True)

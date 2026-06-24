@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 #from tqdm import tqdm
 from functions import plot_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d, predict_flux
-from functions import compute_flux_correction_factor, calculate_correction_factor_weight, biweight_location
+from functions import compute_flux_correction_factor, calculate_correction_factor_weight, biweight_location, report_ignored_cats
 from time import perf_counter
 from catalog_manager import Catalog, Config, Catalog_set, Output
 from joblib import Parallel, delayed
@@ -96,12 +96,13 @@ def _build_parser():
     p.add_argument("--minimum-points",            type=int,   default=3,     help="Ignore matched catalogs sets with matches below this limit (default: 3)")
     p.add_argument("--spectral-index-theory",     type=float, default=-0.8,  help="Theoretical value for spectral index for desired source (default: -0.8)")
     p.add_argument("--minimum-frequency-spacing", type=float, default=100e6, help="Ignore catalog matching with a spacing below threshold (Hz)")
+    p.add_argument("--minimum-position-error",    type=float, default=None,  help="Set a minimum position error. Sources with lower error at set to this value (Default: None).")
     p.add_argument("--reference-file",            default=None,              help="Provide reference cutout when giving a large catalog to speed up matching")
     p.add_argument("--spatial-filter",            action="store_true",       help="Pre-filter reference catalogs to the anchor's spatial coverage (with 10%% margin).")
     p.add_argument("--no-reload-cache",           action="store_true",       help="Force PyBDSF to re-run on the anchor image.")
     p.add_argument("--save-plots",                action="store_true",       help="Save inspection plots to disk")
     p.add_argument("--debug",                     action="store_true",       help="Store debug plots per set of matches (slow)")
-    p.add_argument("--thres-arc",                 default=None,              help="Override error based matching with simple thresholding (arcsec)")
+    p.add_argument("--thres-arc",                 type=float, default=None,  help="Override error based matching with simple thresholding (arcsec)")
     p.add_argument("--n-jobs",                    type=int, default=-1,      help="Number of cores to use, defaults to all of them")
     p.add_argument("--logging",                   action="store_true",       help="Write all output to a log file in --output-dir instead of the terminal.")
     p.add_argument("--output-dir",                default=None,              help="Directory to write plots and logs into (default: current working directory).")
@@ -174,6 +175,7 @@ def main():
         nsigma=args.nsigma,
         crowd_radius_arc=None,
         minimum_frequency_spacing=args.minimum_frequency_spacing,
+        minimum_position_error=args.minimum_position_error,
         catalogs=all_cats,
         anchor_catalog=anchor_cat,
         reference_file=args.reference_file,
@@ -219,15 +221,26 @@ def main():
     #########################################
     all_combinations = get_combinations(config.catalogs, size=COMBINATION_SIZE, required_index=config.anchor_catalog_index, minimum_spacing=config.minimum_frequency_spacing)
     output_width = len(str(len(all_combinations)))
-
-
+    
+    # report catalogs excluded by spacing rules
+    report_ignored_cats(all_combinations, config)
+    
     print(f"Found {len(all_combinations)} valid combinations")
     print("--------------------------------------------------------")
+
+    # error when no valid catalog-catalog combinations are found after freq constraints
+    if len(all_combinations) == 0:
+        print(colored("Error: no valid catalog combinations found\n", 'red'))
+        sys.exit(1)
 
     # multithread the main flux correction factor loop
     outputs = Parallel(n_jobs=args.n_jobs, backend='threading')(
         delayed(compute_flux_correction_factor)([config.catalogs[j] for j in combo], config) for combo in all_combinations
     )
+    
+    if all(val is None for val in outputs):
+        print(colored(f"Error: no sources where able to be matched in any of the {len(outputs)} combinations\n", 'red'))
+        sys.exit(1)
 
     for i, (combo, out) in enumerate(zip(all_combinations, outputs)):
         local_cats = [config.catalogs[j] for j in combo]
@@ -254,7 +267,7 @@ def main():
                 # compare fitted spectral index with correction factor
                 plt.scatter(spx, cor, c=flux, norm='log')
                 plt.yscale('log')
-                plt.axvline(-0.7, ls='--', c='k')
+                plt.axvline(config.spectral_index_theory, ls='--', c='k')
                 plt.axhline(1, ls='--', c='k')
                 plt.colorbar(label='Flux (Jy)')
                 plt.ylabel("Flux correction factor")
@@ -368,7 +381,7 @@ def main():
         log_ticks  = np.log10(real_ticks).tolist()
 
         n_pts_2d = np.sum(mask)
-        if n_pts_2d < 5000:
+        if n_pts_2d < 20000:
             # voronoi plot
             from scipy.spatial import Voronoi
             from matplotlib.patches import Polygon
@@ -399,7 +412,7 @@ def main():
                 ax.add_patch(poly)
 
             scatter = ax.scatter(ras[mask], decs[mask], c=log_values, cmap='RdYlGn_r', vmin=-max_log_dev, vmax=max_log_dev, s=30, edgecolors='black', linewidth=0.5, zorder=5)
-            cbar = fig.colorbar(scatter, ax=ax, label='log10(Correction factor)')
+            cbar = fig.colorbar(scatter, ax=ax, label='Correction factor')
 
         else:
             # hexbin fallback
@@ -407,7 +420,7 @@ def main():
             max_log_dev = np.max(np.abs(log_cf))
 
             hb = ax.hexbin(ras[mask], decs[mask], C=log_cf, gridsize=200, cmap='RdYlGn_r', vmin=-max_log_dev, vmax=max_log_dev, alpha=0.8)
-            cbar = fig.colorbar(hb, ax=ax, label='log10(Correction factor)')
+            cbar = fig.colorbar(hb, ax=ax, label='Correction factor')
 
         cbar.set_ticks(log_ticks)
         cbar.set_ticklabels([f"{t:.2f}" for t in real_ticks])

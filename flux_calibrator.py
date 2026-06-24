@@ -1,4 +1,5 @@
 import warnings
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 #from tqdm import tqdm
@@ -150,6 +151,10 @@ output_width = len(str(len(all_combinations)))
 
 print(f"Found {len(all_combinations)} valid combinations")
 print("--------------------------------------------------------")
+
+if len(all_combinations) == 0:
+    print(colored("Error: no valid combinations found\n", 'red'))
+    sys.exit(1)
 
 # multithread the main flux correction factor loop
 outputs = Parallel(n_jobs=-1, backend='threading')(

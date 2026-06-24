@@ -60,10 +60,10 @@ def resolve_glob(pattern):
 
 # wrapper class for incoming Table data
 class Catalog:
-    def __init__(self, path=None, freq_hz=None, name=None, flux_lim=0, scale=1, table=True, reload_cache=True):
-        self.path      = resolve_catalog_path(path) if path is not None else None
+    def __init__(self, path=None, freq_hz=None, name=None, flux_lim=0, scale=1, table=True, reload_cache=True, minimum_position_error=0):
+        self.path = resolve_catalog_path(path) if path is not None else None
         if self.path is None: raise ValueError(f"Valid catalog path is required\nPath: {path} is not valid")
-        
+
         self.dir          = self.path.parent
         self.path_stem    = self.path.stem
         self.freq         = freq_hz       # central frequency
@@ -73,6 +73,7 @@ class Catalog:
         self.scale        = scale         # scale factor, flux data is multiplied by this value
         self.table        = table         # whether or not the data is a 2D image (False) or table (True)
         self.reload_cache = reload_cache  # whether or not to reload a cached catalog file made from previous image-input
+        self.minimum_position_error = minimum_position_error  # arcsec; lower bound for per-source e_ra, e_dec (0 = no floor)
         
         # data is None until load() is called
         self.flux = self.e_flux = self.flux_unit = None
@@ -94,7 +95,7 @@ class Catalog:
             self.flux       = np.array(catalog['flux_jy']) * self.scale
             
             # setup a threshold lower bound based on flux_lim
-            flux_threshold = (self.flux > self.flux_lim)
+            flux_threshold  = (self.flux > self.flux_lim)
             
             # apply flux_lim threshold
             self.flux       = self.flux[flux_threshold]
@@ -109,6 +110,10 @@ class Catalog:
                 self.e_dec  = np.array(catalog['e_dec'])[flux_threshold]
                 self.e_ra[np.where(np.isnan(self.e_ra))] = 0   # sanitize NaNs
                 self.e_dec[np.where(np.isnan(self.e_dec))] = 0 # sanitize NaNs
+                if self.minimum_position_error > 0:           # apply lower bound
+                    floor_deg = self.minimum_position_error / 3600.0
+                    self.e_ra  = np.maximum(self.e_ra,  floor_deg)
+                    self.e_dec = np.maximum(self.e_dec, floor_deg)
                 self.err_rad = np.deg2rad(get_pos_err_deg(self))
             except KeyError:
                 self.e_ra = self.e_dec = self.err_rad = None
@@ -162,6 +167,10 @@ class Catalog:
             self.dec      = np.array(image_catalog['dec'])     # degrees
             self.e_ra     = np.array(image_catalog['e_ra'])    # degrees
             self.e_dec    = np.array(image_catalog['e_dec'])   # degrees
+            if self.minimum_position_error > 0:                # apply lower bound
+                floor_deg = self.minimum_position_error / 3600.0
+                self.e_ra  = np.maximum(self.e_ra,  floor_deg)
+                self.e_dec = np.maximum(self.e_dec, floor_deg)
             self.err_rad  = np.deg2rad(get_pos_err_deg(self))
             self.flux     = np.array(image_catalog['flux_jy'])    # Jy (integrated)
             self.e_flux   = np.array(image_catalog['e_flux_jy'])  # Jy
@@ -278,6 +287,7 @@ class Config:
                  crowd_radius_arc              = None,
                  minimum_frequency_spacing     = 0,
                  maximum_frequency_spacing     = np.inf,
+                 minimum_position_error        = None,
                  catalogs                      = None,
                  catalog_names                 = None,
                  reference_file                = None,
@@ -299,6 +309,7 @@ class Config:
         self.crowd_radius_arc          = crowd_radius_arc
         self.minimum_frequency_spacing = minimum_frequency_spacing if minimum_frequency_spacing is not None else 0
         self.maximum_frequency_spacing = maximum_frequency_spacing if maximum_frequency_spacing is not None else np.inf
+        self.minimum_position_error    = minimum_position_error
         self.higher_order_simple       = higher_order_simple
 
         if catalogs is not None:
@@ -345,6 +356,11 @@ class Config:
                     self.footprint_box = compute_footprint_box(
                         self.anchor_catalog.ra, self.anchor_catalog.dec, margin_fraction=0.1
                     )
+        
+        # Propagate minimum_position_error to every catalog
+        if self.minimum_position_error is not None:
+            for cat in self.catalogs:
+                cat.minimum_position_error = self.minimum_position_error
 
         # load the data per catalog
         for i, cat in enumerate(self.catalogs):

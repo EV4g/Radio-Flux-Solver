@@ -514,6 +514,13 @@ def get_combinations(cats, size=3, required_index=None, skip_index=None, only_so
         result.append(indices)
     return result
 
+def report_ignored_cats(combinations, config):
+    used_indices = {i for combo in combinations for i in combo}
+    ignored = [(i, cat) for i, cat in enumerate(config.catalogs) if i != config.anchor_catalog_index and i not in used_indices]
+    if ignored:
+        names = [cat.name for _, cat in ignored]
+        print(colored(f"Catalogs ignored due to frequency-spacing constraints: {', '.join(names)}", "yellow"))
+
 """Return indices of catalog of all unique, non-double, <size> permutations with the optional condition f[i] < f[i+1]"""
 def get_permutations(cats, size=3, required_index=None, skip_index=None, only_sorted=True, minimum_spacing=0):
     freqs = [cat.freq for cat in cats]
