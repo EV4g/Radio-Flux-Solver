@@ -319,7 +319,7 @@ if INSPECTION_PLOTS:
             ax.add_patch(poly)
 
         scatter = ax.scatter(ras[mask], decs[mask], c=log_values, cmap='RdYlGn_r', vmin=-max_log_dev, vmax=max_log_dev, s=30, edgecolors='black', linewidth=0.5, zorder=5)
-        cbar = fig.colorbar(scatter, ax=ax, label='log10(Correction factor)')
+        cbar = fig.colorbar(scatter, ax=ax, label='Correction factor')
 
     else:
         # hexbin fallback
@@ -327,7 +327,7 @@ if INSPECTION_PLOTS:
         max_log_dev = np.max(np.abs(log_cf))
 
         hb = ax.hexbin(ras[mask], decs[mask], C=log_cf, gridsize=200, cmap='RdYlGn_r', vmin=-max_log_dev, vmax=max_log_dev, alpha=0.8)
-        cbar = fig.colorbar(hb, ax=ax, label='log10(Correction factor)')
+        cbar = fig.colorbar(hb, ax=ax, label='Correction factor')
 
     cbar.set_ticks(log_ticks)
     cbar.set_ticklabels([f"{t:.2f}" for t in real_ticks])
