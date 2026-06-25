@@ -13,7 +13,7 @@ End-to-end; takes care of the finding, matching, and calibration of sources base
 #### Installation
 You can install the required catalog files using
 ```bash
-uv run install
+uv run install.py
 ```
 or download them from source: `https://huggingface.co/datasets/EV4g/Radio-Flux-Solver-Catalogs/resolve/main/catalogs.tar.gz`.
 
