@@ -25,7 +25,7 @@ uv run flux_calibrator_cli.py path/to/file.fits
 
 For example:
 ```bash
-uv run flux_calibrator_cli.pi catalogs/LoTSS_DR3_v1.0.srl_clean.fits -freq 144.6e6 --save-plots
+uv run flux_calibrator_cli.py catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits --freq 144.6e6 --save-plots
 ```
 will take the LoTSS DR3 data and reference it against all other available surveys, then save the inspection plots.
 Since we are giving it a catalog, we also need to pass a frequency value (default unit is Hz, but can be specified with --freq-unit). For images, this can be inferred from the header.
