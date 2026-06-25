@@ -30,6 +30,7 @@ all_catalogs = Catalog_set([
     Catalog("catalogs/meerkat/meerkat_clean.fits",           1359.7e6,   "meerkat",    scale=1),
     Catalog("catalogs/racs/racs_mid_clean.fits",             1367.5e6,   "racs_mid",   scale=1),
     Catalog("catalogs/nvss/nvss_clean.fits",                 1400e6,     "nvss",       scale=1),
+    Catalog("catalogs/first/first_clean.fits",               1400e6,     "first",      scale=1),
     Catalog("catalogs/racs/racs_high_clean.fits",            1655.5e6,   "racs_high",  scale=1),
     Catalog("catalogs/vlass/vlass_clean.fits",               3000e6,     "vlass",      scale=1),       # vlass
     ])
@@ -43,7 +44,7 @@ full_config = Config(spectral_damping_factor = 5,
                     crowd_radius_arc = None,
                     minimum_frequency_spacing = 0,
                     #catalogs = all_catalogs.catalogs, # all
-                    catalog_names = ["vlssr", "lofar_dr3", "tgss", "gleam_300", "wenss", "vcss", "txs", "racs_low", "apertif", "racs_mid", "nvss", "racs_high", "vlass"], # no galactic specific surveys
+                    catalog_names = ["vlssr", "lofar_dr3", "tgss", "gleam_300", "wenss", "vcss", "txs", "racs_low", "apertif", "racs_mid", "nvss", "first", "racs_high", "vlass"], # no galactic specific surveys
                     reference_file = None,
                     anchor_catalog_name = "nvss",
                     )

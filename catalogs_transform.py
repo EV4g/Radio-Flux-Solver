@@ -23,6 +23,40 @@
 # vlass     = Table.read(os.getcwd()+"/catalogs/vlass/vlass.fit")
 # txs       = Table.read(os.getcwd()+"/catalogs/txs/TXS.fit")
 # vcss      = Table.read(os.getcwd()+"/catalogs/vcss/VCSS.fit")
+# first = Table.read(os.getcwd()+"/catalogs/first/first.fits")
+
+
+#### first
+# first.rename_column("RAJ2000", "ra")
+# first.rename_column("DEJ2000", "dec")
+# first.rename_column("Fint", "flux_jy")
+# first.rename_column("Rms", "e_flux_jy")
+
+# # error = size * (1/snr + 1/20) * arcsec
+# size = (first["Maj"] + first["Min"]) * 0.5 # roughly
+# snr = (first["flux_jy"] - 0.25) / first["e_flux_jy"] # both still in mJy
+# error = size * (1/snr + 1/20) / 1.645 # size is already in arcsec
+
+# first["e_ra"] = error / 3600
+# first["e_dec"] = error / 3600
+# first["e_ra"].unit = 'deg'
+# first["e_dec"].unit = 'deg'
+
+# # currently no units
+# first["ra"].unit = 'deg'
+# first["dec"].unit = 'deg'
+
+# if str(first['flux_jy'].unit) == 'mJy':
+#     first['flux_jy'] *= 1e-3
+#     first['flux_jy'].unit = 'Jy'
+#     first['e_flux_jy'] *= 1e-3
+#     first['e_flux_jy'].unit = 'Jy'
+
+# assert str(first['ra'].unit) == 'deg' and str(first['dec'].unit) == 'deg'
+# assert str(first['e_ra'].unit) == 'deg' and str(first['e_dec'].unit) == 'deg'
+# assert str(first['flux_jy'].unit) == 'Jy' and str(first['e_flux_jy'].unit) == 'Jy'
+
+# first.write(os.getcwd()+"/catalogs/first/first_clean.fits", overwrite=True)
 
 
 #### vcss

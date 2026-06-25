@@ -34,6 +34,7 @@ all_catalogs = Catalog_set([
     Catalog("catalogs/meerkat/meerkat_clean.fits",            1359.7e6,   "meerkat",    scale=0.8525),
     Catalog("catalogs/racs/racs_mid_clean.fits",              1367.5e6,   "racs_mid",   scale=0.9486),
     Catalog("catalogs/nvss/nvss_clean.fits",                  1400e6,     "nvss",       scale=1),
+    Catalog("catalogs/first/first_clean.fits",                1400e6,     "first",      scale=1),
     Catalog("catalogs/racs/racs_high_clean.fits",             1655.5e6,   "racs_high",  scale=0.9901),
     Catalog("catalogs/vlass/vlass_clean.fits",                3000e6,     "vlass",      scale=0.9915),  # vlass
 ])
