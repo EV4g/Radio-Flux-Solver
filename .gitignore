@@ -15,6 +15,7 @@ uv.lock
 
 # logs and log dirs
 *.log
+/logs
 *_output_*/
 
 # build artifacts

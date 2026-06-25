@@ -106,7 +106,7 @@ def _build_parser():
     p.add_argument("--thres-arc",                 type=float, default=None,  help="Override error based matching with simple thresholding (arcsec)")
     p.add_argument("--n-jobs",                    type=int, default=-1,      help="Number of cores to use, defaults to all of them")
     p.add_argument("--logging",                   action="store_true",       help="Write all output to a log file in --output-dir instead of the terminal.")
-    p.add_argument("--output-dir",                default=None,              help="Directory to write plots and logs into (default: current working directory).")
+    p.add_argument("--output-dir",                default=None,              help="Directory to write plots and logs into (default: ./logs/).")
     p.add_argument("--seed",                      type=int, default=None,    help="Seed for the spectra-plot random sample (default: random).")
     return p
 
@@ -136,7 +136,7 @@ def main():
         outdir = Path(args.output_dir)
         outdir.mkdir(parents=True, exist_ok=True)
     elif args.save_plots:
-        outdir = Path(f"flux_calibrator_output_{anchor_name}")
+        outdir = Path("logs") / Path(f"flux_calibrator_output_{anchor_name}")
         outdir.mkdir(parents=True, exist_ok=True)
     else:
         outdir = Path(".")
