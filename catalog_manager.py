@@ -367,8 +367,6 @@ class Config:
             t0 = perf_counter()
             cat.load()
             n_rows = len(cat.ra) if cat.ra is not None else 0
-            if True:
-                print(f"  {cat.name:14s} load+threshold: {(perf_counter()-t0):.2f}s ({n_rows:>8d} rows)")
 
             # if reference file, remove all points outside of that
             if self.reference_file is not None:
@@ -383,8 +381,11 @@ class Config:
                 self.catalogs[i] = cat.create_subset(valid)
             if self.reference_file is not None or self.footprint_box is not None:
                 if cat is not self.anchor_catalog:
-                    print(f"  {cat.name:14s} spatial-filter: {len(self.catalogs[i].ra):>8d} rows kept")
-
+                    print(f"  {cat.name:14s} load+threshold: {(perf_counter()-t0):.2f}s ({n_rows:>8d} rows) --> {len(self.catalogs[i].ra):>8d} rows kept")
+            else:
+                print(f"  {cat.name:14s} load+threshold: {(perf_counter()-t0):.2f}s ({n_rows:>8d} rows)")
+            
+            
         # re-bind anchor to the exact same object now sitting in self.catalogs
         if self.anchor_catalog is not None:
             anchor_name = self.anchor_catalog.name
@@ -399,7 +400,7 @@ class Config:
             delayed(cat.precompute_match_arrays)() for cat in self.catalogs
         )
         if True:
-            print(f"  precompute_match_arrays (threaded): {(perf_counter()-t0):.2f}s")
+            print(f"  precompute_match_arrays: {(perf_counter()-t0):.2f}s")
 
 class Output:
     def __init__(self, spx=None, cur=None, snr=None, cor=None, flux=None, sep=None, pmatch=None, ncrowd=None, ra=None, dec=None):

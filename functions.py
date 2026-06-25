@@ -495,7 +495,8 @@ def fits_to_png(fits_path, output_path, hdu_index=0, vmin=None, vmax=None, cmap=
 """Return indices of catalog of all unique, non-double, <size> combinations with the optional condition f[i] < f[i+1]"""
 def get_combinations(cats, size=3, required_index=None, skip_index=None, only_sorted=True, minimum_spacing=0, maximum_spacing=np.inf):
     freqs = [cat.freq for cat in cats]
-    indexed = sorted(enumerate(zip(freqs, cats)), key=lambda x: x[1][0])
+    
+    indexed = sorted(((i, (f, c)) for i, (f, c) in enumerate(zip(freqs, cats)) if len(c.ra) > 0), key=lambda x: x[1][0])
     
     skip     = {skip_index}     if isinstance(skip_index,     int) else set(skip_index)     if skip_index     is not None else set()
     required = {required_index} if isinstance(required_index, int) else set(required_index) if required_index is not None else set()
@@ -516,10 +517,17 @@ def get_combinations(cats, size=3, required_index=None, skip_index=None, only_so
 
 def report_ignored_cats(combinations, config):
     used_indices = {i for combo in combinations for i in combo}
+
     ignored = [(i, cat) for i, cat in enumerate(config.catalogs) if i != config.anchor_catalog_index and i not in used_indices]
-    if ignored:
-        names = [cat.name for _, cat in ignored]
-        print(colored(f"Catalogs ignored due to frequency-spacing constraints: {', '.join(names)}", "yellow"))
+    if not ignored: return
+
+    empty_cats  = [cat.name for _, cat in ignored if len(cat.ra) == 0]
+    sparse_cats = [cat.name for _, cat in ignored if len(cat.ra) > 0]
+
+    if empty_cats:
+        print(colored(f"Catalogs ignored to due lack of coverage: {', '.join(empty_cats)}", "yellow"))
+    if sparse_cats:
+        print(colored(f"Catalogs ignored due to frequency-spacing constraints: {', '.join(sparse_cats)}", "yellow"))
 
 """Return indices of catalog of all unique, non-double, <size> permutations with the optional condition f[i] < f[i+1]"""
 def get_permutations(cats, size=3, required_index=None, skip_index=None, only_sorted=True, minimum_spacing=0):
