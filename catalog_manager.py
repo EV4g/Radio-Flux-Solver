@@ -55,9 +55,6 @@ def resolve_catalog_path(path):
     clean = str(p).lstrip("/") if p.is_absolute() else str(p)
     return (_PROJECT_ROOT / clean).resolve()
 
-def resolve_glob(pattern):
-    return sorted(_PROJECT_ROOT.glob(pattern))
-
 # wrapper class for incoming Table data
 class Catalog:
     def __init__(self, path=None, freq_hz=None, name=None, flux_lim=0, scale=1, table=True, reload_cache=True, minimum_position_error=0):

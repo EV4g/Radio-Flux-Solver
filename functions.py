@@ -36,73 +36,12 @@ def prep_file(file):
     wcs = WCS(header).celestial
     return data, header, wcs
 
-"""List all meerkat files in dir that overlap with the given coordinate"""
-def get_survey_file(files, coord):
-    for i, fn in enumerate(files):
-
-        with fits.open(fn) as hdul:
-            hdr = hdul[0].header
-            w = WCS(hdr).celestial
-            nx, ny = hdr["NAXIS1"], hdr["NAXIS2"]
-
-        # Convert input coord into wcs frame and then into pix
-        c = coord.transform_to(w.wcs.radesys.lower() if w.wcs.radesys else "icrs")
-        x, y = w.world_to_pixel(c)
-
-        if (0 <= x < nx) and (0 <= y < ny): return files[i]
-
-    return None
-
-"""Return all corners from one .fits file"""
-def get_corners(fn):
-    with fits.open(fn) as hdul:
-        hdr = hdul[0].header
-        w = WCS(hdr).celestial
-        nx, ny = hdr["NAXIS1"], hdr["NAXIS2"]
-    corners_pix = np.array([[0, 0], [nx-1, 0], [0, ny-1], [nx-1, ny-1]], dtype=float)
-    corners_sky = w.pixel_to_world(corners_pix[:, 0], corners_pix[:, 1])
-    return w, nx, ny, corners_sky
-
-"""Return whether or not the corners from one .fits file (corners_sky) are within the bounds of another .fits file (w, nx, ny)"""
-def any_corner_inside(corners_sky, w, nx, ny):
-    xs, ys = w.world_to_pixel(corners_sky)
-    return bool(np.any((xs >= 0) & (xs < nx) & (ys >= 0) & (ys < ny)))
-
-"""Check one .fits file against a host of others and return the files that overlap"""
-def get_overlapping_files(ref_file, files):
-    ref_w, ref_nx, ref_ny, ref_corners = get_corners(ref_file)
-
-    overlapping = []
-    for fn in files:
-        if fn == ref_file:
-            continue
-        try:
-            w, nx, ny, corners = get_corners(fn)
-            if any_corner_inside(ref_corners, w, nx, ny) or any_corner_inside(corners, ref_w, ref_nx, ref_ny):
-                overlapping.append(fn)
-        except Exception as e:
-            print(f"Skipping {fn}: {e}")
-
-    return overlapping
-
 """Get spectral index based on two fluxes and two frequencies"""
 def get_spectral_index(S1, S2, v1, v2, fallback_value=0):
     if v1 != v2:
         return (np.log(S1) - np.log(S2)) / (np.log(v1) - np.log(v2))
     else:
         return fallback_value
-
-""""""
-def cutout_to_galactic_wh(cutout_lon, cutout_lat):
-    l0 = np.mean(cutout_lon) * u.deg
-    b0 = np.mean(cutout_lat) * u.deg
-    center = SkyCoord(l=l0, b=b0, frame="galactic")
-
-    dlon = (cutout_lon[1] - cutout_lon[0]) * u.deg
-    dlat = (cutout_lat[1] - cutout_lat[0]) * u.deg
-    width  = abs(dlon)
-    height = abs(dlat)
-    return center, width, height
 
 """Return beam size [degree] from fits header"""
 def get_beam_size(file):
@@ -485,12 +424,6 @@ def plot_statistics(x, y, weights=None, bins=(50, 50), contour_levels='auto', co
         plt.show()
     else:
         plt.close()
-"""A simple way to save fits files to png"""
-def fits_to_png(fits_path, output_path, hdu_index=0, vmin=None, vmax=None, cmap="viridis"):
-    with fits.open(fits_path) as hdul:
-        data = hdul[hdu_index].data[0,0]
-
-    plt.imsave(output_path, data, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
 
 """Return indices of catalog of all unique, non-double, <size> combinations with the optional condition f[i] < f[i+1]"""
 def get_combinations(cats, size=3, required_index=None, skip_index=None, only_sorted=True, minimum_spacing=0, maximum_spacing=np.inf):
@@ -528,27 +461,6 @@ def report_ignored_cats(combinations, config):
         print(colored(f"Catalogs ignored to due lack of coverage: {', '.join(empty_cats)}", "yellow"))
     if sparse_cats:
         print(colored(f"Catalogs ignored due to frequency-spacing constraints: {', '.join(sparse_cats)}", "yellow"))
-
-"""Return indices of catalog of all unique, non-double, <size> permutations with the optional condition f[i] < f[i+1]"""
-def get_permutations(cats, size=3, required_index=None, skip_index=None, only_sorted=True, minimum_spacing=0):
-    freqs = [cat.freq for cat in cats]
-    indexed = sorted(enumerate(zip(freqs, cats)), key=lambda x: x[1][0])
-    
-    skip     = {skip_index}     if isinstance(skip_index,     int) else set(skip_index)     if skip_index     is not None else set()
-    required = {required_index} if isinstance(required_index, int) else set(required_index) if required_index is not None else set()
-    
-    result = []
-    for combo in permutations(indexed, size):
-        indices = tuple(i for i, (f, _) in combo)
-        freqs_c = [f for _, (f, _) in combo]
-
-        if (freqs_c != sorted(freqs_c)) and only_sorted:        continue
-        if np.any(np.diff(sorted(freqs_c)) < minimum_spacing):  continue
-        if required and not required.issubset(indices):         continue
-        if skip     and any(i in skip for i in indices):        continue
-
-        result.append(indices)
-    return result
 
 """"""
 def weighted_bin_stats(x, y, w, n_bins=200):

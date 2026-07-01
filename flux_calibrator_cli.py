@@ -3,7 +3,6 @@ import sys
 import warnings
 import numpy as np
 import matplotlib.pyplot as plt
-#from tqdm import tqdm
 from functions import plot_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d, predict_flux
 from functions import compute_flux_correction_factor, calculate_correction_factor_weight, biweight_location, report_ignored_cats
 from time import perf_counter
@@ -50,18 +49,6 @@ _PRESETS = {
 _FREQ_UNIT_SCALE = {"Hz": 1.0, "MHz": 1e6, "GHz": 1e9}
 _CUNIT3_SCALE    = {"HZ": 1.0, "KHZ": 1e3, "MHZ": 1e6, "GHZ": 1e9}
 
-class _TeeWriter:
-    """Write to multiple streams (e.g. stdout + a log file)."""
-    def __init__(self, *streams):
-        self._streams = streams
-    def write(self, data):
-        for s in self._streams:
-            s.write(data)
-    def flush(self):
-        for s in self._streams:
-            try: s.flush()
-            except Exception: pass
-
 def _resolve_freq(image_path, args_freq, args_freq_unit):
     """Find the frequency axis (CTYPE contains 'FREQ') and return its CRVAL in Hz.
     Falls back to --freq + --freq-unit if no frequency axis is present."""
@@ -87,7 +74,6 @@ def _build_parser():
     p.add_argument("catalog",                                                help="Path to FITS image or table catalog (the anchor / unknown).")
     p.add_argument("--scale",                     type=float, default=1,     help="Scale values in the anchor catalog by this amount")
     p.add_argument("--catalogs",                  default="default",         help='Preset name (all, default) or comma-separated catalog list.')
-    p.add_argument("--anchor-name",               default=None,              help="Registry name for the anchor (default: input filename stem).")
     p.add_argument("-f","--freq",                 type=float, default=None,  help="Central frequency in --freq-unit; for images, inferred from the FITS FREQ axis when present.")
     p.add_argument("--freq-unit",                 choices=list(_FREQ_UNIT_SCALE), default="Hz")
     p.add_argument("-c","--combination-size",     type=int,   default=3,     help="Set matching complexity as well as fitting D.O.F.")
@@ -100,11 +86,13 @@ def _build_parser():
     p.add_argument("--minimum-position-error",    type=float, default=None,  help="Set a minimum position error. Sources with lower error at set to this value (Default: None).")
     p.add_argument("--reference-file",            default=None,              help="Provide reference cutout when giving a large catalog to speed up matching")
     p.add_argument("--spatial-filter",            action="store_true",       help="Pre-filter reference catalogs to the anchor's spatial coverage (with 10%% margin).")
-    p.add_argument("--no-reload-cache",           action="store_true",       help="Force PyBDSF to re-run on the anchor image.")
-    p.add_argument("--save-plots",                action="store_true",       help="Save inspection plots to disk")
-    p.add_argument("--debug",                     action="store_true",       help="Store debug plots per set of matches (slow)")
     p.add_argument("--thres-arc",                 type=float, default=None,  help="Override error based matching with simple thresholding (arcsec)")
+    p.add_argument("--save-plots",                action="store_true",       help="Save inspection plots to disk")
+    p.add_argument("--save-csv",                  action="store_true",       help="Save csv file with matched sources, their location, and flux at each frequency")
     p.add_argument("--n-jobs",                    type=int, default=-1,      help="Number of cores to use, defaults to all of them")
+    p.add_argument("--anchor-name",               default=None,              help="Registry name for the anchor (default: input filename stem).")
+    p.add_argument("--no-reload-cache",           action="store_true",       help="Force PyBDSF to re-run on the anchor image.")
+    p.add_argument("--debug",                     action="store_true",       help="Store debug plots per set of matches (slow)")
     p.add_argument("--logging",                   action="store_true",       help="Write all output to a log file in --output-dir instead of the terminal.")
     p.add_argument("--output-dir",                default=None,              help="Directory to write plots and logs into (default: ./logs/).")
     p.add_argument("--seed",                      type=int, default=None,    help="Seed for the spectra-plot random sample (default: random).")
