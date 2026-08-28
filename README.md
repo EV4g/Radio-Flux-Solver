@@ -66,3 +66,23 @@ Currently supported arguments are:
 | first         | 1400            |         |
 | racs_high     | 1655.5          |         |
 | vlass         | 3000            |         |
+
+
+## Citation
+
+If you use this package in your research, and find it useful, please consider citing:
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22144139.svg)](https://doi.org/10.5281/zenodo.22144139)
+
+```bibtex
+@software{radiofluxsolver2026,
+  author = {Martens, Floris},
+  title = {Radio-Flux-Solver, a package for low-frequency radio flux calibration},
+  year = {2026},
+  publisher = {Zenodo},
+  version = {v1.1.1},
+  doi = {10.5281/zenodo.22144139},
+  url = {https://doi.org/10.5281/zenodo.22144139}
+}
+```
+
