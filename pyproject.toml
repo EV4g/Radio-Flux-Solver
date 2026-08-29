@@ -1,6 +1,6 @@
 [project]
 name = "Radio-Flux-Solver"
-version = "1.0.0"
+version = "1.1.1"
 description = "Code to calibrate a given radio catalog or image file to known reference catalogs, using source matching and spectral index analysis."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -23,4 +23,4 @@ unresolved-attribute = "ignore"
 unresolved-import = "ignore"
 
 [tool.ruff.lint]
-ignore = ["E701","E702","E722"]
+ignore = ["E701","E702","E722","I001"]

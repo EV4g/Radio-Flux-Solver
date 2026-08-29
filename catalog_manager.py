@@ -6,6 +6,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 from functions import sources_in_fits, get_pos_err_deg, get_beam_size, radec_to_xyz
+from catalogs_transform import standardize_catalog_columns
 from scipy.spatial import cKDTree
 from pathlib import Path
 import bdsf
@@ -86,7 +87,10 @@ class Catalog:
             if self.ra is not None: return # already loaded
             
             # read out from disk
-            catalog = Table.read(self.path) 
+            catalog = Table.read(self.path)
+
+            # read out catalog columns and try to format them correctly (raise error on fail)
+            catalog = standardize_catalog_columns(catalog)
             
             # read out flux data
             self.flux       = np.array(catalog['flux_jy']) * self.scale
