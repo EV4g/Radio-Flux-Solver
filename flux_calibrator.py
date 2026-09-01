@@ -8,13 +8,8 @@ from functions import compute_flux_correction_factor, calculate_correction_facto
 from time import perf_counter
 from catalog_manager import Catalog, Config, Catalog_set, Output
 from joblib import Parallel, delayed
+from termcolor import colored
 warnings.filterwarnings("ignore", message=".*(non-interactive|tqdm).*")
-
-try:
-    from termcolor import colored
-except ImportError:
-    print("termcolor not found, ignoring color")
-    def colored(str, col): return str
 
 start = perf_counter()
 

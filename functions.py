@@ -13,38 +13,32 @@ import matplotlib.pyplot as plt
 from itertools import combinations, permutations
 from scipy.stats import binned_statistic_2d
 from scipy.stats import chi2
+from termcolor import colored
 
 warnings.filterwarnings("ignore", module="matplotlib")
-
-try:
-    from termcolor import colored
-except ImportError:
-    print("termcolor not found, ignoring color")
-    def colored(str, col): return str
-
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
-"""Average of an array in logspace"""
 def log_average(arr, w):
+    """Average of an array in logspace"""
     return np.exp(np.average(np.log(arr), weights=w))
 
-"""Load fits file and extract data, header, wcs"""
 def prep_file(file):
+    """Load fits file and extract data, header, wcs"""
     hdul = fits.open(file)
     data = hdul[0].data if len(hdul[0].data.shape) == 2 else hdul[0].data[0, 0]
     header = hdul[0].header
     wcs = WCS(header).celestial
     return data, header, wcs
 
-"""Get spectral index based on two fluxes and two frequencies"""
 def get_spectral_index(S1, S2, v1, v2, fallback_value=0):
+    """Get spectral index based on two fluxes and two frequencies"""
     if v1 != v2:
         return (np.log(S1) - np.log(S2)) / (np.log(v1) - np.log(v2))
     else:
         return fallback_value
 
-"""Return beam size [degree] from fits header"""
 def get_beam_size(file):
+    """Return beam size [degree] from fits header"""
     hdul = fits.open(file)
     header = hdul[0].header
     try:
@@ -53,9 +47,9 @@ def get_beam_size(file):
         return header['CLEANBMJ'], header['CLEANBMN'], header['CLEANBPA']
     return None
 
-"""Return a per-source 1D positional RMS (deg) for a catalog.
-e_ra / e_dec are combined as sigma_1d = sqrt((e_ra^2 + e_dec^2) / 2)."""
 def get_pos_err_deg(cat):
+    """Return a per-source 1D positional RMS (deg) for a catalog.
+    e_ra / e_dec are combined as sigma_1d = sqrt((e_ra^2 + e_dec^2) / 2)."""
     return np.sqrt((cat.e_ra ** 2 + cat.e_dec ** 2) / 2.0) # degrees
 
 def radec_to_xyz(ra_deg, dec_deg):
@@ -162,7 +156,7 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
         cached = getattr(cat_list[i], '_tree', None)
         trees.append(cached if cached is not None else cKDTree(xyz_all[i]))
 
-    # Crowding (return_length=True returns counts directly — no list-of-lists allocation)
+    # Crowding (return_length=True returns counts directly)
     crowd_counts = {}
     if crowd_radius_arc is not None:
         crowd_r_3d = 2.0 * np.sin(np.deg2rad(crowd_radius_arc / 3600.0) / 2.0)
@@ -348,10 +342,10 @@ def match_catalogs_2D(cat_list, thres_arc=2, nsigma=3.0, crowd_radius_arc=None, 
         return result, quality
     return result
 
-"""Add contours to scatterplot
-Takes x, y coordinated and a per-source weighting c. Can make the contour fitting work in logspace by using
-(logy, logx). n sets the 2D resolution of the mesh."""
 def calculate_contour_statistics(x, y, c, logx=False, logy=False, n=1000):
+    """Add contours to scatterplot
+    Takes x, y coordinated and a per-source weighting c. Can make the contour fitting work in logspace by using
+    (logy, logx). n sets the 2D resolution of the mesh."""
     if logx: x = np.log10(x)
     if logy: y = np.log10(y)
 
@@ -425,8 +419,8 @@ def plot_statistics(x, y, weights=None, bins=(50, 50), contour_levels='auto', co
     else:
         plt.close()
 
-"""Return indices of catalog of all unique, non-double, <size> combinations with the optional condition f[i] < f[i+1]"""
 def get_combinations(cats, size=3, required_index=None, skip_index=None, only_sorted=True, minimum_spacing=0, maximum_spacing=np.inf):
+    """Return indices of catalog of all unique, non-double, <size> combinations with the optional condition f[i] < f[i+1]"""
     freqs = [cat.freq for cat in cats]
     
     indexed = sorted(((i, (f, c)) for i, (f, c) in enumerate(zip(freqs, cats)) if len(c.ra) > 0), key=lambda x: x[1][0])
@@ -462,8 +456,8 @@ def report_ignored_cats(combinations, config):
     if sparse_cats:
         print(colored(f"Catalogs ignored due to frequency-spacing constraints: {', '.join(sparse_cats)}", "yellow"))
 
-""""""
 def weighted_bin_stats(x, y, w, n_bins=200):
+    """"""
     edges = np.linspace(x.min(), x.max(), n_bins + 1)
     centers = 0.5 * (edges[:-1] + edges[1:])
     mn  = np.full(n_bins, np.nan)
@@ -487,8 +481,8 @@ def weighted_bin_stats(x, y, w, n_bins=200):
     ok = ~np.isnan(mn)
     return centers[ok], mn[ok], std[ok], sem[ok]
 
-""""""
 def weighted_bin_stats_2d(x, y, z, w, n_bins=50, m_bins=50):
+    """"""
     x_edges = np.linspace(x.min(), x.max(), n_bins + 1)
     y_edges = np.linspace(y.min(), y.max(), m_bins + 1)
 
@@ -522,8 +516,8 @@ def weighted_percentile(data, weights, percentiles):
     cdf = np.cumsum(weights_sorted) / weights_sorted.sum()
     return np.interp(percentiles, cdf, data_sorted)
 
-"""Given arrays of RA/Dec (degrees) and a FITS file, return a boolean array of which sources fall within the image footprint."""
 def sources_in_fits(ra_deg, dec_deg, fn):
+    """Given arrays of RA/Dec (degrees) and a FITS file, return a boolean array of which sources fall within the image footprint."""
     with fits.open(fn) as hdul:
         w  = WCS(hdul[0].header).celestial
         nx = hdul[0].header["NAXIS1"]
@@ -652,9 +646,9 @@ def solve_flux_scales_band(ratio_slice, weight_slice, normalize=True):
     s_full[idx_active] = s_sub
     return s_full
 
-"""compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
-which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
 def compute_flux_correction_factor(cats, config, anchor_override=None, precomputed_indices=None, precomputed_quality=None, workers=-1):
+    """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
+    which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
     # allow for pre-computed inputs, to skip match_catalogs_2D
     if precomputed_indices is None and precomputed_quality is None:
         indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma, thres_arc_override=config.thres_arc_override, crowd_radius_arc=config.crowd_radius_arc, workers=workers)
@@ -756,22 +750,22 @@ def compute_flux_correction_factor(cats, config, anchor_override=None, precomput
     
     return (spectral_indices, spectral_curvature, snr, correction_factor, extrapolated_flux_fit, max_sep, p_weight, n_crowd, ra, dec)
 
-"""fit log parabola, but now with pivot to ensure scale remains stable"""
 def fit_log_parabola(freq, flux, freq_pivot=100e6):
+    """fit log parabola, but now with pivot to ensure scale remains stable"""
     freq = np.array(freq)
     x = np.log(freq / freq_pivot)
     y = np.log(flux)
     curvature, spectral_index, scale = np.polyfit(x, y, 2)
     return scale, spectral_index, curvature, freq_pivot
 
-"""Extrapolate flux based on two frequencies, one flux, a spectral index, and an optional curvature parameter"""
 def predict_flux(freq_target, freq_reference, flux_reference, spectral_index, curvature=0):
+    """Extrapolate flux based on two frequencies, one flux, a spectral index, and an optional curvature parameter"""
     log_freq_delta = np.log(freq_target / freq_reference)
     log_flux_ratio = spectral_index * log_freq_delta + curvature * log_freq_delta**2
     return flux_reference * np.exp(log_flux_ratio)
 
-"""Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
 def calculate_correction_factor_weight(output, config, sigma_cutoff=6):
+    """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
     # downweight sources with spectral indices far away from -0.7
     exponent = config.spectral_damping_factor * (output.spectral_index - config.spectral_index_theory)**2
     cutoff = 0.5 * sigma_cutoff**2
@@ -786,16 +780,14 @@ def calculate_correction_factor_weight(output, config, sigma_cutoff=6):
     
     return spectral_difference_factor * signal_to_noise_factor * output.point_probability
 
-"""Return median of an array with value weights"""
 def weighted_median(val, w):
-    # searchsorted on the cumulative weight avoids the O(N) bool-mask + indexed-array
-    # allocations that the previous "val[np.cumsum(w) >= w.sum()/2][0]" version did.
+    """Return median of an array with value weights"""
     idx = np.argsort(val)
     cw  = np.cumsum(w[idx])
     return float(val[idx[np.searchsorted(cw, 0.5 * cw[-1])]])
 
-"""Return biweight location statistic for determining the center of a distribution"""
 def biweight_location(arr1, arr2, arr3, weights=None, c=None, max_iter=30, tol=1e-9):
+    """Return biweight location statistic for determining the center of a distribution"""
     # stack data
     X = np.column_stack([np.asarray(a, dtype=float) for a in (arr1, arr2, arr3)])
 
@@ -821,8 +813,7 @@ def biweight_location(arr1, arr2, arr3, weights=None, c=None, max_iter=30, tol=1
 
     # iterative re-weighted least-square loop
     for _ in range(max_iter):
-        # median absolute deviation per axis (per-axis loop is more cache-friendly
-        # than batching to a (3, N) matrix at large N — the intermediates blow L3)
+        # median absolute deviation per axis
         mad   = np.array([weighted_median(np.abs(X[:, j] - mu[j]), w) for j in range(3)])
         scale = np.where(mad > 0, mad, 1.0)
         

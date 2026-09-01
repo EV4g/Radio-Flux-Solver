@@ -12,12 +12,7 @@ from pathlib import Path
 import bdsf
 from joblib import Parallel, delayed
 from time import perf_counter
-
-try:
-    from termcolor import colored
-except ImportError:
-    print("termcolor not found, ignoring color")
-    def colored(str, col): return str
+from termcolor import colored
 
 _PROJECT_ROOT = Path(__file__).resolve().parent
 

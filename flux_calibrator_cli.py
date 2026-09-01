@@ -10,13 +10,8 @@ from catalog_manager import Catalog, Config, Catalog_set, Output
 from joblib import Parallel, delayed
 from pathlib import Path
 from astropy.io import fits
+from termcolor import colored
 warnings.filterwarnings("ignore", message=".*(non-interactive|tqdm).*")
-
-try:
-    from termcolor import colored
-except ImportError:
-    print("termcolor not found, ignoring color")
-    def colored(str, col): return str
 
 #### all currently implemented survey catalogs
 all_catalogs = Catalog_set([
