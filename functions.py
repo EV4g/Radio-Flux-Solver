@@ -786,7 +786,7 @@ def weighted_median(val, w):
     cw  = np.cumsum(w[idx])
     return float(val[idx[np.searchsorted(cw, 0.5 * cw[-1])]])
 
-def biweight_location(arr1, arr2, arr3, weights=None, c=None, max_iter=30, tol=1e-9):
+def biweight_location(arr1, arr2, arr3, weights=None, c=None, max_iter=20, tol=1e-9):
     """Return biweight location statistic for determining the center of a distribution"""
     # stack data
     X = np.column_stack([np.asarray(a, dtype=float) for a in (arr1, arr2, arr3)])
@@ -798,6 +798,10 @@ def biweight_location(arr1, arr2, arr3, weights=None, c=None, max_iter=30, tol=1
     X, w = X[keep], w[keep]
 
     if len(X) == 0: return (np.nan, np.nan, np.nan)
+
+    if len(X) > 100_000:  # a location estimate needs no more; keeps the sorts cheap
+        sel = np.random.default_rng(0).choice(len(X), 100_000, replace=False)
+        X, w = X[sel], w[sel]
     
     # normalize weights
     w /= w.sum()
@@ -809,7 +813,7 @@ def biweight_location(arr1, arr2, arr3, weights=None, c=None, max_iter=30, tol=1
     if c is None: c = np.sqrt(chi2.ppf(0.975, df=max(int(active.sum()), 1)))
     
     # initial guess from simple weighted median
-    mu = np.array([weighted_median(X[:, j], w) for j in range(3)])
+    mu = w @ X
 
     # iterative re-weighted least-square loop
     for _ in range(max_iter):
