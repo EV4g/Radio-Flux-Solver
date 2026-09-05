@@ -16,10 +16,6 @@ from termcolor import colored
 warnings.filterwarnings("ignore", module="matplotlib")
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
-def log_average(arr, w):
-    """Average of an array in logspace"""
-    return np.exp(np.average(np.log(arr), weights=w))
-
 def prep_file(file):
     """Load fits file and extract data, header, wcs"""
     hdul = fits.open(file)
@@ -27,13 +23,6 @@ def prep_file(file):
     header = hdul[0].header
     wcs = WCS(header).celestial
     return data, header, wcs
-
-def get_spectral_index(S1, S2, v1, v2, fallback_value=0):
-    """Get spectral index based on two fluxes and two frequencies"""
-    if v1 != v2:
-        return (np.log(S1) - np.log(S2)) / (np.log(v1) - np.log(v2))
-    else:
-        return fallback_value
 
 def get_beam_size(file):
     """Return beam size [degree] from fits header"""
@@ -644,6 +633,185 @@ def solve_flux_scales_band(ratio_slice, weight_slice, normalize=True):
     s_full[idx_active] = s_sub
     return s_full
 
+def predict_flux(freq_target, freq_reference, flux_reference, spectral_index, curvature=0):
+    """Extrapolate flux based on two frequencies, one flux, a spectral index, and an optional curvature parameter"""
+    log_freq_delta = np.log(freq_target / freq_reference)
+    log_flux_ratio = spectral_index * log_freq_delta + curvature * log_freq_delta**2
+    return flux_reference * np.exp(log_flux_ratio)
+
+def CPL(freq, reference_flux, reference_freq, spectral_index, spectral_curvature):
+    """Simple curved power-law model"""
+    ln_nu = np.log(freq / reference_freq)
+    return np.exp(np.log(reference_flux) + spectral_index * ln_nu + spectral_curvature * ln_nu**2)
+
+def FFA(freq, reference_flux, reference_freq, spectral_index, tau_freefree):
+    """Free-free turnover model"""
+    ratio = freq / reference_freq
+    log_ratio = np.log(ratio)
+    return np.exp(np.log(reference_flux) + spectral_index * log_ratio - tau_freefree * ratio**-2.1)
+
+def SSA(freq, reference_flux, reference_freq, spectral_index_thick, spectral_index_thin):
+    """Synchrotron self-absorption model with a_thick and a_thin"""
+    delta_nu = freq / reference_freq
+    tau = delta_nu**(spectral_index_thin - spectral_index_thick)
+    return np.exp(np.log(reference_flux) + spectral_index_thick * np.log(delta_nu) + np.log(-np.expm1(-tau) / (1 - np.exp(-1))))
+
+def log_cpl(nu, lnS0, a, q, lnpiv):
+    xx = np.log(nu / np.exp(lnpiv))
+    return lnS0 + a * xx + q * xx * xx
+
+def log_ffa(nu, lnS0, a, tau, lnpiv):
+    rr = nu / np.exp(lnpiv)
+    return lnS0 + a * np.log(rr) - tau * rr**-2.1
+
+def _predict_theory(ref_freqs, ref_fluxes, anchor_freq, model, config):
+    preds = []
+    for k in range(ref_freqs.shape[0]):
+        fr = ref_freqs[k]
+        fl = ref_fluxes[k]
+        if model == 'cpl':
+            preds.append(CPL(anchor_freq, fl, fr, config.spectral_index_theory, config.spectral_curvature_theory))
+        elif model == 'ffa':
+            preds.append(FFA(anchor_freq, fl, fr, config.spectral_index_theory, config.tau_freefree_theory))
+        else:
+            preds.append(SSA(anchor_freq, fl, np.full_like(fl, fr), config.spectral_index_thick_theory, config.spectral_index_thin_theory))
+    return np.mean(preds, axis=0)
+
+def _fit_linear(ref_freqs, ref_fluxes, anchor_freq, model, order, config):
+    """Linear least squares. Only for (cpl|ffa, order 2|3)"""
+    n = ref_fluxes.shape[1]
+    is_cpl = (model == 'cpl')
+    piv_th = config.pivot_freq_theory
+    bend_th = config.spectral_curvature_theory if is_cpl else config.tau_freefree_theory
+    predict = CPL if is_cpl else FFA
+    
+    out = {'alpha':        np.full(n, np.nan), 
+           'bend':         np.full(n, bend_th),
+           'lnS0':         np.full(n, np.nan), 
+           'pivot':        np.full(n, piv_th),
+           'extrapolated': np.full(n, np.nan),
+           'thin':         np.full(n, np.nan), 
+           'thick':        np.full(n, np.nan),
+           'fitted':       np.zeros(n, bool)}
+    
+    xx = np.log(ref_freqs / piv_th)                                      # (m,)
+    rr = ref_freqs / piv_th                                              # (m,)
+    bend_col = xx**2 if is_cpl else -(rr**-2.1)
+    
+    if order == 2:
+        A_full = np.column_stack([np.ones(ref_freqs.shape[0]), xx])
+    else:
+        A_full = np.column_stack([np.ones(ref_freqs.shape[0]), xx, bend_col])
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        logF = np.log(ref_fluxes)
+        
+    Y_full = logF - bend_th * bend_col[:, None] if order == 2 else logF
+    valid = np.isfinite(ref_fluxes) & (ref_fluxes > 0) & np.isfinite(Y_full)
+    P = np.linalg.pinv(A_full)  # (p, m): one SVD for all sources
+    full = valid.all(axis=0)
+
+    if full.any():
+        C = P @ Y_full[:, full]  # (p, n_full)
+        out['alpha'][full]  = C[1]
+        out['lnS0'][full]   = C[0]
+        out['fitted'][full] = True
+        if order == 3: out['bend'][full] = C[2]
+        out['extrapolated'][full] = predict(anchor_freq, np.exp(C[0]), piv_th, C[1], out['bend'][full])
+
+    for j in np.flatnonzero(~full):
+        ok = valid[:, j]
+        if int(np.count_nonzero(ok)) < order:  # 2 cols for o2, 3 for o3
+            continue
+        coef, *_ = np.linalg.lstsq(A_full[ok], Y_full[ok, j], rcond=None)
+        out['alpha'][j]  = coef[1]
+        out['lnS0'][j]   = coef[0]
+        out['fitted'][j] = True
+        if order == 3: out['bend'][j] = coef[2]
+        out['extrapolated'][j] = predict(anchor_freq, np.exp(coef[0]), piv_th, coef[1], out['bend'][j])
+    return out
+
+_FIT_MAXFEV     = 2000
+_LN_S0_BOUNDS   = (-100, 100)
+_ALPHA_BOUNDS   = (-5, 5)
+_LNPIVOT_BOUNDS = (np.log(1e6), np.log(1e10))
+_Q_BOUNDS       = (-3, 3)
+_TAU_BOUNDS     = (0, 100)
+_S_REF_BOUNDS   = (0, np.inf)
+_THIN_BOUNDS    = (-5, 5)
+_THICK_BOUNDS   = (-1, 6)
+
+def _fit_nonlinear(ref_freqs, ref_fluxes, anchor_freq, model, order, config):
+    """Per-source curve_fit in log-flux. 
+    cpl/ffa o>=4: fit for (lnS0, alpha, bend, pivot)
+    ssa o2: fit for (S, nu); o3: + thin; o>=4: + thick"""
+    n = ref_fluxes.shape[1]
+    is_cpl = (model == 'cpl')
+    
+    out = {'alpha':        np.full(n, np.nan),
+           'bend':         np.full(n, np.nan),
+           'lnS0':         np.full(n, np.nan),
+           'pivot':        np.full(n, np.nan),
+           'extrapolated': np.full(n, np.nan),
+           'thin':         np.full(n, np.nan),
+           'thick':        np.full(n, np.nan),
+           'fitted':       np.zeros(n, bool)}
+
+    for j in range(n):
+        fv = ref_fluxes[:, j]
+        ok = np.isfinite(fv) & (fv > 0)
+        if int(np.count_nonzero(ok)) < 2:
+            continue
+        fr = ref_freqs[ok]
+        ly = np.log(fv[ok])
+        try:
+            if model in ('cpl', 'ffa'):
+                log_model = log_cpl if is_cpl else log_ffa
+                blo, bhi, binit = ((_Q_BOUNDS[0],   _Q_BOUNDS[1],   config.spectral_curvature_theory) if is_cpl else (_TAU_BOUNDS[0], _TAU_BOUNDS[1], config.tau_freefree_theory))
+                
+                p0 = [float(np.log(np.median(fv[ok]))), config.spectral_index_theory, binit, np.log(config.pivot_freq_theory)]
+                popt, _ = curve_fit(log_model, fr, ly, p0=p0, maxfev=_FIT_MAXFEV, bounds=([_LN_S0_BOUNDS[0], _ALPHA_BOUNDS[0], blo, _LNPIVOT_BOUNDS[0]], [_LN_S0_BOUNDS[1], _ALPHA_BOUNDS[1], bhi, _LNPIVOT_BOUNDS[1]]))
+                lnS0, alpha, bend, lnpiv = popt
+                piv = float(np.exp(lnpiv))
+
+                out['alpha'][j]  = alpha
+                out['bend'][j]   = bend
+                out['lnS0'][j]   = lnS0
+                out['pivot'][j]  = piv
+                out['fitted'][j] = True
+                out['extrapolated'][j] = (CPL if is_cpl else FFA)(anchor_freq, np.exp(lnS0), piv, alpha, bend)
+            else:
+                S0   = float(np.median(fv[ok]))
+                lnu0 = float(np.mean(np.log(fr)))
+                
+                if order == 2:
+                    fn = lambda nu, S, lnnup: np.log(SSA(nu, S, np.exp(lnnup), config.spectral_index_thick_theory, config.spectral_index_thin_theory))
+                    p0, bounds = [S0, lnu0], ([_S_REF_BOUNDS[0], _LNPIVOT_BOUNDS[0]], [_S_REF_BOUNDS[1], _LNPIVOT_BOUNDS[1]])
+                elif order == 3:
+                    fn = lambda nu, S, lnnup, athin: np.log(SSA(nu, S, np.exp(lnnup), config.spectral_index_thick_theory, athin))
+                    p0, bounds = [S0, lnu0, config.spectral_index_thin_theory], ([_S_REF_BOUNDS[0], _LNPIVOT_BOUNDS[0], _THIN_BOUNDS[0]], [_S_REF_BOUNDS[1], _LNPIVOT_BOUNDS[1], _THIN_BOUNDS[1]])
+                else:
+                    fn = lambda nu, S, lnnup, athin, athick: np.log(SSA(nu, S, np.exp(lnnup), athick, athin))
+                    p0, bounds = [S0, lnu0, config.spectral_index_thin_theory, config.spectral_index_thick_theory], ([_S_REF_BOUNDS[0], _LNPIVOT_BOUNDS[0], _THIN_BOUNDS[0], _THICK_BOUNDS[0]], [_S_REF_BOUNDS[1], _LNPIVOT_BOUNDS[1], _THIN_BOUNDS[1], _THICK_BOUNDS[1]])
+
+                popt, _ = curve_fit(fn, fr, ly, p0=p0, bounds=bounds, maxfev=_FIT_MAXFEV)
+                S     = popt[0]
+                lnup  = popt[1]
+                thin  = popt[2] if order >= 3 else config.spectral_index_thin_theory
+                thick = popt[3] if order >= 4 else config.spectral_index_thick_theory
+
+                nup = float(np.exp(lnup))
+                out['alpha'][j]  = thin
+                out['thin'][j]   = thin
+                out['thick'][j]  = thick
+                out['lnS0'][j]   = float(np.log(S)) if S > 0 else -np.inf
+                out['pivot'][j]  = nup
+                out['fitted'][j] = True
+                out['extrapolated'][j] = SSA(anchor_freq, S, nup, thick, thin)
+        except (RuntimeError, ValueError):
+            continue
+    return out
+
 def compute_flux_correction_factor(cats, config, anchor_override=None, precomputed_indices=None, precomputed_quality=None, workers=-1):
     """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
     which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
@@ -718,29 +886,34 @@ def compute_flux_correction_factor(cats, config, anchor_override=None, precomput
     pivot_flux            = np.full(n_values, np.nan)
     tau_freefree          = np.full(n_values, config.tau_freefree_theory)
 
-    # simple case is equal to the N=2 case
-    # use theory value and extrapolate. For N>2, average those values per source --> (flux_ref, freq_ref) are each lists
-    if config.higher_order_simple or len(cats) == 2:
-        flux_ref = [cats[idx].flux for idx in other_index]
-        freq_ref = [cats[idx].freq for idx in other_index]
+    if config.fitting_order >= len(cats):
+        print(colored(f"Fitting order ({config.fitting_order}) has to be lower than number of datapoints ({len(cats)}).", "light_red"))
+        return None
+
+    # Dispatcher on (model, order): model selects the parameters, order how many are free. 
+    #Order 1 is theory scaling, no fitting.
+    # Orders 2-3 share one linear function (pivot fixed)
+    # order >= 4 shares one non-linear function. 
+    model = config.spectral_model.lower()
+    order = config.fitting_order
+    ref_freqs = np.array([float(cats[idx].freq) for idx in other_index], dtype=float)
+    ref_fluxes = np.stack([np.asarray(cats[idx].flux, dtype=float) for idx in other_index])
+    anchor_freq = float(cats[anchor_index].freq)
+
+    if model not in ('cpl', 'ffa', 'ssa'):
+        print(colored(f"Model '{model}' not supported. Try (cpl, ffa, ssa).", "light_red"))
+        return None
+    if order < 1:
+        print(colored(f"Fitting order ({order}) must be >= 1.", "light_red"))
+        return None
+
+    if order == 1:
+        extrapolated_flux_fit = _predict_theory(ref_freqs, ref_fluxes, anchor_freq, model, config)
     else:
-        # calculate spectral indices based on available data
-        match len(cats):
-            case 3:
-                # use the other two data points to calculate a spectral index
-                # extrapolated flux line goes through both ref points, thus (flux_ref, freq_ref) can be single values
-                spectral_indices = get_spectral_index(cats[other_index[0]].flux, cats[other_index[1]].flux, cats[other_index[0]].freq, cats[other_index[1]].freq, fallback_value=np.nan)
-                flux_ref = [cats[other_index[0]].flux]
-                freq_ref = [cats[other_index[0]].freq]
-            case 4:
-                # use the other three data points to calculate spectral index and spectral curvature
-                # # extrapolated flux line goes through all ref points, thus (flux_ref, freq_ref) can be single values
-                scale, spectral_indices, spectral_curvature, freq_ref = fit_log_parabola([cats[i].freq for i in other_index], [cats[i].flux for i in other_index])
-                flux_ref = [np.exp(scale)]
-                freq_ref = [freq_ref]
-            case _:
-                print(colored(f"Case N={len(cats)} not yet implemented", "light_red"))
-                return None
+        if order in (2, 3) and model in ('cpl', 'ffa'):
+            fit = _fit_linear(ref_freqs, ref_fluxes, anchor_freq, model, order, config)
+        else:
+            fit = _fit_nonlinear(ref_freqs, ref_fluxes, anchor_freq, model, order, config)
 
         fitted                           = fit['fitted']
         spectral_indices[fitted]         = fit['alpha'][fitted]
