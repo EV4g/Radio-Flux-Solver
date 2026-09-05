@@ -1,18 +1,16 @@
 import warnings
-from astropy.wcs import FITSFixedWarning
+from astropy.wcs import FITSFixedWarning, WCS
+from astropy.table import Table
 from astropy.io import fits
-from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import minimize, curve_fit
 from scipy.spatial import cKDTree
-from scipy.stats import gaussian_kde
+from scipy.stats import gaussian_kde, binned_statistic_2d, chi2
 from scipy.ndimage import gaussian_filter, gaussian_filter1d
 import matplotlib.pyplot as plt
-from itertools import combinations, permutations
-from scipy.stats import binned_statistic_2d
-from scipy.stats import chi2
+from itertools import combinations
 from termcolor import colored
 
 warnings.filterwarnings("ignore", module="matplotlib")
@@ -706,7 +704,7 @@ def compute_flux_correction_factor(cats, config, anchor_override=None, precomput
     max_sep = np.maximum.reduce(list(pair_seps.values()))
 
     # flux and flux error
-    uncorrected_flux = cats[anchor_index].flux
+    uncorrected_flux       = cats[anchor_index].flux
     uncorrected_flux_error = cats[anchor_index].e_flux
     
     # setup spectral index and curvature arrays, will remain theoretical value if not fitted for
@@ -770,11 +768,11 @@ def calculate_correction_factor_weight(output, config, sigma_cutoff=6):
     exponent = config.spectral_damping_factor * (output.spectral_index - config.spectral_index_theory)**2
     cutoff = 0.5 * sigma_cutoff**2
     spectral_difference_factor = np.where(exponent < cutoff, np.exp(-exponent), 0.0)
-    
+
     # discard low snr sources
     signal_to_noise_factor = output.signal_to_noise.copy()
     signal_to_noise_factor[signal_to_noise_factor < config.snr_lower_limit] = 0
-    
+
     # weighting based on separation between points
     # separation_weight = np.exp(-(max_sep / config.thres_arc) ** 2)
     

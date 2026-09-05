@@ -262,7 +262,7 @@ def compute_footprint_box(ra_deg, dec_deg, margin_fraction=0.1):
     dec_mid  = 0.5 * (dec_min + dec_max)
     ra_margin  = margin_fraction * ra_span  / max(np.cos(np.radians(dec_mid)), 1e-3)
     dec_margin = margin_fraction * dec_span
-    if ra_span < 1.0:  # essentially full-sky; keep bounds as [0, 360) so the filter is a no-op
+    if ra_span < 1.0:  # essentially full-sky; keep bounds as [0, 360)
         ra_min, ra_max = 0.0, 360.0
     else:
         ra_min  = (ra_min  - ra_margin) % 360.0

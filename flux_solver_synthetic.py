@@ -5,12 +5,7 @@ from functions import compute_flux_correction_factor, calculate_correction_facto
 from time import perf_counter
 from catalog_manager import Catalog, Config, Catalog_set, Output
 from joblib import Parallel, delayed
-
-try:
-    from termcolor import colored
-except ImportError:
-    print("termcolor not found, ignoring color")
-    def colored(str, col): return str
+from termcolor import colored
 
 # load a catalog normally, but replace the internal flux data
 def inject_synthetic_data(catalogs, ref_flux=1.0, ref_freq=1400e6, spectral_index=-0.8, curvature=0, snr=10):
@@ -72,7 +67,7 @@ weight_matrix = np.zeros((len(config.catalogs), len(config.catalogs)))
 all_combinations = get_combinations(config.catalogs, size=2)
 output_width = len(str(len(all_combinations)))
 
-outputs = Parallel(n_jobs=-1)(delayed(compute_flux_correction_factor)([config.catalogs[j] for j in combo], config, debug=False, anchor_override=0) for combo in all_combinations)
+outputs = Parallel(n_jobs=-1)(delayed(compute_flux_correction_factor)([config.catalogs[j] for j in combo], config, anchor_override=0) for combo in all_combinations)
 
 for i, (combination, out) in enumerate(zip(all_combinations, outputs)):
     local_cats = [config.catalogs[j] for j in combination]

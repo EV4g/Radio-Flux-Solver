@@ -305,7 +305,7 @@ def main():
     ##########################
     #### inspection plots ####
     ##########################
-    if INSPECTION_PLOTS:
+    if INSPECTION_PLOTS and SAVE_PLOTS:
         min_cor, max_cor = 0.25, 4.0
         mask = (correction_factor > min_cor) & (correction_factor < max_cor) #(correction_factor != np.nan)
 
