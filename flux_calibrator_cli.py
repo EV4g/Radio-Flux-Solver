@@ -6,10 +6,11 @@ import matplotlib.pyplot as plt
 from functions import plot_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d, predict_flux
 from functions import compute_flux_correction_factor, calculate_correction_factor_weight, biweight_location, report_ignored_cats
 from time import perf_counter
-from catalog_manager import Catalog, Config, Catalog_set, Output
+from catalog_manager import Catalog, Config, Catalog_set
 from joblib import Parallel, delayed
 from pathlib import Path
 from astropy.io import fits
+from astropy.table import vstack
 from termcolor import colored
 warnings.filterwarnings("ignore", message=".*(non-interactive|tqdm).*")
 
@@ -44,6 +45,9 @@ _PRESETS = {
 _FREQ_UNIT_SCALE = {"Hz": 1.0, "MHz": 1e6, "GHz": 1e9}
 _CUNIT3_SCALE    = {"HZ": 1.0, "KHZ": 1e3, "MHZ": 1e6, "GHZ": 1e9}
 
+#### allowed models
+SPECTRAL_MODELS = ['cpl', 'ffa', 'ssa']
+
 def _resolve_freq(image_path, args_freq, args_freq_unit):
     """Find the frequency axis (CTYPE contains 'FREQ') and return its CRVAL in Hz.
     Falls back to --freq + --freq-unit if no frequency axis is present."""
@@ -67,30 +71,49 @@ def _is_table_catalog(path):
 def _build_parser():
     p = argparse.ArgumentParser(description="Calibrate a radio image or table catalog against reference catalogs.")
     p.add_argument("catalog",                                                help="Path to FITS image or table catalog (the anchor / unknown).")
-    p.add_argument("--scale",                     type=float, default=1,     help="Scale values in the anchor catalog by this amount")
+
+    # basic settings
     p.add_argument("--catalogs",                  default="default",         help='Preset name (all, default) or comma-separated catalog list.')
     p.add_argument("-f","--freq",                 type=float, default=None,  help="Central frequency in --freq-unit; for images, inferred from the FITS FREQ axis when present.")
     p.add_argument("--freq-unit",                 choices=list(_FREQ_UNIT_SCALE), default="Hz")
+    p.add_argument("--spectral-model",            choices=SPECTRAL_MODELS,   default="cpl", help="Spectral model to use for fitting (default: CPL)")
     p.add_argument("-c","--combination-size",     type=int,   default=3,     help="Set matching complexity as well as fitting D.O.F.")
+    p.add_argument("--fitting-order",             type=int,   default=None,  help="Order of the fitting polynomial (default: combination-size - 1)")
     p.add_argument("--spectral_damping_factor",   type=float, default=5,     help="Dampen unphysical spectral index outliers")
     p.add_argument("--nsigma",                    type=float, default=2,     help="Sigma range to use for error based matching (default: 2)")
     p.add_argument("--snr-lower-limit",           type=float, default=7,     help="Ignore sources below this SNR limit (default: 7)")
     p.add_argument("--minimum-points",            type=int,   default=3,     help="Ignore matched catalogs sets with matches below this limit (default: 3)")
-    p.add_argument("--spectral-index-theory",     type=float, default=-0.8,  help="Theoretical value for spectral index for desired source (default: -0.8)")
     p.add_argument("--minimum-frequency-spacing", type=float, default=100e6, help="Ignore catalog matching with a spacing below threshold (Hz)")
+
+    # default theoretical values used when not fitting for them
+    p.add_argument("--spectral-index-theory",       type=float, default=-0.8,  help="Theoretical value for spectral index for desired source (default: -0.8)")
+    p.add_argument("--spectral-index-thin-theory",  type=float, default=-0.5,  help="Theoretical value for thin spectral index for desired source (default: -0.5)")
+    p.add_argument("--spectral-index-thick-theory", type=float, default=2.5,   help="Theoretical value for thick spectral index for desired source (default: 2.5)")
+    p.add_argument("--spectral-curvature-theory",   type=float, default=0,     help="Theoretical value for spectral curvature for desired source (default: 0)")
+    p.add_argument("--tau-freefree-theory",         type=float, default=0,     help="Theoretical value for tau_freefree for desired source (default: 0)")
+    p.add_argument("--pivot-freq-theory",           type=float, default=100e6, help="Theoretical value for pivot frequency for desired source (default: 100e6 Hz)")
+
+    # plotting/logging
+    p.add_argument("--save-plots",                action="store_true",       help="Save inspection plots to disk")
+    p.add_argument("--save-csv",                  action="store_true",       help="Save csv file with matched sources, their location, and flux at each frequency")
+    p.add_argument("--logging",                   action="store_true",       help="Write all output to a log file in --output-dir instead of the terminal.")
+    p.add_argument("--output-dir",                default=None,              help="Directory to write plots and logs into (default: ./logs/).")
+    p.add_argument("--anchor-name",               default=None,              help="Registry name for the anchor (default: input filename stem).")
+
+    # additional overrides
+    p.add_argument("--scale",                     type=float, default=1,     help="Scale values in the anchor catalog by this amount")
     p.add_argument("--minimum-position-error",    type=float, default=None,  help="Set a minimum position error. Sources with lower error at set to this value (Default: None).")
     p.add_argument("--reference-file",            default=None,              help="Provide reference cutout when giving a large catalog to speed up matching")
     p.add_argument("--spatial-filter",            action="store_true",       help="Pre-filter reference catalogs to the anchor's spatial coverage (with 10%% margin).")
     p.add_argument("--thres-arc",                 type=float, default=None,  help="Override error based matching with simple thresholding (arcsec)")
-    p.add_argument("--save-plots",                action="store_true",       help="Save inspection plots to disk")
-    p.add_argument("--save-csv",                  action="store_true",       help="Save csv file with matched sources, their location, and flux at each frequency")
+    p.add_argument("--crowd-radius-arc",          type=float, default=None,  help="Radius for point crowding penalty (arcsec), (Default: None)")
     p.add_argument("--n-jobs",                    type=int, default=-1,      help="Number of cores to use, defaults to all of them")
-    p.add_argument("--anchor-name",               default=None,              help="Registry name for the anchor (default: input filename stem).")
-    p.add_argument("--no-reload-cache",           action="store_true",       help="Force PyBDSF to re-run on the anchor image.")
+
+    # debug
     p.add_argument("--debug",                     action="store_true",       help="Store debug plots per set of matches (slow)")
-    p.add_argument("--logging",                   action="store_true",       help="Write all output to a log file in --output-dir instead of the terminal.")
-    p.add_argument("--output-dir",                default=None,              help="Directory to write plots and logs into (default: ./logs/).")
+    p.add_argument("--no-reload-cache",           action="store_true",       help="Force PyBDSF to re-run on the anchor image.")
     p.add_argument("--seed",                      type=int, default=None,    help="Seed for the spectra-plot random sample (default: random).")
+    
     return p
 
 def main():
@@ -98,8 +121,16 @@ def main():
     start = perf_counter()
 
     # error when choosing wrong combination size parameter
-    if args.combination_size < 2 or args.combination_size > 4:
-        raise SystemExit(f"--combination-size must be >= 2 and <= 4 (got {args.combination_size}).")
+    if args.combination_size < 2:
+        raise SystemExit(f"--combination-size must be >= 2 (got {args.combination_size}).")
+
+    # set fitting-order automatically if not specified
+    if args.fitting_order is None:
+        args.fitting_order = args.combination_size - 1
+
+    # ensure given model is in list of models
+    if args.spectral_model.lower() not in SPECTRAL_MODELS:
+        raise SystemExit(f"--spectral-model must be one of {SPECTRAL_MODELS} (got {args.spectral_model}).")
 
     # check for fits file
     catalog_path = Path(args.catalog)
@@ -152,24 +183,35 @@ def main():
     all_cats = ref_cats + [anchor_cat]
 
     config = Config(
-        spectral_damping_factor=args.spectral_damping_factor,
-        snr_lower_limit=args.snr_lower_limit,
-        spectral_index_theory=args.spectral_index_theory,
-        minimum_points=args.minimum_points,
-        nsigma=args.nsigma,
-        crowd_radius_arc=None,
-        minimum_frequency_spacing=args.minimum_frequency_spacing,
-        minimum_position_error=args.minimum_position_error,
-        catalogs=all_cats,
-        anchor_catalog=anchor_cat,
-        reference_file=args.reference_file,
-        spatial_filter=args.spatial_filter,
-        thres_arc=args.thres_arc if args.thres_arc is not None else 2,
-        thres_arc_override=True  if args.thres_arc is not None else False
+        anchor_catalog = anchor_cat,
+        catalogs       = all_cats,
+        spectral_model              = args.spectral_model,
+        fitting_order               = args.fitting_order,
+        spectral_damping_factor     = args.spectral_damping_factor,
+        snr_lower_limit             = args.snr_lower_limit,
+        minimum_points              = args.minimum_points,
+        nsigma                      = args.nsigma,
+        crowd_radius_arc            = args.crowd_radius_arc,
+        minimum_frequency_spacing   = args.minimum_frequency_spacing,
+
+        # theoretical values
+        spectral_index_theory       = args.spectral_index_theory,
+        spectral_index_thin_theory  = args.spectral_index_thin_theory,
+        spectral_index_thick_theory = args.spectral_index_thick_theory,
+        spectral_curvature_theory   = args.spectral_curvature_theory,
+        tau_freefree_theory         = args.tau_freefree_theory,
+        pivot_freq_theory           = args.pivot_freq_theory,
+
+        # additional
+        minimum_position_error      = args.minimum_position_error,
+        reference_file              = args.reference_file,
+        spatial_filter              = args.spatial_filter,
+        thres_arc                   = args.thres_arc if args.thres_arc is not None else 2,
+        thres_arc_override          = args.thres_arc is not None,
     )
     
     config.setup()
-    output = Output()
+    output_table = []
 
     DEBUG_MODE       = args.debug
     INSPECTION_PLOTS = True
@@ -230,13 +272,12 @@ def main():
         local_cats = [config.catalogs[j] for j in combo]
 
         if out is not None:
-
-            print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",f"Matches: {len(out[0])}")
-
-            output.add(*out)
-            spx, curv, snr, cor, flux, max_sep, p_weight, n_crowd, ra, dec = out
+            print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]",f"Matches: {len(out)}")
+            output_table.append(out)
 
             if DEBUG_MODE:
+                spx, flux, cor = out["spectral_index"], out["fitted_flux"], out["correction_factor"]
+
                 # compare spectral_index_theory assumption versus fitted spectral indices
                 plt.scatter(flux, cor, c=spx)
                 plt.yscale('log')
@@ -261,19 +302,40 @@ def main():
                 plt.close('all')
 
         else:
-
             print(f"({i+1:{output_width}}/{len(all_combinations)})",f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]","Matches:", colored("None", "yellow"))
 
 
     print(f"Flux compute done at {(perf_counter() - start):.2f} seconds")
 
-    output.concatenate()
-    total_weighting_factor = calculate_correction_factor_weight(output, config)
+    results = vstack(output_table)
+    total_weighting_factor = calculate_correction_factor_weight(results, config)
     weight_mask = total_weighting_factor > 0
-    output.apply_mask(weight_mask)
+    results = results[weight_mask]
     total_weighting_factor = total_weighting_factor[weight_mask]
 
-    ras, decs, correction_factor, spectral_index, spectral_curvature, fitted_flux, signal_to_noise, max_separation, point_probability, crowding_parameter = output.return_values()
+    if args.save_csv:
+        results.write(outdir / f"{anchor_name}_results.csv", overwrite=True)
+
+    ras                 = results["ra"]
+    decs                = results["dec"]
+    correction_factor   = results["correction_factor"]
+    spectral_index      = results["spectral_index"]
+    spectral_curvature  = results["spectral_curvature"]
+    fitted_flux         = results["fitted_flux"]
+    #signal_to_noise     = results["signal_to_noise"]
+    #max_separation      = results["max_separation"]
+    #point_probability   = results["point_probability"]
+    #crowding_parameter  = results["crowding_parameter"]
+
+    #spectral_index_thin  = results["spectral_index_thin"]
+    #spectral_index_thick = results["spectral_index_thick"]
+    #tau_freefree         = results["tau_freefree"]
+    #pivot_frequency      = results["pivot_frequency"]
+    #pivot_flux           = results["pivot_flux"]
+
+
+
+
 
     ############################################################################
     #### plotting correction factor based on all previous catalog matchings ####

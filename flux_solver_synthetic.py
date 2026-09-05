@@ -3,7 +3,7 @@ import numpy as np
 from functions import get_combinations, solve_flux_scales, predict_flux
 from functions import compute_flux_correction_factor, calculate_correction_factor_weight, calculate_1d_peak#, solve_flux_scales_band
 from time import perf_counter
-from catalog_manager import Catalog, Config, Catalog_set, Output
+from catalog_manager import Catalog, Config, Catalog_set
 from joblib import Parallel, delayed
 from termcolor import colored
 
@@ -73,17 +73,17 @@ for i, (combination, out) in enumerate(zip(all_combinations, outputs)):
     local_cats = [config.catalogs[j] for j in combination]
     
     if out is not None:
-        output = Output(*out)
-        
-        print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(output.ras)}")
-        
+        output = out
+
+        print(f"({i+1:{output_width}}/{len(all_combinations)})", f"Completed set [{', '.join(f'{cat.name:9}' for cat in local_cats)}]", f"Matches: {len(output)}")
+
         tot_wf = calculate_correction_factor_weight(output, config)
-        
+
         filter = tot_wf > 0
         tot_wf = tot_wf[filter]
-        output.apply_mask(filter)
+        output = output[filter]
         
-        _, _, py = calculate_1d_peak(output.correction_factor, tot_wf, log=True)
+        _, _, py = calculate_1d_peak(output["correction_factor"], tot_wf, log=True)
         
         y, x = combination
         cor_matrix[x, y] = 1.0 / py

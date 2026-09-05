@@ -275,39 +275,45 @@ def compute_footprint_box(ra_deg, dec_deg, margin_fraction=0.1):
 
 # wrapper class for passable parameters
 class Config:
-    def __init__(self, spectral_damping_factor = 5,
-                 snr_lower_limit               = 7,
-                 spectral_index_theory         = -0.7,
-                 minimum_points                = 2,
-                 nsigma                        = 3,
-                 crowd_radius_arc              = None,
-                 minimum_frequency_spacing     = 0,
-                 maximum_frequency_spacing     = np.inf,
-                 minimum_position_error        = None,
-                 catalogs                      = None,
-                 catalog_names                 = None,
-                 reference_file                = None,
-                 footprint_box                 = None,
-                 spatial_filter                = False,
-                 anchor_catalog                = None,
-                 anchor_catalog_name           = None,
-                 thres_arc                     = 2,
-                 thres_arc_override            = False,
-                 spectral_curvature_theory     = 0,
-                 higher_order_simple           = False):
+    def __init__(self, anchor_catalog         = None,
+                 anchor_catalog_name          = None,
+                 catalogs                     = None,
+                 catalog_names                = None,
+                 spectral_model               = 'cpl',
+                 fitting_order                = 2,
+                 spectral_damping_factor      = 5,
+                 snr_lower_limit              = 7,
+                 minimum_points               = 2,
+                 nsigma                       = 3,
+                 crowd_radius_arc             = None,
+                 minimum_frequency_spacing    = 0,
+                 maximum_frequency_spacing    = np.inf,
+                 spectral_index_theory        = -0.7,
+                 spectral_curvature_theory    = 0,
+                 spectral_index_thin_theory   = -0.5,
+                 spectral_index_thick_theory  = 2.5,
+                 tau_freefree_theory          = 0,
+                 pivot_freq_theory            = 100e6,
+                 minimum_position_error       = None,
+                 reference_file               = None,
+                 footprint_box                = None,
+                 spatial_filter               = False,
+                 thres_arc                    = 2,
+                 thres_arc_override           = False):
 
+        self.spectral_model            = spectral_model
+        self.fitting_order             = fitting_order
         self.thres_arc                 = thres_arc
         self.spectral_damping_factor   = spectral_damping_factor
         self.snr_lower_limit           = snr_lower_limit
         self.minimum_points            = minimum_points
-        self.spectral_index_theory     = spectral_index_theory
         self.nsigma                    = nsigma
         self.crowd_radius_arc          = crowd_radius_arc
         self.minimum_frequency_spacing = minimum_frequency_spacing if minimum_frequency_spacing is not None else 0
         self.maximum_frequency_spacing = maximum_frequency_spacing if maximum_frequency_spacing is not None else np.inf
         self.minimum_position_error    = minimum_position_error
-        self.higher_order_simple       = higher_order_simple
-
+        self.pivot_freq_theory         = pivot_freq_theory       
+        
         if catalogs is not None:
             self.catalogs = list(catalogs)
             self.catalog_names = [cat.name for cat in self.catalogs]
@@ -328,7 +334,12 @@ class Config:
         self.footprint_box  = footprint_box
         self.spatial_filter = spatial_filter
         self.thres_arc_override         = thres_arc_override
-        self.spectral_curvature_theory  = spectral_curvature_theory
+
+        self.spectral_index_theory       = spectral_index_theory
+        self.spectral_index_thin_theory  = spectral_index_thin_theory
+        self.spectral_index_thick_theory = spectral_index_thick_theory
+        self.tau_freefree_theory         = tau_freefree_theory
+        self.spectral_curvature_theory   = spectral_curvature_theory
 
     def setup(self):
         # Resolve catalog names to Catalog objects from the global registry
@@ -397,55 +408,3 @@ class Config:
         )
         if True:
             print(f"  precompute_match_arrays: {(perf_counter()-t0):.2f}s")
-
-class Output:
-    def __init__(self, spx=None, cur=None, snr=None, cor=None, flux=None, sep=None, pmatch=None, ncrowd=None, ra=None, dec=None):
-        self.spectral_index     = [] if spx    is None else spx    # per-source spectral index
-        self.spectral_curvature = [] if cur    is None else cur    # per-source spectral curvature
-        self.signal_to_noise    = [] if snr    is None else snr    # signal-to-noise (flux_jy / e_flux_jy)
-        self.correction_factor  = [] if cor    is None else cor    # ratio between read-out anchor_catalog flux and computed flux
-        self.fitted_flux        = [] if flux   is None else flux   # anchor_catalog flux based on spectral index extrapolation
-        self.max_separation     = [] if sep    is None else sep    # maximum per-source separation between all three matched catalog positions
-        self.point_probability  = [] if pmatch is None else pmatch # probability of points matching
-        self.crowding_parameter = [] if ncrowd is None else ncrowd # maximum number of neighbours per source within crowd_radius_arc
-        self.ras                = [] if ra     is None else ra     # positional coordinates
-        self.decs               = [] if dec    is None else dec    # positional coordinates
-    
-    def add(self, spx, cur, snr, cor, flux, sep, pmatch, ncrowd, ra, dec):
-        self.ras.append(ra)
-        self.decs.append(dec)
-        self.correction_factor.append(cor)
-        self.spectral_index.append(spx)
-        self.spectral_curvature.append(cur)
-        self.fitted_flux.append(flux)
-        self.signal_to_noise.append(snr)
-        self.max_separation.append(sep)
-        self.point_probability.append(pmatch)
-        self.crowding_parameter.append(ncrowd)
-        
-    def concatenate(self):
-        self.ras                   = np.concatenate(self.ras)
-        self.decs                  = np.concatenate(self.decs)
-        self.correction_factor     = np.concatenate(self.correction_factor)
-        self.spectral_index        = np.concatenate(self.spectral_index)
-        self.spectral_curvature    = np.concatenate(self.spectral_curvature)
-        self.fitted_flux           = np.concatenate(self.fitted_flux)
-        self.signal_to_noise       = np.concatenate(self.signal_to_noise)
-        self.max_separation        = np.concatenate(self.max_separation)
-        self.point_probability     = np.concatenate(self.point_probability)
-        self.crowding_parameter    = np.concatenate(self.crowding_parameter)
-        
-    def apply_mask(self, mask):
-        self.ras                   = self.ras[mask]
-        self.decs                  = self.decs[mask]
-        self.correction_factor     = self.correction_factor[mask]
-        self.spectral_index        = self.spectral_index[mask]
-        self.spectral_curvature    = self.spectral_curvature[mask]
-        self.fitted_flux           = self.fitted_flux[mask]
-        self.signal_to_noise       = self.signal_to_noise[mask]
-        self.max_separation        = self.max_separation[mask]
-        self.point_probability     = self.point_probability[mask]
-        self.crowding_parameter    = self.crowding_parameter[mask]
-
-    def return_values(self):
-        return self.ras, self.decs, self.correction_factor, self.spectral_index, self.spectral_curvature, self.fitted_flux, self.signal_to_noise, self.max_separation, self.point_probability, self.crowding_parameter

@@ -706,10 +706,17 @@ def compute_flux_correction_factor(cats, config, anchor_override=None, precomput
     # flux and flux error
     uncorrected_flux       = cats[anchor_index].flux
     uncorrected_flux_error = cats[anchor_index].e_flux
+    n_values = len(uncorrected_flux)
     
-    # setup spectral index and curvature arrays, will remain theoretical value if not fitted for
-    spectral_curvature = np.full_like(uncorrected_flux, config.spectral_curvature_theory)
-    spectral_indices   = np.full_like(uncorrected_flux, config.spectral_index_theory)
+    # setup arrays, will remain theoretical value if not fitted for
+    extrapolated_flux_fit = np.full(n_values, np.nan)
+    spectral_curvature    = np.full(n_values, config.spectral_curvature_theory)
+    spectral_indices      = np.full(n_values, config.spectral_index_theory)
+    spectral_index_thin   = np.full(n_values, config.spectral_index_thin_theory)
+    spectral_index_thick  = np.full(n_values, config.spectral_index_thick_theory)
+    pivot_frequency       = np.full(n_values, config.pivot_freq_theory)
+    pivot_flux            = np.full(n_values, np.nan)
+    tau_freefree          = np.full(n_values, config.tau_freefree_theory)
 
     # simple case is equal to the N=2 case
     # use theory value and extrapolate. For N>2, average those values per source --> (flux_ref, freq_ref) are each lists
@@ -735,8 +742,19 @@ def compute_flux_correction_factor(cats, config, anchor_override=None, precomput
                 print(colored(f"Case N={len(cats)} not yet implemented", "light_red"))
                 return None
 
-    # fit is based on measuring between two points, linear is average between assuming theoretical extragalactic value for both
-    extrapolated_flux_fit = np.average([predict_flux(cats[anchor_index].freq, freq, flux, spectral_indices, spectral_curvature) for (freq, flux) in zip(freq_ref, flux_ref)], axis=0)
+        fitted                           = fit['fitted']
+        spectral_indices[fitted]         = fit['alpha'][fitted]
+        pivot_frequency[fitted]          = fit['pivot'][fitted]
+        pivot_flux[fitted]               = np.exp(fit['lnS0'][fitted])
+        extrapolated_flux_fit[fitted]    = fit['extrapolated'][fitted]
+
+        if model == 'cpl':
+            spectral_curvature[fitted]   = fit['bend'][fitted]
+        elif model == 'ffa':
+            tau_freefree[fitted]         = fit['bend'][fitted]
+        else:
+            spectral_index_thin[fitted]  = fit['thin'][fitted]
+            spectral_index_thick[fitted] = fit['thick'][fitted]
     
     # correction factor is the factor to multiply the anchor_catalog flux by to get what it should be, based on the other catalogs
     correction_factor = extrapolated_flux_fit / uncorrected_flux
@@ -746,37 +764,39 @@ def compute_flux_correction_factor(cats, config, anchor_override=None, precomput
     ra = np.average([cat.ra for cat in cats], axis=0)
     dec = np.average([cat.dec for cat in cats], axis=0)
     
-    return (spectral_indices, spectral_curvature, snr, correction_factor, extrapolated_flux_fit, max_sep, p_weight, n_crowd, ra, dec)
-
-def fit_log_parabola(freq, flux, freq_pivot=100e6):
-    """fit log parabola, but now with pivot to ensure scale remains stable"""
-    freq = np.array(freq)
-    x = np.log(freq / freq_pivot)
-    y = np.log(flux)
-    curvature, spectral_index, scale = np.polyfit(x, y, 2)
-    return scale, spectral_index, curvature, freq_pivot
-
-def predict_flux(freq_target, freq_reference, flux_reference, spectral_index, curvature=0):
-    """Extrapolate flux based on two frequencies, one flux, a spectral index, and an optional curvature parameter"""
-    log_freq_delta = np.log(freq_target / freq_reference)
-    log_flux_ratio = spectral_index * log_freq_delta + curvature * log_freq_delta**2
-    return flux_reference * np.exp(log_flux_ratio)
+    return Table({
+        "spectral_index":       spectral_indices,
+        "spectral_curvature":   spectral_curvature,
+        "spectral_index_thick": spectral_index_thick,
+        "spectral_index_thin":  spectral_index_thin,
+        "tau_freefree":         tau_freefree,
+        "pivot_frequency":      pivot_frequency,
+        "pivot_flux":           pivot_flux,
+        "signal_to_noise":      snr,
+        "correction_factor":    correction_factor,
+        "fitted_flux":          extrapolated_flux_fit,
+        "max_separation":       max_sep,
+        "point_probability":    p_weight,
+        "crowding_parameter":   n_crowd,
+        "ra":                   ra,
+        "dec":                  dec,
+    })
 
 def calculate_correction_factor_weight(output, config, sigma_cutoff=6):
     """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
     # downweight sources with spectral indices far away from -0.7
-    exponent = config.spectral_damping_factor * (output.spectral_index - config.spectral_index_theory)**2
+    exponent = config.spectral_damping_factor * (output["spectral_index"] - config.spectral_index_theory)**2
     cutoff = 0.5 * sigma_cutoff**2
     spectral_difference_factor = np.where(exponent < cutoff, np.exp(-exponent), 0.0)
 
     # discard low snr sources
-    signal_to_noise_factor = output.signal_to_noise.copy()
+    signal_to_noise_factor = output["signal_to_noise"].copy()
     signal_to_noise_factor[signal_to_noise_factor < config.snr_lower_limit] = 0
 
     # weighting based on separation between points
     # separation_weight = np.exp(-(max_sep / config.thres_arc) ** 2)
-    
-    return spectral_difference_factor * signal_to_noise_factor * output.point_probability
+
+    return spectral_difference_factor * signal_to_noise_factor * output["point_probability"]
 
 def weighted_median(val, w):
     """Return median of an array with value weights"""
