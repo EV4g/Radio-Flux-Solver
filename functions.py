@@ -447,9 +447,9 @@ def weighted_bin_stats(x, y, w, n_bins=200):
     """"""
     edges = np.linspace(x.min(), x.max(), n_bins + 1)
     centers = 0.5 * (edges[:-1] + edges[1:])
-    mn  = np.full(n_bins, np.nan)
-    std = np.full(n_bins, np.nan)
-    sem = np.full(n_bins, np.nan)
+    mn  = np.full(n_bins, np.nan, dtype=float)
+    std = np.full(n_bins, np.nan, dtype=float)
+    sem = np.full(n_bins, np.nan, dtype=float)
 
     for i in range(n_bins):
         in_bin = (x >= edges[i]) & (x < edges[i + 1])
@@ -685,13 +685,13 @@ def _fit_linear(ref_freqs, ref_fluxes, anchor_freq, model, order, config):
     bend_th = config.spectral_curvature_theory if is_cpl else config.tau_freefree_theory
     predict = CPL if is_cpl else FFA
     
-    out = {'alpha':        np.full(n, np.nan), 
-           'bend':         np.full(n, bend_th),
-           'lnS0':         np.full(n, np.nan), 
-           'pivot':        np.full(n, piv_th),
-           'extrapolated': np.full(n, np.nan),
-           'thin':         np.full(n, np.nan), 
-           'thick':        np.full(n, np.nan),
+    out = {'alpha':        np.full(n, np.nan, dtype=float), 
+           'bend':         np.full(n, bend_th, dtype=float),
+           'lnS0':         np.full(n, np.nan, dtype=float), 
+           'pivot':        np.full(n, piv_th, dtype=float),
+           'extrapolated': np.full(n, np.nan, dtype=float),
+           'thin':         np.full(n, np.nan, dtype=float), 
+           'thick':        np.full(n, np.nan, dtype=float),
            'fitted':       np.zeros(n, bool)}
     
     xx = np.log(ref_freqs / piv_th)                                      # (m,)
@@ -748,13 +748,13 @@ def _fit_nonlinear(ref_freqs, ref_fluxes, anchor_freq, model, order, config):
     n = ref_fluxes.shape[1]
     is_cpl = (model == 'cpl')
     
-    out = {'alpha':        np.full(n, np.nan),
-           'bend':         np.full(n, np.nan),
-           'lnS0':         np.full(n, np.nan),
-           'pivot':        np.full(n, np.nan),
-           'extrapolated': np.full(n, np.nan),
-           'thin':         np.full(n, np.nan),
-           'thick':        np.full(n, np.nan),
+    out = {'alpha':        np.full(n, np.nan, dtype=float),
+           'bend':         np.full(n, np.nan, dtype=float),
+           'lnS0':         np.full(n, np.nan, dtype=float),
+           'pivot':        np.full(n, np.nan, dtype=float),
+           'extrapolated': np.full(n, np.nan, dtype=float),
+           'thin':         np.full(n, np.nan, dtype=float),
+           'thick':        np.full(n, np.nan, dtype=float),
            'fitted':       np.zeros(n, bool)}
 
     for j in range(n):
@@ -877,14 +877,14 @@ def compute_flux_correction_factor(cats, config, anchor_override=None, precomput
     n_values = len(uncorrected_flux)
     
     # setup arrays, will remain theoretical value if not fitted for
-    extrapolated_flux_fit = np.full(n_values, np.nan)
-    spectral_curvature    = np.full(n_values, config.spectral_curvature_theory)
-    spectral_indices      = np.full(n_values, config.spectral_index_theory)
-    spectral_index_thin   = np.full(n_values, config.spectral_index_thin_theory)
-    spectral_index_thick  = np.full(n_values, config.spectral_index_thick_theory)
-    pivot_frequency       = np.full(n_values, config.pivot_freq_theory)
-    pivot_flux            = np.full(n_values, np.nan)
-    tau_freefree          = np.full(n_values, config.tau_freefree_theory)
+    extrapolated_flux_fit = np.full(n_values, np.nan, dtype=float)
+    spectral_curvature    = np.full(n_values, config.spectral_curvature_theory, dtype=float)
+    spectral_indices      = np.full(n_values, config.spectral_index_theory, dtype=float)
+    spectral_index_thin   = np.full(n_values, config.spectral_index_thin_theory, dtype=float)
+    spectral_index_thick  = np.full(n_values, config.spectral_index_thick_theory, dtype=float)
+    pivot_frequency       = np.full(n_values, config.pivot_freq_theory, dtype=float)
+    pivot_flux            = np.full(n_values, np.nan, dtype=float)
+    tau_freefree          = np.full(n_values, config.tau_freefree_theory, dtype=float)
 
     if config.fitting_order >= len(cats):
         print(colored(f"Fitting order ({config.fitting_order}) has to be lower than number of datapoints ({len(cats)}).", "light_red"))

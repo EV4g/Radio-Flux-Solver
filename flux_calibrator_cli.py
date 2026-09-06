@@ -89,8 +89,8 @@ def _build_parser():
     p.add_argument("--spectral-index-theory",       type=float, default=-0.8,  help="Theoretical value for spectral index for desired source (default: -0.8)")
     p.add_argument("--spectral-index-thin-theory",  type=float, default=-0.5,  help="Theoretical value for thin spectral index for desired source (default: -0.5)")
     p.add_argument("--spectral-index-thick-theory", type=float, default=2.5,   help="Theoretical value for thick spectral index for desired source (default: 2.5)")
-    p.add_argument("--spectral-curvature-theory",   type=float, default=0,     help="Theoretical value for spectral curvature for desired source (default: 0)")
-    p.add_argument("--tau-freefree-theory",         type=float, default=0,     help="Theoretical value for tau_freefree for desired source (default: 0)")
+    p.add_argument("--spectral-curvature-theory",   type=float, default=0.0,   help="Theoretical value for spectral curvature for desired source (default: 0)")
+    p.add_argument("--tau-freefree-theory",         type=float, default=0.0,   help="Theoretical value for tau_freefree for desired source (default: 0)")
     p.add_argument("--pivot-freq-theory",           type=float, default=100e6, help="Theoretical value for pivot frequency for desired source (default: 100e6 Hz)")
 
     # plotting/logging
@@ -327,11 +327,11 @@ def main():
     #point_probability   = results["point_probability"]
     #crowding_parameter  = results["crowding_parameter"]
 
-    #spectral_index_thin  = results["spectral_index_thin"]
-    #spectral_index_thick = results["spectral_index_thick"]
-    #tau_freefree         = results["tau_freefree"]
-    #pivot_frequency      = results["pivot_frequency"]
-    #pivot_flux           = results["pivot_flux"]
+    spectral_index_thin  = results["spectral_index_thin"]
+    spectral_index_thick = results["spectral_index_thick"]
+    tau_freefree         = results["tau_freefree"]
+    pivot_frequency      = results["pivot_frequency"]
+    pivot_flux           = results["pivot_flux"]
 
 
 
@@ -459,7 +459,6 @@ def main():
 
             scatter = ax.scatter(ras[mask], decs[mask], c=log_values, cmap='RdYlGn_r', vmin=-max_log_dev, vmax=max_log_dev, s=30, edgecolors='black', linewidth=0.5, zorder=5)
             cbar = fig.colorbar(scatter, ax=ax, label='Correction factor')
-
         else:
             # hexbin fallback
             log_cf = np.log10(correction_factor[mask])
