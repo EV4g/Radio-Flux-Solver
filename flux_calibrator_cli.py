@@ -343,23 +343,65 @@ def main():
     mspx, mcor, mcur = biweight_location(spectral_index, np.log10(correction_factor), spectral_curvature, weights=total_weighting_factor)
     mcor = 10**mcor
 
-    plot_statistics(spectral_index, correction_factor, total_weighting_factor,
-                    logy=True,
-                    save=SAVE_PLOTS,
-                    path=outdir / "correction_factor_vs_spx.png",
-                    show=False,
-                    xlabel=r"Fitted spectral index $\alpha$",
+    if config.spectral_model.lower() != "ssa":
+        # plot correction factor as function of spectral index [cpl | ffa]
+        plot_statistics(spectral_index, correction_factor, total_weighting_factor,
+                        logy=True, save=SAVE_PLOTS, show=False,
+                        path=outdir / "correction_factor_vs_spx.png",
+                        xlabel=r"Fitted spectral index $\alpha$",
+                        ylabel="Correction factor",
+                        title="Correction factor as function of fitted spectral index\nall catalogs")
+
+        if config.spectral_model.lower() == "cpl" and config.fitting_order >= 3:
+            # plot spectral curvature as function of spectral index [cpl]
+            plot_statistics(spectral_index, spectral_curvature, total_weighting_factor,
+                            save=SAVE_PLOTS, show=False,
+                            path=outdir / "spectral_curvature_vs_spx.png",
+                            xlabel=r"Fitted spectral index $\alpha$",
+                            ylabel="Spectral curvature",
+                            title="Spectral curvature as function of fitted spectral index\nall catalogs")
+            
+        elif config.spectral_model.lower() == "ffa" and config.fitting_order >= 3:
+            # plot tau_ff as function of spectral index [ffa]
+            plot_statistics(spectral_index, tau_freefree, total_weighting_factor,
+                            save=SAVE_PLOTS, show=False,
+                            path=outdir / "tau_freefree_vs_spx.png",
+                            xlabel=r"Fitted spectral index $\alpha$",
+                            ylabel="Tau_ff",
+                            title="Tau_ff as function of fitted spectral index\nall catalogs")
+    
+    elif config.spectral_model.lower() == "ssa":
+        if config.fitting_order >= 2:
+            # order 2 fits for S_peak and nu_peak
+            plot_statistics(pivot_flux, pivot_frequency, total_weighting_factor,
+                    save=SAVE_PLOTS, show=False,
+                    path=outdir / "peak_flux_vs_freq.png",
+                    xlabel="Peak flux",
+                    ylabel="Peak frequency",
+                    title="Peak flux as function of peak frequency\nall catalogs")
+            plot_statistics(pivot_frequency, correction_factor, total_weighting_factor,
+                    save=SAVE_PLOTS, show=False,
+                    path=outdir / "peak_freq_vs_correction_factor.png",
+                    xlabel="Peak frequency",
                     ylabel="Correction factor",
-                    title="Correction factor as function of fitted spectral index\nall catalogs")
-
-    plot_statistics(spectral_index, spectral_curvature, total_weighting_factor,
-                    save=SAVE_PLOTS,
-                    path=outdir / "spectral_curvature_vs_spx.png",
-                    show=False,
-                    xlabel=r"Fitted spectral index $\alpha$",
-                    ylabel="Spectral curvature",
-                    title="Spectral curvature as function of fitted spectral index\nall catalogs")
-
+                    title="Correction factor as function of peak frequency\nall catalogs")
+        if config.fitting_order >= 3:
+            # order 3 fits for S_peak, nu_peak, and spectral_index_thin
+            plot_statistics(spectral_index_thin, correction_factor, total_weighting_factor,
+                    save=SAVE_PLOTS, show=False,
+                    path=outdir / "spx_thin_vs_correction_factor.png",
+                    xlabel=r"Fitted spectral index thin $\alpha$",
+                    ylabel="Correction factor",
+                    title="Correction factor as function of spectral index (thin)\nall catalogs")
+        if config.fitting_order >= 4:
+            # order 4 fits for S_peak, nu_peak, spectral_thin, and spectral_thick
+            plot_statistics(spectral_index_thin, spectral_index_thick, total_weighting_factor,
+                    save=SAVE_PLOTS, show=False,
+                    path=outdir / "spx_thin_vs_spx_thick.png",
+                    xlabel=r"Fitted spectral index thin $\alpha$",
+                    ylabel="Fitted spectral index thick",
+                    title="Spectral index (thick) as function of spectral index (thin)\nall catalogs")
+    
     print("--------------------------------------------------------")
     print(f"Spectral index: {mspx:.3f}, correction factor: {mcor:.3f}, curvature: {mcur:.3f}, total matches: {len(correction_factor)}")
     print("--------------------------------------------------------")
