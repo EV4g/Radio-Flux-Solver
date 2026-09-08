@@ -11,6 +11,8 @@ End-to-end; takes care of the finding, matching, and calibration of sources base
 - Either two-point spectral index fitting or three-or-more-point index + curvature estimation advanced modes
 
 #### Installation
+This project makes use of `UV`, to install it see: `https://docs.astral.sh/uv/getting-started/installation/`.
+
 You can install the required catalog files using
 ```bash
 uv run install.py
