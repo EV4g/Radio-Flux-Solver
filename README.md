@@ -80,7 +80,7 @@ If you use this package in your research, and find it useful, please consider ci
   title = {Radio-Flux-Solver, a package for low-frequency radio flux calibration},
   year = {2026},
   publisher = {Zenodo},
-  version = {v1.1.1},
+  version = {v1.2.0},
   doi = {10.5281/zenodo.22144139},
   url = {https://doi.org/10.5281/zenodo.22144139}
 }
