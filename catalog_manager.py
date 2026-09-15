@@ -280,7 +280,7 @@ class Config:
                  catalogs                     = None,
                  catalog_names                = None,
                  spectral_model               = 'cpl',
-                 fitting_order                = 2,
+                 fitting_order                = 1,
                  spectral_damping_factor      = 5,
                  snr_lower_limit              = 7,
                  minimum_points               = 2,

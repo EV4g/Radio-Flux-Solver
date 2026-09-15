@@ -5,12 +5,7 @@ from functions import compute_flux_correction_factor, calculate_correction_facto
 from time import perf_counter
 from catalog_manager import Catalog, Config, Catalog_set
 from joblib import Parallel, delayed
-
-try:
-    from termcolor import colored
-except ImportError:
-    print("termcolor not found, ignoring color")
-    def colored(str, col): return str
+from termcolor import colored
 
 start = perf_counter()
 
@@ -37,6 +32,7 @@ all_catalogs = Catalog_set([
 
 #### available configurations
 full_config = Config(spectral_damping_factor = 5,
+                    fitting_order = 1,
                     spectral_index_theory = -0.8,
                     snr_lower_limit = 7,
                     nsigma = 2,
