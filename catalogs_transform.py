@@ -1,8 +1,9 @@
 import os
-from astropy.table import Table, Column
+from astropy.table import Table
 import bdsf
 import glob
 import numpy as np
+from termcolor import colored
 
 def simplify(text):
     return "".join(char for char in text if not char.isdigit() and char != "_").lower()
@@ -267,7 +268,33 @@ if __name__ == "__main__":
     # txs       = Table.read(os.getcwd()+"/catalogs/txs/TXS.fit")
     # vcss      = Table.read(os.getcwd()+"/catalogs/vcss/VCSS.fit")
     # first     = Table.read(os.getcwd()+"/catalogs/first/first.fits")
+    lolss     = Table.read(os.getcwd()+"/catalogs/lolss/LoLSS_DR1_v1.1.srl.fits")
+
+
+    #### lolss
+    # lolss.rename_column("RA", "ra")
+    # lolss.rename_column("DEC", "dec")
+    # lolss.rename_column("E_RA", "e_ra")
+    # lolss.rename_column("E_DEC", "e_dec")
+    # lolss.rename_column('Total_flux', 'flux_jy')
+    # lolss.rename_column('E_Total_flux', 'e_flux_jy')
     
+    # # LOFAR-DR3 uses mJy, pybdsf uses Jy, force everything to Jy
+    # if str(lolss['flux_jy'].unit) == 'mJy':
+    #     lolss['flux_jy'] *= 1e-3
+    #     lolss['e_flux_jy'] *= 1e-3
+    #     lolss['flux_jy'].unit = 'Jy'
+    #     lolss['e_flux_jy'].unit = 'Jy'
+    
+    # if str(lolss['e_ra'].unit) == 'arcsec':
+    #     lolss['e_ra'] /= 3600
+    #     lolss['e_ra'].unit = 'deg'
+    # if str(lolss['e_dec'].unit) == 'arcsec':
+    #     lolss['e_dec'] /= 3600
+    #     lolss['e_dec'].unit = 'deg'
+    
+    # lolss.write(os.getcwd()+'/catalogs/lolss/lolss_clean.fits', overwrite=True)
+
     
     #### first
     # first.rename_column("RAJ2000", "ra")
@@ -703,30 +730,37 @@ if __name__ == "__main__":
     
     # wenss.write("wenss_clean.fits", overwrite=True)
     
-    ###############################################
-    #### ensurinig all cleaned catalogs are OK ####
-    ###############################################
-    racs      = Table.read(os.getcwd()+"/catalogs/racs/racs_clean.fits")
-    meerkat   = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.fits")
+    ##############################################
+    #### ensuring all cleaned catalogs are OK ####
+    ##############################################
+
+    # mainline surveys
+    lolss     = Table.read(os.getcwd()+"/catalogs/lolss/lolss_clean.fits")
     vlssr     = Table.read(os.getcwd()+"/catalogs/vlssr/vlssr_clean.fits")
-    tgss      = Table.read(os.getcwd()+"/catalogs/tgss/tgss_clean.fits")
-    gleam     = Table.read(os.getcwd()+"/catalogs/gleam_300/gleam_300_clean.fits")
-    gleam_xgp = Table.read(os.getcwd()+"/catalogs/gleam_x_gp/gleam_x_gp_clean.fits")
-    nvss      = Table.read(os.getcwd()+"/catalogs/nvss/nvss_clean.fits")
-    wenss     = Table.read(os.getcwd()+"/catalogs/wenss/wenss_clean.fits")
     lofar_dr3 = Table.read(os.getcwd()+"/catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits")
+    tgss      = Table.read(os.getcwd()+"/catalogs/tgss/tgss_clean.fits")
+    gleam_xgp = Table.read(os.getcwd()+"/catalogs/gleam_x_gp/gleam_x_gp_clean.fits")
+    gleam     = Table.read(os.getcwd()+"/catalogs/gleam_300/gleam_300_clean.fits")
+    wenss     = Table.read(os.getcwd()+"/catalogs/wenss/wenss_clean.fits")
+    vcss      = Table.read(os.getcwd()+"/catalogs/vcss/vcss_clean.fits")
+    txs       = Table.read(os.getcwd()+"/catalogs/txs/txs_clean.fits")
+    racs_gal  = Table.read(os.getcwd()+"/catalogs/racs/racs_low_gal_clean.fits")
+    racs_low  = Table.read(os.getcwd()+"/catalogs/racs/racs_low_clean.fits")
+    apertif   = Table.read(os.getcwd()+"/catalogs/apertif/apertif_clean.fits")
+    meerkat   = Table.read(os.getcwd()+"/catalogs/meerkat/meerkat_clean.fits")
+    racs_mid  = Table.read(os.getcwd()+"/catalogs/racs/racs_mid_clean.fits")
+    nvss      = Table.read(os.getcwd()+"/catalogs/nvss/nvss_clean.fits")
+    first     = Table.read(os.getcwd()+"/catalogs/first/first_clean.fits")
+    racs_high = Table.read(os.getcwd()+"/catalogs/racs/racs_high_clean.fits")
+    vlass     = Table.read(os.getcwd()+"/catalogs/vlass/vlass_clean.fits")
+
+    # additional small catalogs
     lofar     = Table.read(os.getcwd()+'/catalogs/lofar/lofar_sources_pipeline.fits')
     cygnus    = Table.read(os.getcwd()+'/catalogs/other/cygnus_clean.fits')
-    racs_mid  = Table.read(os.getcwd()+"/catalogs/racs/racs_mid_clean.fits")
-    racs_high = Table.read(os.getcwd()+"/catalogs/racs/racs_high_clean.fits")
-    apertif   = Table.read(os.getcwd()+"/catalogs/apertif/apertif_clean.fits")
-    vlass     = Table.read(os.getcwd()+"/catalogs/vlass/vlass_clean.fits")
-    txs       = Table.read(os.getcwd()+"/catalogs/txs/txs_clean.fits")
-    vcss       = Table.read(os.getcwd()+"/catalogs/vcss/vcss_clean.fits")
-    
-    cats = [apertif, vlass, txs, vcss, racs_mid, racs_high, meerkat, vlssr, tgss, gleam, gleam_xgp, nvss, wenss, lofar_dr3, lofar, cygnus]
-    name = ['apertif', 'vlass', 'txs', 'vcss', 'racs_mid', 'racs_high', 'meerkat', 'vlssr', 'tgss', 'gleam_300', 'gleam_xgp', 'nvss', 'wenss', 'lofar_dr3', 'lofar_pipe', 'cygnus']
-    
+
+    cats = [lolss, vlssr, lofar_dr3, tgss, gleam_xgp, gleam, wenss, vcss, txs, racs_gal, racs_low, apertif, meerkat, racs_mid, nvss, first, vlass]
+    name = ['lolss', 'vlssr', 'lofar_dr3', 'tgss', 'gleam_xgp', 'gleam', 'wenss', 'vcss', 'txs', 'racs_gal', 'racs_low', 'apertif', 'meerkat', 'racs_mid', 'nvss', 'first', 'vlass']
+
     for i, cat in enumerate(cats):
         assert "flux_jy" in cat.colnames
         assert "e_flux_jy" in cat.colnames
@@ -742,3 +776,5 @@ if __name__ == "__main__":
         assert str(cat["e_dec"].unit) == 'deg' or str(cat["e_dec"].unit) == 'None'
         
         print(f"PASSED {i+1} / {len(cats)}: {name[i]}")
+
+    print(colored("ALL PASSED", "green"))

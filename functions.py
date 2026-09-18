@@ -815,13 +815,13 @@ def _fit_nonlinear(ref_freqs, ref_fluxes, anchor_freq, model, order, config):
 def compute_flux_correction_factor(cats, config, anchor_override=None, precomputed_indices=None, precomputed_quality=None, workers=-1):
     """compute the flux correction factor based on three given catalogs. Catalogs are matches, and the last two are used to calculate the spectral index
     which is used to extrapolate what the first cat -should- be. The different between -should- and -is-, is the correction factor."""
+
     # allow for pre-computed inputs, to skip match_catalogs_2D
-    if precomputed_indices is None and precomputed_quality is None:
+    if precomputed_indices is None or precomputed_quality is None:
         indices, quality = match_catalogs_2D(cats, thres_arc=config.thres_arc, return_quality=True, nsigma=config.nsigma, thres_arc_override=config.thres_arc_override, crowd_radius_arc=config.crowd_radius_arc, workers=workers)
-    else:
-        indices = np.array(precomputed_indices)
-        quality = np.array(precomputed_quality)
-        
+    if precomputed_indices is not None: indices = np.asarray(precomputed_indices)
+    if precomputed_quality is not None: quality = precomputed_quality # already the dict match_catalogs_2D returns; np.array() would break keys
+    
     # if there are too few sources, return None
     if len(indices[0]) <= config.minimum_points:
         return None

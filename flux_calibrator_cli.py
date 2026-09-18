@@ -35,9 +35,10 @@ all_catalogs = Catalog_set([
     Catalog("catalogs/vlass/vlass_clean.fits",                3000e6,     "vlass",      scale=0.9915),  # vlass
 ])
 
-#### Preset -> reference catalog name list
+#### Presets
 _PRESETS = {
     "all":      [cat.name for cat in all_catalogs],
+    "small":    ["vlssr", "tgss", "wenss", "racs_low", "nvss"],
     "default":  ["vlssr", "lofar_dr3", "tgss", "gleam_300", "wenss", "vcss", "txs", "racs_low", "apertif", "racs_mid", "nvss", "first", "racs_high", "vlass"],
 }
 
@@ -137,6 +138,7 @@ def main():
     if not catalog_path.exists():
         raise SystemExit(f"Catalog not found: {catalog_path}")
 
+    # check whether the data is a catalog or image, and try to get the frequency
     is_table = _is_table_catalog(catalog_path)
     if is_table:
         if args.freq is None:
