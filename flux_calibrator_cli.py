@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore", message=".*(non-interactive|tqdm).*")
 
 #### all currently implemented survey catalogs
 all_catalogs = Catalog_set([
-    Catalog("catalogs/lolss/lolss_clean.fits",                54e6,       "lolss_dr1",  scale=1),
+    #Catalog("catalogs/lolss/lolss_clean.fits",                54e6,       "lolss_dr1",  scale=1),
     Catalog("catalogs/vlssr/vlssr_clean.fits",                73.8e6,     "vlssr",      scale=1.1733),
     Catalog("catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",   144.6e6,    "lofar_dr3",  scale=1.0564),
     Catalog("catalogs/tgss/tgss_clean.fits",                  150e6,      "tgss",       scale=1.1125),
