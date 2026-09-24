@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore", message=".*(non-interactive|tqdm).*")
 
 #### all currently implemented survey catalogs
 all_catalogs = Catalog_set([
-    #Catalog("catalogs/lolss/lolss_clean.fits",                54e6,       "lolss_dr1",  scale=1),
+    Catalog("catalogs/lolss/lolss_clean.fits",                54e6,       "lolss_dr1",  scale=1),
     Catalog("catalogs/vlssr/vlssr_clean.fits",                73.8e6,     "vlssr",      scale=1.1733),
     Catalog("catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",   144.6e6,    "lofar_dr3",  scale=1.0564),
     Catalog("catalogs/tgss/tgss_clean.fits",                  150e6,      "tgss",       scale=1.1125),
@@ -182,12 +182,23 @@ def main():
     if not ref_names:
         raise SystemExit("Reference catalog list is empty.")
 
+    # all catalogs in the set-list
     ref_cats = [Catalog_set.registry[n] for n in ref_names]
+
+    # check whether or not certain main catalogs are missing from disk
+    missing = [cat for cat in ref_cats if not cat.path.is_file()]
+    for cat in missing:
+        print(colored(f"Main catalog {cat.name} could not be loaded, please re-run install.py if you aim to use it. Skipping for now.", "yellow"))
+    ref_cats = [cat for cat in ref_cats if cat.path.is_file()]
+    if not ref_cats:
+        raise SystemExit("No reference catalogs available. Run install.py to download the catalogs.")
+
+    # build all catalogs
     all_cats = ref_cats + [anchor_cat]
 
     config = Config(
-        anchor_catalog = anchor_cat,
-        catalogs       = all_cats,
+        anchor_catalog              = anchor_cat,
+        catalogs                    = all_cats,
         spectral_model              = args.spectral_model,
         fitting_order               = args.fitting_order,
         spectral_damping_factor     = args.spectral_damping_factor,

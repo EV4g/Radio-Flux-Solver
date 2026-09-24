@@ -1,3 +1,4 @@
+import re
 import warnings
 from astropy.wcs import FITSFixedWarning, WCS
 from astropy.table import Table
@@ -974,7 +975,7 @@ def compute_flux_correction_factor(cats, config, anchor_override=None, precomput
 
 def calculate_correction_factor_weight(output, config, sigma_cutoff=6):
     """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
-    # downweight sources with spectral indices far away from -0.7
+    # downweight sources with spectral indices far away from physical values
     exponent = config.spectral_damping_factor * (output["spectral_index"] - config.spectral_index_theory)**2
     cutoff = 0.5 * sigma_cutoff**2
     spectral_difference_factor = np.where(exponent < cutoff, np.exp(-exponent), 0.0)
