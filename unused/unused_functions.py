@@ -10,6 +10,15 @@ from astropy.wcs import WCS
 import numpy as np
 import matplotlib.pyplot as plt
 
+def prep_file(file):
+    """Load fits file and extract data, header, wcs"""
+    hdul = fits.open(file)
+    data = hdul[0].data if len(hdul[0].data.shape) == 2 else hdul[0].data[0, 0]
+    header = hdul[0].header
+    wcs = WCS(header).celestial
+    return data, header, wcs
+
+
 """Get two catalogs and return flux and snr (flux / e_flux)"""
 def get_catalog_matched_flux(cat1, cat2, thres_arc=2):
     idx_cat1, idx_cat2 = match_catalogs_2D([cat1, cat2], thres_arc=thres_arc)

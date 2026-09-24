@@ -17,14 +17,6 @@ from termcolor import colored
 warnings.filterwarnings("ignore", module="matplotlib")
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
-def prep_file(file):
-    """Load fits file and extract data, header, wcs"""
-    hdul = fits.open(file)
-    data = hdul[0].data if len(hdul[0].data.shape) == 2 else hdul[0].data[0, 0]
-    header = hdul[0].header
-    wcs = WCS(header).celestial
-    return data, header, wcs
-
 def get_beam_size(file):
     """Return beam size [degree] from fits header"""
     hdul = fits.open(file)
@@ -683,17 +675,20 @@ def log_ffa(nu, lnS0, a, tau, lnpiv):
     return lnS0 + a * np.log(rr) - tau * rr**-2.1
 
 def _predict_theory(ref_freqs, ref_fluxes, anchor_freq, model, config):
-    preds = []
-    for k in range(ref_freqs.shape[0]):
-        fr = ref_freqs[k]
-        fl = ref_fluxes[k]
-        if model == 'cpl':
-            preds.append(CPL(anchor_freq, fl, fr, config.spectral_index_theory, config.spectral_curvature_theory))
-        elif model == 'ffa':
-            preds.append(FFA(anchor_freq, fl, fr, config.spectral_index_theory, config.tau_freefree_theory))
-        else:
-            preds.append(SSA(anchor_freq, fl, np.full_like(fl, fr), config.spectral_index_thick_theory, config.spectral_index_thin_theory))
-    return np.mean(preds, axis=0)
+    # CPL()/FFA() curvature/tauff are relative to reference freq.
+    ref_freqs  = np.asarray(ref_freqs,  dtype=float)
+    ref_fluxes = np.asarray(ref_fluxes, dtype=float)
+    if model == 'ssa':
+        # single-ref SSA is ill-posed (S_tau1, nu_tau1 underdetermined)
+        return np.mean([SSA(anchor_freq, fl, np.full_like(fl, fr), config.spectral_index_thick_theory, config.spectral_index_thin_theory) for fr, fl in zip(ref_freqs, ref_fluxes)], axis=0)
+
+    lnpiv = np.log(float(config.pivot_freq_theory))
+    log_model = log_cpl if model == 'cpl' else log_ffa
+    bend = (config.spectral_curvature_theory if model == 'cpl' else config.tau_freefree_theory)
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        lnS0 = np.log(ref_fluxes) - log_model(ref_freqs, 0.0, config.spectral_index_theory, bend, lnpiv)[:, None]
+        return np.exp(log_model(anchor_freq, lnS0, config.spectral_index_theory, bend, lnpiv)).mean(axis=0)
 
 def _fit_linear(ref_freqs, ref_fluxes, anchor_freq, model, order, config):
     """Linear least squares. Only for (cpl|ffa, order 2|3)"""
@@ -987,7 +982,13 @@ def calculate_correction_factor_weight(output, config, sigma_cutoff=6):
     # weighting based on separation between points
     # separation_weight = np.exp(-(max_sep / config.thres_arc) ** 2)
 
-    return spectral_difference_factor * signal_to_noise_factor * output["point_probability"]
+    # flag sources with unbounded or negative tau values when spectral-model = ffa
+    if config.spectral_model == "ffa":
+        tau_factor = np.isfinite(output["tau_freefree"]) & (output["tau_freefree"] >= 0)
+    else:
+        tau_factor = np.ones_like(output["tau_freefree"], dtype=bool)
+    
+    return spectral_difference_factor * signal_to_noise_factor * output["point_probability"] * tau_factor
 
 def weighted_median(val, w):
     """Return median of an array with value weights"""
