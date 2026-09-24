@@ -28,11 +28,28 @@ def get_beam_size(file):
     """Return beam size [degree] from fits header"""
     hdul = fits.open(file)
     header = hdul[0].header
-    try:
-        return header['BMAJ'], header['BMIN'], header['BPA']
-    except KeyError:
-        return header['CLEANBMJ'], header['CLEANBMN'], header['CLEANBPA']
-    return None
+
+    for maj, min_, pa in [('BMAJ', 'BMIN', 'BPA'), ('CLEANBMJ', 'CLEANBMN', 'CLEANBPA')]:
+        if maj in header and min_ in header:
+            if pa not in header:
+                print(colored(f"Missing PA in header of {file}, defaulting to 0", "red"))
+                return header[maj], header[min_], 0.0
+            return header[maj], header[min_], header[pa]
+
+    # some writers only store the CLEAN beam in HISTORY cards
+    pattern = re.compile(r"BMAJ=\s*([\dEe.+-]+)\s+BMIN=\s*([\dEe.+-]+)(?:\s+BPA=\s*([\dEe.+-]+))?")
+    for card in header.cards:
+        if card.keyword != 'HISTORY':
+            continue
+        match = pattern.search(str(card.value))
+        if match:
+            maj, min_, pa = match.groups()
+            if pa is None:
+                print(colored(f"Missing BPA in CLEAN HISTORY of {file}, defaulting to 0", "red"))
+                return float(maj), float(min_), 0.0
+            return float(maj), float(min_), float(pa)
+
+    raise KeyError(f"No beam information (BMAJ/BMIN/BPA, CLEANBMJ/CLEANBMN/CLEANBPA, or CLEAN HISTORY) in header of {file}")
 
 def get_pos_err_deg(cat):
     """Return a per-source 1D positional RMS (deg) for a catalog.
