@@ -168,9 +168,14 @@ class Catalog:
                 self.e_ra  = np.maximum(self.e_ra,  floor_deg)
                 self.e_dec = np.maximum(self.e_dec, floor_deg)
             self.err_rad  = np.deg2rad(get_pos_err_deg(self))
-            self.flux     = np.array(image_catalog['flux_jy'])    # Jy (integrated)
-            self.e_flux   = np.array(image_catalog['e_flux_jy'])  # Jy
+            self.flux     = np.array(image_catalog['flux_jy']) * self.scale   # Jy (integrated)
+            self.e_flux   = np.array(image_catalog['e_flux_jy']) * self.scale  # Jy
             self.flux_unit = 'Jy'
+
+            # setup a threshold lower bound based on flux_lim
+            flux_threshold  = (self.flux > self.flux_lim)
+            self.flux     = self.flux[flux_threshold]
+            self.e_flux   = self.e_flux[flux_threshold]
             
     
     def create_subset(self, valid):
