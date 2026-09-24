@@ -16,6 +16,7 @@ warnings.filterwarnings("ignore", message=".*(non-interactive|tqdm).*")
 
 #### all currently implemented survey catalogs
 all_catalogs = Catalog_set([
+    Catalog("catalogs/lolss/lolss_clean.fits",                54e6,       "lolss_dr1",  scale=1),
     Catalog("catalogs/vlssr/vlssr_clean.fits",                73.8e6,     "vlssr",      scale=1.1733),
     Catalog("catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",   144.6e6,    "lofar_dr3",  scale=1.0564),
     Catalog("catalogs/tgss/tgss_clean.fits",                  150e6,      "tgss",       scale=1.1125),
@@ -84,7 +85,7 @@ def _build_parser():
     p.add_argument("--nsigma",                    type=float, default=2,     help="Sigma range to use for error based matching (default: 2)")
     p.add_argument("--snr-lower-limit",           type=float, default=7,     help="Ignore sources below this SNR limit (default: 7)")
     p.add_argument("--minimum-points",            type=int,   default=3,     help="Ignore matched catalogs sets with matches below this limit (default: 3)")
-    p.add_argument("--minimum-frequency-spacing", type=float, default=100e6, help="Ignore catalog matching with a spacing below threshold (Hz)")
+    p.add_argument("--minimum-frequency-spacing", type=float, default=10e6,  help="Ignore catalog matching with a spacing below threshold (Hz)")
 
     # default theoretical values used when not fitting for them
     p.add_argument("--spectral-index-theory",       type=float, default=-0.8,  help="Theoretical value for spectral index for desired source (default: -0.8)")
@@ -312,8 +313,9 @@ def main():
     results = vstack(output_table)
     total_weighting_factor = calculate_correction_factor_weight(results, config)
     weight_mask = total_weighting_factor > 0
-    results = results[weight_mask]
-    total_weighting_factor = total_weighting_factor[weight_mask]
+    corr_mask = (results["correction_factor"] > 0) & np.isfinite(results["correction_factor"])
+    results = results[weight_mask & corr_mask]
+    total_weighting_factor = total_weighting_factor[weight_mask & corr_mask]
 
     if args.save_csv:
         results.write(outdir / f"{anchor_name}_results.csv", overwrite=True)
@@ -421,7 +423,7 @@ def main():
         plt.colorbar(label='Cummulative weight / max weight')
         plt.ylabel("DEC (deg)")
         plt.xlabel("RA (deg)")
-        if SAVE_PLOTS: plt.savefig(outdir / f"{config.anchor_catalog.name}_weight_density_vs_pos.png")
+        plt.savefig(outdir / f"{config.anchor_catalog.name}_weight_density_vs_pos.png")
         plt.close('all')
 
 
@@ -435,7 +437,7 @@ def main():
         plt.ylabel("Correction factor")
         plt.xlabel("Total weighting factor")
         plt.legend()
-        if SAVE_PLOTS: plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_weightfac.png")
+        plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_weightfac.png")
         plt.close('all')
 
 
@@ -460,7 +462,7 @@ def main():
         ax2.legend()
         fig.suptitle('Weighted correction factor')
         plt.tight_layout()
-        if SAVE_PLOTS: plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_weightfac_radec_dual.png")
+        plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_weightfac_radec_dual.png")
         plt.close('all')
 
 
@@ -519,7 +521,7 @@ def main():
         ax.set_xlabel('RA (deg)')
         ax.set_ylabel('Dec (deg)')
         ax.set_title('Correction factor map')
-        if SAVE_PLOTS: plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_pos_2d.png")
+        plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_pos_2d.png")
         plt.close('all')
 
 
@@ -569,7 +571,7 @@ def main():
         ax.set_ylabel('Flux (Jy)')
         ax.set_title(f'Reconstructed spectra ({n_plot} sources) {config.anchor_catalog.name}')
         ax.legend(fontsize=9)
-        if SAVE_PLOTS: plt.savefig(outdir / f"{config.anchor_catalog.name}_flux_vs_freq.png")
+        plt.savefig(outdir / f"{config.anchor_catalog.name}_flux_vs_freq.png")
         plt.close('all')
 
 
