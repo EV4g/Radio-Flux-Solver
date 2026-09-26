@@ -10,7 +10,7 @@ uv run flux_calibrator_cli.py vla_cygnus.fits --freq 336e6 --save-plots
 
 If we have more information, and for example know the sources in this region have a spectral index closer to -0.7, we only want to compare it to a couple handpicked catalogs, and we know there will be few sources, the following command would be run:
 ```bash
-uv run flux_calibrator_cli.py vla_cygnus.fits --freq 336e6 --catalogs wenss,vcss,nvss -c 2 --save-plots --save-csv
+uv run flux_calibrator_cli.py vla_cygnus.fits --freq 336e6 --catalogs wenss,vcss,nvss -c 2 --spectral-index-theory -0.7 --save-plots --save-csv
 ```
 
 Let's say we, via a different method, figured out that the image likely has to be re-scaled by 1.4, a quick test to verify could be:
