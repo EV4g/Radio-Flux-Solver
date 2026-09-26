@@ -26,4 +26,4 @@ build/
 dist/
 
 # unused files
-unused/*
+unused/
