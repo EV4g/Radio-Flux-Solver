@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from functions import plot_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d, predict_flux
 from functions import compute_flux_correction_factor, calculate_correction_factor_weight, biweight_location, report_ignored_cats
+from functions import load_config
 from time import perf_counter
 from catalog_manager import Catalog, Config, Catalog_set
 from joblib import Parallel, delayed
@@ -72,7 +73,8 @@ def _is_table_catalog(path):
 
 def _build_parser():
     p = argparse.ArgumentParser(description="Calibrate a radio image or table catalog against reference catalogs.")
-    p.add_argument("catalog",                                                help="Path to FITS image or table catalog (the anchor / unknown).")
+    p.add_argument("catalog",                     nargs="?", help="Path to FITS image or table catalog (the anchor / unknown). A single .cfg file may be given instead.")
+    p.add_argument("config",                      nargs="?", help="Optional 'key = value' config file with long flag names as keys; explicit flags override it.")
 
     # basic settings
     p.add_argument("--catalogs",                  default="default",         help='Preset name (all, default) or comma-separated catalog list.')
@@ -119,7 +121,30 @@ def _build_parser():
     return p
 
 def main():
-    args = _build_parser().parse_args()
+    parser = _build_parser()
+    args = parser.parse_args()
+
+    # a config file may be passed alone or after the catalog
+    raw_catalog, raw_config = args.catalog, args.config
+    swap = raw_config is None and raw_catalog is not None and raw_catalog.lower().endswith(".cfg")
+    cli_catalog = None if swap else raw_catalog
+    cli_config  = raw_catalog if swap else raw_config
+
+    # load config as defaults, then re-parse so explicit flags win
+    if cli_config:
+        parser.set_defaults(**load_config(cli_config, parser))
+        argv = sys.argv[1:].copy()
+        for token in (raw_catalog, raw_config):
+            if token is not None:
+                argv.remove(token)
+        args = parser.parse_args(argv)
+        if cli_catalog is not None:
+            args.catalog = cli_catalog
+        print(f"Using config: {cli_config}")
+
+    if args.catalog is None:
+        raise SystemExit("No input given: pass a FITS catalog and/or a .cfg config file.")
+
     start = perf_counter()
 
     # error when choosing wrong combination size parameter

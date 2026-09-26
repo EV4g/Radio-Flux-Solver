@@ -17,6 +17,49 @@ from termcolor import colored
 warnings.filterwarnings("ignore", module="matplotlib")
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 
+def load_config(path, parser):
+    """Read a simple 'key = value' file into argparse defaults."""
+    keys, bools = {}, set()
+    for action in parser._actions:
+        if action.dest in ("help", "config"): continue
+        longs = [opt for opt in action.option_strings if opt.startswith("--")]
+        key = longs[0][2:] if longs else action.dest
+        keys[key.replace("_", "-")] = action.dest
+        if action.const is True and action.nargs == 0:
+            bools.add(action.dest)
+
+    values = {}
+    try:
+        handle = open(path)
+    except OSError as e:
+        raise SystemExit(f"Cannot read config file {path}: {e}")
+
+    try:
+        with handle:
+            for lineno, line in enumerate(handle, 1):
+                line = line.split("#", 1)[0].strip()
+                if not line:
+                    continue
+                key, sep, value = line.partition("=")
+                if not sep:
+                    raise SystemExit(f"{path}:{lineno}: expected 'key = value', got: {line}")
+                key = key.strip().replace("_", "-")
+                value = value.strip()
+                if key not in keys:
+                    raise SystemExit(f"{path}:{lineno}: unknown key '{key}'. Valid keys: {', '.join(sorted(keys))}")
+                dest = keys[key]
+                if dest in bools:
+                    if value.lower() not in ("true", "false", "1", "0", "yes", "no", "on", "off"):
+                        raise SystemExit(f"{path}:{lineno}: '{key}' expects a true/false value, got: {value}")
+                    values[dest] = value.lower() in ("true", "1", "yes", "on")
+                elif value.lower() in ("none", "null", ""):
+                    values[dest] = None
+                else:
+                    values[dest] = value
+    except UnicodeDecodeError:
+        raise SystemExit(f"Cannot read config file {path}! (the catalog goes first, then the config)")
+    return values
+
 def get_beam_size(file):
     """Return beam size [degree] from fits header"""
     hdul = fits.open(file)

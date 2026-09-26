@@ -152,3 +152,23 @@ Seed for one of the plots showcasing a random asortment of spectra.
 
 **`--anchor-name`, default: None**\
 Option to change the name of the input file in the debug plots. Can be used for clarity.
+
+### Config file
+
+All arguments can instead be placed in a simple config file, passed alone or after the catalog:
+```bash
+`uv run flux_calibrator_cli.py image.fits config.cfg`
+```
+```bash
+`uv run flux_calibrator_cli.py config.cfg`
+```
+Keys are the same as the flag names without the leading `--` (for example `spectral-model`, `combination-size`, `spectral_damping_factor`). Explicit command line flags always override the config.
+
+```cfg
+catalog = data/other/image.fits
+catalogs = default
+spectral-model = ffa
+combination-size = 4
+minimum-frequency-spacing = 1e6
+save-plots = true
+```
