@@ -4,14 +4,16 @@
 *.FITS
 *.fits
 *.gz
+*.tar
 
 /__pycache__
 *.xml
 *.csv
+*.json
 
+# uv files
 uv.lock
 .python-version
-*.json
 
 # logs and log dirs
 *.log
@@ -22,3 +24,6 @@ uv.lock
 *.egg-info/
 build/
 dist/
+
+# unused files
+unused/*
