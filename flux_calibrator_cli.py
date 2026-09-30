@@ -67,8 +67,10 @@ def _resolve_freq(image_path, args_freq, args_freq_unit):
     return args_freq * _FREQ_UNIT_SCALE[args_freq_unit]
 
 def _is_table_catalog(path):
-    """True if the FITS file contains a BINTABLE HDU (i.e. a table catalog, not an image)."""
+    """True if the FITS file is a table catalog (empty primary HDU), rather than an image."""
     with fits.open(path) as hdul:
+        if hdul[0].data is not None:
+            return False
         return any(hdu.header.get("XTENSION") == "BINTABLE" for hdu in hdul)
 
 def _build_parser():
