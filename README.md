@@ -51,6 +51,7 @@ Currently supported arguments are:
 
 | Catalog Name  | Frequency (MHz) | Notes   |
 |---------------|-----------------|---------|
+| lolss_dr1     | 54              |         |
 | vlssr         | 73.8            |         |
 | lofar_dr3     | 144.6           |         |
 | tgss          | 150             |         |
