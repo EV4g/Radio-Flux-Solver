@@ -131,9 +131,18 @@ class Catalog:
                         img_path,
                         thresh_isl=3.0,                   # island threshold (sigma)
                         thresh_pix=5.0,                   # peak detection threshold (sigma)
-                        rms_box=(200, 50),                # (box_size, step_size) for rms map; tune to your image
+                        rms_map=True,                     # estimate rms/noise map
+                        rms_box=(80, 20),                 # (box_size, step_size)
+                        adaptive_rms_box=True,            # tight boxes around bright sources
+                        adaptive_thresh=80,               # ... above this sigma
+                        rms_box_bright=(35, 7),           # ... with this box
+                        kappa_clip=3,                     # clip bright outliers from rms estimate
+                        mean_map='zero',                  # interferometric noise is zero-mean
+                        atrous_do=True,                   # wavelet decomposition for extended emission
+                        atrous_jmax=2,                    # ... up to this scale
+                        group_by_isl=True,                # group Gaussians per island
                         beam=(get_beam_size(self.path)),  # (maj_deg, min_deg, PA)
-                        frequency = self.freq,
+                        frequency=self.freq,
                         quiet=True,
                         blank_limit=1e-6,                 # internal mask; values below this (Jy) get ignored
                         outdir='/tmp'
