@@ -127,6 +127,7 @@ class Catalog:
                 print(colored(f"  Running PyBDSF source finding on {self.path_stem}", "yellow"))
 
                 img_path = _extract_plane(self.path)
+                tmp_catalog_path = self.dir / f".{self.path_stem}_catalog_tmp.fits"
                 try:
                     image = bdsf.process_image(
                         img_path,
@@ -149,9 +150,9 @@ class Catalog:
                         outdir='/tmp'
                     )
 
-                    # write pybdsf catalog to file
-                    image.write_catalog(outfile=str(image_catalog_path), catalog_type='srl', format='fits', clobber=True)
-                    image_catalog = Table.read(image_catalog_path)
+                    # write pybdsf catalog to tmp file, so a crash won't leave a half-written cache
+                    image.write_catalog(outfile=str(tmp_catalog_path), catalog_type='srl', format='fits', clobber=True)
+                    image_catalog = Table.read(tmp_catalog_path)
 
                     # stick to convention and overwrite (PyBDSF does not offer column renaming internally)
                     image_catalog.rename_columns(
@@ -161,12 +162,14 @@ class Catalog:
 
                     _to_icrs(self.path, image_catalog)
 
-                    image_catalog.write(image_catalog_path, overwrite=True)
+                    image_catalog.write(tmp_catalog_path, overwrite=True)
+                    os.replace(tmp_catalog_path, image_catalog_path)
 
                     print(f"Catalog written to {image_catalog_path}\n")
                 finally:
                     if img_path != self.path:
                         img_path.unlink(missing_ok=True)
+                    tmp_catalog_path.unlink(missing_ok=True)
 
             # set data based on image data
             self.ra       = np.array(image_catalog['ra'])      # degrees

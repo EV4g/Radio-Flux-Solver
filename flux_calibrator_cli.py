@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 import warnings
 import numpy as np
@@ -101,6 +102,8 @@ def _build_parser():
     p.add_argument("--pivot-freq-theory",           type=float, default=100e6, help="Theoretical value for pivot frequency for desired source (default: 100e6 Hz)")
 
     # plotting/logging
+    p.add_argument("--save-correction-factors",   action="store_true",       help="Save correction factors to disk")
+    p.add_argument("--output-name",               default=None,              help="Name to use for output files (default: anchor catalog name)")
     p.add_argument("--save-plots",                action="store_true",       help="Save inspection plots to disk")
     p.add_argument("--save-csv",                  action="store_true",       help="Save csv file with matched sources, their location, and flux at each frequency")
     p.add_argument("--logging",                   action="store_true",       help="Write all output to a log file in --output-dir instead of the terminal.")
@@ -177,18 +180,19 @@ def main():
     else:
         freq_hz = _resolve_freq(catalog_path, args.freq, args.freq_unit)
     anchor_name = args.anchor_name or catalog_path.stem
+    output_name = args.output_name or anchor_name
 
     if args.output_dir:
         outdir = Path(args.output_dir)
         outdir.mkdir(parents=True, exist_ok=True)
     elif args.save_plots:
-        outdir = Path("logs") / Path(f"flux_calibrator_output_{anchor_name}")
+        outdir = Path("logs") / Path(f"flux_calibrator_output_{output_name}")
         outdir.mkdir(parents=True, exist_ok=True)
     else:
         outdir = Path(".")
 
     if args.logging:
-        sys.stdout = open(outdir / f"{anchor_name}_run.log", "w")
+        sys.stdout = open(outdir / f"{output_name}_run.log", "w")
 
     anchor_cat = Catalog(
         path=str(catalog_path),
@@ -247,6 +251,7 @@ def main():
 
         # additional
         minimum_position_error      = args.minimum_position_error,
+        unit_fallback               = args.unit_fallback,
         reference_file              = args.reference_file,
         spatial_filter              = args.spatial_filter,
         thres_arc                   = args.thres_arc if args.thres_arc is not None else 2,
@@ -329,7 +334,7 @@ def main():
                 plt.xlabel(f"{config.anchor_catalog.name} fitted flux (Jy)")
                 plt.ylabel("Correction factor")
                 plt.title(f"{config.anchor_catalog.name} "+r"flux, $\alpha$=-"+f"{config.spectral_index_theory} vs fitted")
-                if SAVE_PLOTS: plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_flux.png")
+                if SAVE_PLOTS: plt.savefig(outdir / f"{output_name}_corr_vs_flux.png")
                 plt.close('all')
 
                 # compare fitted spectral index with correction factor
@@ -341,7 +346,7 @@ def main():
                 plt.ylabel("Flux correction factor")
                 plt.xlabel(r"Spectral index $\alpha$")
                 plt.title("Flux correction as function of spectral index")
-                if SAVE_PLOTS: plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_spx.png")
+                if SAVE_PLOTS: plt.savefig(outdir / f"{output_name}_corr_vs_spx.png")
                 plt.close('all')
 
         else:
@@ -362,7 +367,7 @@ def main():
         sys.exit(1)
 
     if args.save_csv:
-        results.write(outdir / f"{anchor_name}_results.csv", overwrite=True)
+        results.write(outdir / f"{output_name}_results.csv", overwrite=True)
 
     ras                 = results["ra"]
     decs                = results["dec"]
@@ -470,7 +475,7 @@ def main():
         plt.colorbar(label='Cummulative weight / max weight')
         plt.ylabel("DEC (deg)")
         plt.xlabel("RA (deg)")
-        plt.savefig(outdir / f"{config.anchor_catalog.name}_weight_density_vs_pos.png")
+        plt.savefig(outdir / f"{output_name}_weight_density_vs_pos.png")
         plt.close('all')
 
 
@@ -484,7 +489,7 @@ def main():
         plt.ylabel("Correction factor")
         plt.xlabel("Total weighting factor")
         plt.legend()
-        plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_weightfac.png")
+        plt.savefig(outdir / f"{output_name}_corr_vs_weightfac.png")
         plt.close('all')
 
 
@@ -509,7 +514,7 @@ def main():
         ax2.legend()
         fig.suptitle('Weighted correction factor')
         plt.tight_layout()
-        plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_weightfac_radec_dual.png")
+        plt.savefig(outdir / f"{output_name}_corr_vs_weightfac_radec_dual.png")
         plt.close('all')
 
 
@@ -568,7 +573,7 @@ def main():
         ax.set_xlabel('RA (deg)')
         ax.set_ylabel('Dec (deg)')
         ax.set_title('Correction factor map')
-        plt.savefig(outdir / f"{config.anchor_catalog.name}_corr_vs_pos_2d.png")
+        plt.savefig(outdir / f"{output_name}_corr_vs_pos_2d.png")
         plt.close('all')
 
 
@@ -633,11 +638,26 @@ def main():
         ax.set_ylabel('Flux (Jy)')
         ax.set_title(f'Reconstructed spectra ({n_plot} sources) {config.anchor_catalog.name}')
         ax.legend(fontsize=9)
-        plt.savefig(outdir / f"{config.anchor_catalog.name}_flux_vs_freq.png")
+        plt.savefig(outdir / f"{output_name}_flux_vs_freq.png")
         plt.close('all')
 
 
 
+
+    # save the aggregate correction factor as a [scale, error] array
+    if args.save_correction_factors:
+        x      = np.log10(correction_factor)
+        w      = total_weighting_factor
+        mu     = np.sum(w * x) / np.sum(w)
+        var    = np.sum(w * (x - mu)**2) / np.sum(w)
+        n_eff  = np.sum(w)**2 / np.sum(w**2)
+        err    = max(mcor * np.log(10) * np.sqrt(var / n_eff), 1e-3)
+
+        out_path = outdir / f"{output_name}.npy"
+        tmp_path = outdir / f".{output_name}.npy"
+        np.save(tmp_path, np.array([[mcor, err]], dtype=float))
+        os.replace(tmp_path, out_path)
+        print(f"Correction factors saved to {out_path}")
 
     print(f"Done at: {(perf_counter() - start):.2f} s")
 
