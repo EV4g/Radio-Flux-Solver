@@ -1013,7 +1013,7 @@ def compute_flux_correction_factor(cats, config, anchor_override=None, precomput
         "dec":                  dec,
     })
 
-def calculate_correction_factor_weight(output, config, sigma_cutoff=6):
+def calculate_correction_factor_weight(output, config, sigma_cutoff=6, tau_cutoff=10):
     """Calculate weighted correction factor based on per-point spectral indices, signal-to-noise, and correction factor"""
     # downweight sources with spectral indices far away from physical values
     exponent = config.spectral_damping_factor * (output["spectral_index"] - config.spectral_index_theory)**2
@@ -1029,7 +1029,7 @@ def calculate_correction_factor_weight(output, config, sigma_cutoff=6):
 
     # flag sources with unbounded or negative tau values when spectral-model = ffa
     if config.spectral_model == "ffa":
-        tau_factor = np.isfinite(output["tau_freefree"]) & (output["tau_freefree"] >= 0)
+        tau_factor = np.isfinite(output["tau_freefree"]) & (output["tau_freefree"] >= 0) & (output["tau_freefree"] <= tau_cutoff)
     else:
         tau_factor = np.ones_like(output["tau_freefree"], dtype=bool)
     
