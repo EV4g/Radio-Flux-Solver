@@ -52,9 +52,10 @@ def standardize_catalog_columns(cat, override_units=False, fallback=True):
         if fallback and (max(cat['ra']) >= 4 and max(cat['ra']) <= 360 and min(cat['ra']) >= 0 and min(cat['ra']) <= 360): 
             cat['ra'].unit = 'deg'
         
-        if str(cat['ra'].unit) != 'deg' and not override_units:
-            raise KeyError(f"Ambigious values without units in RA column. (min,max): ({min(cat['ra'])}, {max(cat['ra'])})")
-        else:
+        if str(cat['ra'].unit) != 'deg':
+            if not override_units:
+                raise KeyError(f"Ambigious values without units in RA column. (min,max): ({min(cat['ra'])}, {max(cat['ra'])})")
+            print(colored("No unambiguous unit on RA column, assuming deg", "yellow"))
             cat['ra'].unit = 'deg'
 
     ##############
@@ -90,9 +91,10 @@ def standardize_catalog_columns(cat, override_units=False, fallback=True):
         if fallback and (str(cat['e_ra'].unit) != 'deg' and np.mean(cat['e_ra']) * 3600 > 1 and np.mean(cat['e_ra']) * 3600 < 10):
             cat['e_ra'].unit = 'deg'
         
-        if str(cat['e_ra'].unit) != 'deg' and not override_units:
-            raise KeyError(f"Ambigious values without units in e_RA column. (min,max): ({min(cat['e_ra'])}, {max(cat['e_ra'])})")
-        else:
+        if str(cat['e_ra'].unit) != 'deg':
+            if not override_units:
+                raise KeyError(f"Ambigious values without units in e_RA column. (min,max): ({min(cat['e_ra'])}, {max(cat['e_ra'])})")
+            print(colored("No unambiguous unit on e_RA column, assuming deg", "yellow"))
             cat['e_ra'].unit = 'deg'
 
     #############
@@ -126,9 +128,10 @@ def standardize_catalog_columns(cat, override_units=False, fallback=True):
         if fallback and (max(cat['dec']) >= -90 and max(cat['dec']) <= 90 and min(cat['dec']) >= -90 and min(cat['dec']) <= 90): 
             cat['dec'].unit = 'deg'
 
-        if str(cat['dec'].unit) != 'deg' and not override_units:
-            raise KeyError(f"Ambigious values without units in DEC column. (min,max): ({min(cat['dec'])}, {max(cat['dec'])})")
-        else:
+        if str(cat['dec'].unit) != 'deg':
+            if not override_units:
+                raise KeyError(f"Ambigious values without units in DEC column. (min,max): ({min(cat['dec'])}, {max(cat['dec'])})")
+            print(colored("No unambiguous unit on DEC column, assuming deg", "yellow"))
             cat['dec'].unit = 'deg'
 
     ###############
@@ -164,9 +167,10 @@ def standardize_catalog_columns(cat, override_units=False, fallback=True):
         if fallback and (str(cat['e_dec'].unit) != 'deg' and np.mean(cat['e_dec']) * 3600 > 1 and np.mean(cat['e_dec']) * 3600 < 10):
             cat['e_dec'].unit = 'deg'
         
-        if str(cat['e_dec'].unit) != 'deg' and  not override_units:
-            raise KeyError(f"Ambigious values without units in e_DEC column. (min,max): ({min(cat['e_dec'])}, {max(cat['e_dec'])})")
-        else:
+        if str(cat['e_dec'].unit) != 'deg':
+            if not override_units:
+                raise KeyError(f"Ambigious values without units in e_DEC column. (min,max): ({min(cat['e_dec'])}, {max(cat['e_dec'])})")
+            print(colored("No unambiguous unit on e_DEC column, assuming deg", "yellow"))
             cat['e_dec'].unit = 'deg'
 
     #################
@@ -201,9 +205,10 @@ def standardize_catalog_columns(cat, override_units=False, fallback=True):
             cat['flux_jy'] /= 1000
             cat['flux_jy'].unit = 'Jy'
         
-        if str(cat['flux_jy'].unit) != 'Jy' and not override_units:
-            raise KeyError(f"Ambigious values without units in flux column. (min,max): ({min(cat['flux_jy'])}, {max(cat['flux_jy'])})")
-        else:
+        if str(cat['flux_jy'].unit) != 'Jy':
+            if not override_units:
+                raise KeyError(f"Ambigious values without units in flux column. (min,max): ({min(cat['flux_jy'])}, {max(cat['flux_jy'])})")
+            print(colored("No unambiguous unit on flux column, assuming Jy", "yellow"))
             cat['flux_jy'].unit = 'Jy'
 
     ###################
@@ -222,17 +227,18 @@ def standardize_catalog_columns(cat, override_units=False, fallback=True):
     # not returned yet, so must have gone well, check units
     if str(cat['e_flux_jy'].unit) != 'Jy':
         # might be capitalized
-        if str(cat['e_flux_jy'].unit).lower() == 'Jy':
+        if str(cat['e_flux_jy'].unit).lower() == 'jy':
             cat['e_flux_jy'].unit = 'Jy'
 
         # might be mJy
         if str(cat['e_flux_jy'].unit).lower() == 'mjy':
             cat['e_flux_jy'] /= 1000
             cat['e_flux_jy'].unit = 'Jy'
-        
-        if str(cat['e_flux_jy'].unit) != 'Jy' and not override_units:
-            raise KeyError(f"Ambigious values without units in flux column. (min,max): ({min(cat['e_flux_jy'])}, {max(cat['e_flux_jy'])})")
-        else:
+
+        if str(cat['e_flux_jy'].unit) != 'Jy':
+            if not override_units:
+                raise KeyError(f"Ambigious values without units in flux column. (min,max): ({min(cat['e_flux_jy'])}, {max(cat['e_flux_jy'])})")
+            print(colored("No unambiguous unit on e_flux column, assuming Jy", "yellow"))
             cat['e_flux_jy'].unit = 'Jy'
 
 

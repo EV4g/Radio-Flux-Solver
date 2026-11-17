@@ -53,7 +53,7 @@ def resolve_catalog_path(path):
 
 # wrapper class for incoming Table data
 class Catalog:
-    def __init__(self, path=None, freq_hz=None, name=None, flux_lim=0, scale=1, table=True, reload_cache=True, minimum_position_error=0):
+    def __init__(self, path=None, freq_hz=None, name=None, flux_lim=0, scale=1, table=True, reload_cache=True, minimum_position_error=0, unit_fallback=False):
         self.path = resolve_catalog_path(path) if path is not None else None
         if self.path is None: raise ValueError(f"Valid catalog path is required\nPath: {path} is not valid")
 
@@ -67,6 +67,7 @@ class Catalog:
         self.table        = table         # whether or not the data is a 2D image (False) or table (True)
         self.reload_cache = reload_cache  # whether or not to reload a cached catalog file made from previous image-input
         self.minimum_position_error = minimum_position_error  # arcsec; lower bound for per-source e_ra, e_dec (0 = no floor)
+        self.unit_fallback        = unit_fallback          # assume deg/Jy for unitless columns instead of stopping
         
         # data is None until load() is called
         self.flux = self.e_flux = self.flux_unit = None
@@ -85,7 +86,7 @@ class Catalog:
             catalog = Table.read(self.path)
 
             # read out catalog columns and try to format them correctly (raise error on fail)
-            catalog = standardize_catalog_columns(catalog)
+            catalog = standardize_catalog_columns(catalog, override_units=self.unit_fallback)
             
             # read out flux data
             self.flux       = np.array(catalog['flux_jy']) * self.scale
@@ -309,6 +310,7 @@ class Config:
                  tau_freefree_theory          = 0,
                  pivot_freq_theory            = 100e6,
                  minimum_position_error       = None,
+                 unit_fallback                = None,
                  reference_file               = None,
                  footprint_box                = None,
                  spatial_filter               = False,
@@ -326,6 +328,7 @@ class Config:
         self.minimum_frequency_spacing = minimum_frequency_spacing if minimum_frequency_spacing is not None else 0
         self.maximum_frequency_spacing = maximum_frequency_spacing if maximum_frequency_spacing is not None else np.inf
         self.minimum_position_error    = minimum_position_error
+        self.unit_fallback             = unit_fallback
         self.pivot_freq_theory         = pivot_freq_theory       
         
         if catalogs is not None:
@@ -382,6 +385,11 @@ class Config:
         if self.minimum_position_error is not None:
             for cat in self.catalogs:
                 cat.minimum_position_error = self.minimum_position_error
+
+        # Propagate unit_fallback to every catalog
+        if self.unit_fallback is not None:
+            for cat in self.catalogs:
+                cat.unit_fallback = self.unit_fallback
 
         # load the data per catalog
         for i, cat in enumerate(self.catalogs):

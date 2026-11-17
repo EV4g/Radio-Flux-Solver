@@ -110,6 +110,7 @@ def _build_parser():
     # additional overrides
     p.add_argument("--scale",                     type=float, default=1,     help="Scale values in the anchor catalog by this amount")
     p.add_argument("--minimum-position-error",    type=float, default=None,  help="Set a minimum position error. Sources with lower error at set to this value (Default: None).")
+    p.add_argument("--unit-fallback",             action="store_true",       help="Assume deg/Jy for input columns with ambiguous units, instead of stopping (default: False)")
     p.add_argument("--reference-file",            default=None,              help="Provide reference cutout when giving a large catalog to speed up matching")
     p.add_argument("--spatial-filter",            action="store_true",       help="Pre-filter reference catalogs to the anchor's spatial coverage (with 10%% margin).")
     p.add_argument("--thres-arc",                 type=float, default=None,  help="Override error based matching with simple thresholding (arcsec)")
