@@ -3,7 +3,7 @@ import sys
 import warnings
 import numpy as np
 import matplotlib.pyplot as plt
-from functions import plot_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d, predict_flux
+from functions import plot_statistics, get_combinations, weighted_bin_stats, weighted_bin_stats_2d, predict_flux, FFA
 from functions import compute_flux_correction_factor, calculate_correction_factor_weight, biweight_location, report_ignored_cats
 from functions import load_config
 from time import perf_counter
@@ -42,6 +42,7 @@ _PRESETS = {
     "all":      [cat.name for cat in all_catalogs],
     "small":    ["vlssr", "tgss", "wenss", "racs_low", "nvss"],
     "default":  ["vlssr", "lofar_dr3", "tgss", "gleam_300", "wenss", "vcss", "txs", "racs_low", "apertif", "racs_mid", "nvss", "first", "racs_high", "vlass"],
+    "galactic": ["vlssr", "tgss", "wenss", "racs_gal", "racs_mid", "meerkat"],
 }
 
 #### Frequency units
@@ -587,14 +588,24 @@ def main():
         # individual source spectra
         for i in idx:
             si = spectral_index[i]
-            ci = spectral_curvature[i]
+            bi = tau_freefree[i] if is_ffa else spectral_curvature[i]
             f0 = fitted_flux[i]
-            if not np.isfinite(si) or f0 <= 0:
+            if not (np.isfinite(si) and np.isfinite(bi) and np.isfinite(f0)) or f0 <= 0:
                 continue
 
-            # back-compute flux at the log-parabola pivot, then predict full spectrum
-            ln_scale = np.log(f0) - (si * np.log(freq0 / freq_pivot) + ci * np.log(freq0 / freq_pivot)**2)
-            flux_spec = predict_flux(freqs, freq_pivot, np.exp(ln_scale), si, curvature=ci)
+            piv_i = pivot_frequency[i] / MHz
+            if not np.isfinite(piv_i) or piv_i <= 0:
+                continue
+
+            # back-compute the flux at the pivot, then predict the full spectrum
+            if is_ffa:
+                ln_scale = np.log(f0) - (si * np.log(freq0 / piv_i) - bi * ((freq0 / piv_i)**-2.1 - 1))
+                flux_spec = FFA(freqs, np.exp(ln_scale), piv_i, si, bi)
+            else:
+                ln_scale = np.log(f0) - (si * np.log(freq0 / piv_i) + bi * np.log(freq0 / piv_i)**2)
+                flux_spec = predict_flux(freqs, piv_i, np.exp(ln_scale), si, curvature=bi)
+            if not np.all(np.isfinite(flux_spec)):
+                continue
             ax.loglog(freqs, flux_spec, lw=0.3, alpha=0.15, color='gray')
 
         # aggregate power-law (bend = 0)
@@ -603,9 +614,14 @@ def main():
 
         # aggregate curved fit
         if np.isfinite(mcur) and abs(mcur) > 1e-6:
-            ln_scale_mn = np.log(np.median(fitted_flux)) - (mspx * np.log(freq0 / freq_pivot) + mcur * np.log(freq0 / freq_pivot)**2)
-            flux_cv = predict_flux(freqs, freq_pivot, np.exp(ln_scale_mn), mspx, curvature=mcur)
-            ax.loglog(freqs, flux_cv, lw=2, ls='--', color='tomato', label=f'Curved:  α = {mspx:.3f},  β = {mcur:.3f}')
+            if is_ffa:
+                ln_scale_mn = np.log(np.median(fitted_flux)) - (mspx * np.log(freq0 / freq_pivot) - mcur * ((freq0 / freq_pivot)**-2.1 - 1))
+                flux_cv = FFA(freqs, np.exp(ln_scale_mn), freq_pivot, mspx, mcur)
+                ax.loglog(freqs, flux_cv, lw=2, ls='--', color='tomato', label=f'Curved:  α = {mspx:.3f},  τ = {mcur:.3f}')
+            else:
+                ln_scale_mn = np.log(np.median(fitted_flux)) - (mspx * np.log(freq0 / freq_pivot) + mcur * np.log(freq0 / freq_pivot)**2)
+                flux_cv = predict_flux(freqs, freq_pivot, np.exp(ln_scale_mn), mspx, curvature=mcur)
+                ax.loglog(freqs, flux_cv, lw=2, ls='--', color='tomato', label=f'Curved:  α = {mspx:.3f},  β = {mcur:.3f}')
 
         # catalog frequencies
         for cat in config.catalogs:

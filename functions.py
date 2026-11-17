@@ -688,20 +688,15 @@ def solve_flux_scales_band(ratio_slice, weight_slice, normalize=True):
 
 def predict_flux(freq_target, freq_reference, flux_reference, spectral_index, curvature=0):
     """Extrapolate flux based on two frequencies, one flux, a spectral index, and an optional curvature parameter"""
-    log_freq_delta = np.log(freq_target / freq_reference)
-    log_flux_ratio = spectral_index * log_freq_delta + curvature * log_freq_delta**2
-    return flux_reference * np.exp(log_flux_ratio)
+    return np.exp(log_cpl(freq_target, np.log(flux_reference), spectral_index, curvature, np.log(freq_reference)))
 
 def CPL(freq, reference_flux, reference_freq, spectral_index, spectral_curvature):
-    """Simple curved power-law model"""
-    ln_nu = np.log(freq / reference_freq)
-    return np.exp(np.log(reference_flux) + spectral_index * ln_nu + spectral_curvature * ln_nu**2)
+    """Simple curved power-law model; reference_flux is the flux at reference_freq"""
+    return predict_flux(freq, reference_freq, reference_flux, spectral_index, spectral_curvature)
 
 def FFA(freq, reference_flux, reference_freq, spectral_index, tau_freefree):
-    """Free-free turnover model"""
-    ratio = freq / reference_freq
-    log_ratio = np.log(ratio)
-    return np.exp(np.log(reference_flux) + spectral_index * log_ratio - tau_freefree * ratio**-2.1)
+    """Free-free turnover model; reference_flux is the flux at reference_freq"""
+    return np.exp(log_ffa(freq, np.log(reference_flux), spectral_index, tau_freefree, np.log(reference_freq)))
 
 def SSA(freq, reference_flux, reference_freq, spectral_index_thick, spectral_index_thin):
     """Synchrotron self-absorption model with a_thick and a_thin"""
@@ -717,7 +712,7 @@ def log_cpl(nu, lnS0, a, q, lnpiv):
 def log_ffa(nu, lnS0, a, tau, lnpiv):
     """Free-free turnover in log space; lnS0 is the flux at the pivot frequency (absorption vanishes there)"""
     rr = nu / np.exp(lnpiv)
-    return lnS0 + a * np.log(rr) - tau * rr**-2.1
+    return lnS0 + a * np.log(rr) - tau * (rr**-2.1 - 1)
 
 def _predict_theory(ref_freqs, ref_fluxes, anchor_freq, model, config):
     # CPL()/FFA() curvature/tauff are relative to reference freq.
@@ -733,7 +728,15 @@ def _predict_theory(ref_freqs, ref_fluxes, anchor_freq, model, config):
 
     with np.errstate(divide='ignore', invalid='ignore'):
         lnS0 = np.log(ref_fluxes) - log_model(ref_freqs, 0.0, config.spectral_index_theory, bend, lnpiv)[:, None]
-        return np.exp(log_model(anchor_freq, lnS0, config.spectral_index_theory, bend, lnpiv)).mean(axis=0)
+        pred = np.exp(log_model(anchor_freq, lnS0, config.spectral_index_theory, bend, lnpiv))
+
+    # drop zero/negative/non-finite refs per source instead of letting them affect the mean
+    valid  = np.isfinite(pred) & (pred > 0)
+    counts = valid.sum(axis=0)
+    out    = np.full(ref_fluxes.shape[1], np.nan)
+    has    = counts > 0
+    out[has] = np.where(valid[:, has], pred[:, has], 0.0).sum(axis=0) / counts[has]
+    return out
 
 def _fit_linear(ref_freqs, ref_fluxes, anchor_freq, model, order, config):
     """Linear least squares. Only for (cpl|ffa, order 2|3)"""
@@ -775,7 +778,8 @@ def _fit_linear(ref_freqs, ref_fluxes, anchor_freq, model, order, config):
         out['lnS0'][full]   = C[0]
         out['fitted'][full] = True
         if order == 3: out['bend'][full] = C[2]
-        out['extrapolated'][full] = predict(anchor_freq, np.exp(C[0]), piv_th, C[1], out['bend'][full])
+        if not is_cpl: out['lnS0'][full] -= out['bend'][full]  # ffa: lnS0 is the flux at the pivot (absorption vanishes there)
+        out['extrapolated'][full] = predict(anchor_freq, np.exp(out['lnS0'][full]), piv_th, C[1], out['bend'][full])
 
     for j in np.flatnonzero(~full):
         ok = valid[:, j]
@@ -786,7 +790,8 @@ def _fit_linear(ref_freqs, ref_fluxes, anchor_freq, model, order, config):
         out['lnS0'][j]   = coef[0]
         out['fitted'][j] = True
         if order == 3: out['bend'][j] = coef[2]
-        out['extrapolated'][j] = predict(anchor_freq, np.exp(coef[0]), piv_th, coef[1], out['bend'][j])
+        if not is_cpl: out['lnS0'][j] -= out['bend'][j]
+        out['extrapolated'][j] = predict(anchor_freq, np.exp(out['lnS0'][j]), piv_th, coef[1], out['bend'][j])
     return out
 
 _FIT_MAXFEV     = 2000
@@ -801,7 +806,7 @@ _THICK_BOUNDS   = (-1, 6)
 
 def _fit_nonlinear(ref_freqs, ref_fluxes, anchor_freq, model, order, config):
     """Per-source curve_fit in log-flux. 
-    cpl/ffa o>=4: fit for (lnS0, alpha, bend, pivot)
+    cpl/ffa o>=4: fit for (lnS0, alpha, bend); the pivot is pinned at the geometric mean of the refs (a fitted pivot is degenerate)
     ssa o2: fit for (S, nu); o3: + thin; o>=4: + thick"""
     n = ref_fluxes.shape[1]
     is_cpl = (model == 'cpl')
@@ -818,7 +823,8 @@ def _fit_nonlinear(ref_freqs, ref_fluxes, anchor_freq, model, order, config):
     for j in range(n):
         fv = ref_fluxes[:, j]
         ok = np.isfinite(fv) & (fv > 0)
-        if int(np.count_nonzero(ok)) < 2:
+        n_params = 3 if model in ('cpl', 'ffa') else min(order, 4)
+        if int(np.count_nonzero(ok)) < n_params:  # need at least one point per free parameter
             continue
         fr = ref_freqs[ok]
         ly = np.log(fv[ok])
@@ -826,10 +832,17 @@ def _fit_nonlinear(ref_freqs, ref_fluxes, anchor_freq, model, order, config):
             if model in ('cpl', 'ffa'):
                 log_model = log_cpl if is_cpl else log_ffa
                 blo, bhi, binit = ((_Q_BOUNDS[0],   _Q_BOUNDS[1],   config.spectral_curvature_theory) if is_cpl else (_TAU_BOUNDS[0], _TAU_BOUNDS[1], config.tau_freefree_theory))
-                
-                p0 = [float(np.log(np.median(fv[ok]))), config.spectral_index_theory, binit, np.log(config.pivot_freq_theory)]
-                popt, _ = curve_fit(log_model, fr, ly, p0=p0, maxfev=_FIT_MAXFEV, bounds=([_LN_S0_BOUNDS[0], _ALPHA_BOUNDS[0], blo, _LNPIVOT_BOUNDS[0]], [_LN_S0_BOUNDS[1], _ALPHA_BOUNDS[1], bhi, _LNPIVOT_BOUNDS[1]]))
-                lnS0, alpha, bend, lnpiv = popt
+
+                # pin the pivot at the geometric mean of the refs
+                lnpiv = float(np.mean(np.log(fr)))
+                fn = lambda nu, lnS0, a, bend: log_model(nu, lnS0, a, bend, lnpiv)
+
+                lnS0_init = float(np.log(np.median(fv[ok])))
+                if not is_cpl: lnS0_init += binit * float(np.mean((fr / np.exp(lnpiv))**-2.1 - 1.0))  # ffa: undo absorption at the refs
+
+                p0 = [lnS0_init, config.spectral_index_theory, binit]
+                popt, _ = curve_fit(fn, fr, ly, p0=p0, maxfev=_FIT_MAXFEV, bounds=([_LN_S0_BOUNDS[0], _ALPHA_BOUNDS[0], blo], [_LN_S0_BOUNDS[1], _ALPHA_BOUNDS[1], bhi]))
+                lnS0, alpha, bend = popt
                 piv = float(np.exp(lnpiv))
 
                 out['alpha'][j]  = alpha
