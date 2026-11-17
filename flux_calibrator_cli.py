@@ -226,7 +226,7 @@ def main():
     config = Config(
         anchor_catalog              = anchor_cat,
         catalogs                    = all_cats,
-        spectral_model              = args.spectral_model,
+        spectral_model              = args.spectral_model.lower(),
         fitting_order               = args.fitting_order,
         spectral_damping_factor     = args.spectral_damping_factor,
         snr_lower_limit             = args.snr_lower_limit,
@@ -355,6 +355,10 @@ def main():
     results = results[weight_mask & corr_mask]
     total_weighting_factor = total_weighting_factor[weight_mask & corr_mask]
 
+    if len(results) == 0:
+        print(colored("Error: no valid sources remain after filtering (all weights zero or correction factors non-physical)\n", "red"))
+        sys.exit(1)
+
     if args.save_csv:
         results.write(outdir / f"{anchor_name}_results.csv", overwrite=True)
 
@@ -382,10 +386,12 @@ def main():
     ############################################################################
     #### plotting correction factor based on all previous catalog matchings ####
     ############################################################################
-    mspx, mcor, mcur = biweight_location(spectral_index, np.log10(correction_factor), spectral_curvature, weights=total_weighting_factor)
+    is_ffa = config.spectral_model == "ffa"
+    bend_column = tau_freefree if is_ffa else spectral_curvature  # ffa: the fitted bend is tau, curvature is meaningless
+    mspx, mcor, mcur = biweight_location(spectral_index, np.log10(correction_factor), bend_column, weights=total_weighting_factor)
     mcor = 10**mcor
 
-    if config.spectral_model.lower() != "ssa":
+    if config.spectral_model != "ssa":
         # plot correction factor as function of spectral index [cpl | ffa]
         plot_statistics(spectral_index, correction_factor, total_weighting_factor,
                         logy=True, save=SAVE_PLOTS, show=False,
@@ -394,7 +400,7 @@ def main():
                         ylabel="Correction factor",
                         title="Correction factor as function of fitted spectral index\nall catalogs")
 
-        if config.spectral_model.lower() == "cpl" and config.fitting_order >= 3:
+        if config.spectral_model == "cpl" and config.fitting_order >= 3:
             # plot spectral curvature as function of spectral index [cpl]
             plot_statistics(spectral_index, spectral_curvature, total_weighting_factor,
                             save=SAVE_PLOTS, show=False,
@@ -403,7 +409,7 @@ def main():
                             ylabel="Spectral curvature",
                             title="Spectral curvature as function of fitted spectral index\nall catalogs")
             
-        elif config.spectral_model.lower() == "ffa" and config.fitting_order >= 3:
+        elif config.spectral_model == "ffa" and config.fitting_order >= 3:
             # plot tau_ff as function of spectral index [ffa]
             plot_statistics(spectral_index, tau_freefree, total_weighting_factor,
                             save=SAVE_PLOTS, show=False,
@@ -412,7 +418,7 @@ def main():
                             ylabel="Tau_ff",
                             title="Tau_ff as function of fitted spectral index\nall catalogs")
     
-    elif config.spectral_model.lower() == "ssa":
+    elif config.spectral_model == "ssa":
         if config.fitting_order >= 2:
             # order 2 fits for S_peak and nu_peak
             plot_statistics(pivot_flux, pivot_frequency, total_weighting_factor,
@@ -445,7 +451,8 @@ def main():
                     title="Spectral index (thick) as function of spectral index (thin)\nall catalogs")
     
     print("--------------------------------------------------------")
-    print(f"Spectral index: {mspx:.3f}, correction factor: {mcor:.3f}, curvature: {mcur:.3f}, total matches: {len(correction_factor)}")
+    bend_label = "tau_ff" if is_ffa else "curvature"
+    print(f"Spectral index: {mspx:.3f}, correction factor: {mcor:.3f}, {bend_label}: {mcur:.3f}, total matches: {len(correction_factor)}")
     print("--------------------------------------------------------")
 
     ##########################
@@ -573,7 +580,7 @@ def main():
         max_freq = np.max([cat.freq for cat in config.catalogs])
         freqs = np.logspace(np.log10(min_freq), np.log10(max_freq), 100) / MHz
         freq0 = config.anchor_catalog.freq / MHz
-        freq_pivot = 100e6 / MHz
+        freq_pivot = config.pivot_freq_theory / MHz
 
         fig, ax = plt.subplots(figsize=(9, 6))
 
@@ -590,7 +597,7 @@ def main():
             flux_spec = predict_flux(freqs, freq_pivot, np.exp(ln_scale), si, curvature=ci)
             ax.loglog(freqs, flux_spec, lw=0.3, alpha=0.15, color='gray')
 
-        # aggregate power-law (curvature = 0)
+        # aggregate power-law (bend = 0)
         flux_pl = predict_flux(freqs, freq_pivot, np.exp(np.log(np.median(fitted_flux)) - (mspx * np.log(freq0 / freq_pivot))), mspx, curvature=0)
         ax.loglog(freqs, flux_pl, lw=2.5, color='steelblue', label=f'Power law:  α = {mspx:.3f}')
 

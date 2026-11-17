@@ -710,10 +710,12 @@ def SSA(freq, reference_flux, reference_freq, spectral_index_thick, spectral_ind
     return np.exp(np.log(reference_flux) + spectral_index_thick * np.log(delta_nu) + np.log(-np.expm1(-tau) / (1 - np.exp(-1))))
 
 def log_cpl(nu, lnS0, a, q, lnpiv):
+    """Curved power law in log space; lnS0 is the flux at the pivot frequency"""
     xx = np.log(nu / np.exp(lnpiv))
     return lnS0 + a * xx + q * xx * xx
 
 def log_ffa(nu, lnS0, a, tau, lnpiv):
+    """Free-free turnover in log space; lnS0 is the flux at the pivot frequency (absorption vanishes there)"""
     rr = nu / np.exp(lnpiv)
     return lnS0 + a * np.log(rr) - tau * rr**-2.1
 
@@ -950,7 +952,7 @@ def compute_flux_correction_factor(cats, config, anchor_override=None, precomput
     #Order 1 is theory scaling, no fitting.
     # Orders 2-3 share one linear function (pivot fixed)
     # order >= 4 shares one non-linear function. 
-    model = config.spectral_model.lower()
+    model = config.spectral_model
     order = config.fitting_order
     ref_freqs = np.array([float(cats[idx].freq) for idx in other_index], dtype=float)
     ref_fluxes = np.stack([np.asarray(cats[idx].flux, dtype=float) for idx in other_index])
