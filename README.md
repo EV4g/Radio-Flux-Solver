@@ -40,11 +40,29 @@ Which uses `combination-size=4` (matching of 3 catalogs to estimate the fourth) 
 
 Currently supported arguments are:
 ```bash
-[-h] [--scale SCALE] [--catalogs CATALOGS] [--anchor-name ANCHOR_NAME] [--freq FREQ] [--freq-unit {Hz,MHz,GHz}]
-                              [--combination-size COMBINATION_SIZE] [--spectral_damping_factor SPECTRAL_DAMPING_FACTOR] [--nsigma NSIGMA] [--snr-lower-limit SNR_LOWER_LIMIT]
-                              [--minimum-points MINIMUM_POINTS] [--minimum-position-error MINIMUM_POSITION_ERROR] [--spectral-index-theory SPECTRAL_INDEX_THEORY]
-                              [--minimum-frequency-spacing MINIMUM_FREQUENCY_SPACING] [--reference-file REFERENCE_FILE] [--spatial-filter] [--no-reload-cache]
-                              [--save-plots] [--debug] [--thres-arc THRES_ARC] [--n-jobs N_JOBS] [--logging] [--output-dir OUTPUT_DIR] [--seed SEED]
+flux_calibrator_cli.py [-h] [--catalogs CATALOGS] [-f FREQ]
+                              [--freq-unit {Hz,MHz,GHz}] [--spectral-model {cpl,ffa,ssa}]
+                              [-c COMBINATION_SIZE] [--fitting-order FITTING_ORDER]
+                              [--spectral_damping_factor SPECTRAL_DAMPING_FACTOR]
+                              [--nsigma NSIGMA] [--snr-lower-limit SNR_LOWER_LIMIT]
+                              [--minimum-points MINIMUM_POINTS]
+                              [--minimum-frequency-spacing MINIMUM_FREQUENCY_SPACING]
+                              [--spectral-index-theory SPECTRAL_INDEX_THEORY]
+                              [--spectral-index-thin-theory SPECTRAL_INDEX_THIN_THEORY]
+                              [--spectral-index-thick-theory SPECTRAL_INDEX_THICK_THEORY]
+                              [--spectral-curvature-theory SPECTRAL_CURVATURE_THEORY]
+                              [--tau-freefree-theory TAU_FREEFREE_THEORY]
+                              [--pivot-freq-theory PIVOT_FREQ_THEORY]
+                              [--save-correction-factors] [--output-name OUTPUT_NAME]
+                              [--save-plots] [--save-csv] [--logging]
+                              [--output-dir OUTPUT_DIR] [--anchor-name ANCHOR_NAME]
+                              [--scale SCALE]
+                              [--minimum-position-error MINIMUM_POSITION_ERROR]
+                              [--unit-fallback] [--reference-file REFERENCE_FILE]
+                              [--spatial-filter] [--thres-arc THRES_ARC]
+                              [--crowd-radius-arc CROWD_RADIUS_ARC] [--n-jobs N_JOBS]
+                              [--debug] [--no-reload-cache] [--seed SEED]
+                              [catalog] [config]
 ```
 
 #### Currently included reference survey catalogs
