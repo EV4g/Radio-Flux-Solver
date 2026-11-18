@@ -11,13 +11,13 @@ End-to-end; takes care of the finding, matching, and calibration of sources base
 - Either two-point spectral index fitting or three-or-more-point index + curvature estimation advanced modes
 
 #### Installation
-This project makes use of `UV`, to install it see: `https://docs.astral.sh/uv/getting-started/installation/`.
+This project makes use of `UV`, to install it see: [`https://docs.astral.sh/uv/getting-started/installation/`](https://docs.astral.sh/uv/getting-started/installation/).
 
 You can install the required catalog files using
 ```bash
 uv run install.py
 ```
-or download them from source: `https://huggingface.co/datasets/EV4g/Radio-Flux-Solver-Catalogs/resolve/main/catalogs.tar.gz`.
+or download them from source: [`https://huggingface.co/datasets/EV4g/Radio-Flux-Solver-Catalogs/resolve/main/catalogs.tar.gz`](https://huggingface.co/datasets/EV4g/Radio-Flux-Solver-Catalogs/resolve/main/catalogs.tar.gz).
 
 #### Usage (see also: [documentation.md](documentation.md))
 You can validate a .fits file using:
