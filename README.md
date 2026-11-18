@@ -19,7 +19,7 @@ uv run install.py
 ```
 or download them from source: `https://huggingface.co/datasets/EV4g/Radio-Flux-Solver-Catalogs/resolve/main/catalogs.tar.gz`.
 
-#### Usage
+#### Usage (see also: [documentation.md](documentation.md))
 You can validate a .fits file using:
 ```bash
 uv run flux_calibrator_cli.py path/to/file.fits
