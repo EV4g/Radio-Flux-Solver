@@ -1,5 +1,6 @@
 """Download and unpack Radio-Flux-Solver catalogs. Run with: uv run install.py"""
 
+import argparse
 import os
 import tarfile
 import requests
@@ -10,9 +11,6 @@ FILENAME = "catalogs.tar.gz"
 URL = f"https://huggingface.co/datasets/{REPO_ID}/resolve/main/{FILENAME}"
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-CATALOGS_DIR = os.path.join(SCRIPT_DIR, "catalogs")
-MARKER = os.path.join(CATALOGS_DIR, ".downloaded")
-ARCHIVE_PATH = os.path.join(CATALOGS_DIR, FILENAME)
 
 def download_with_progress(url, dest):
     existing_size = os.path.getsize(dest) if os.path.exists(dest) else 0
@@ -34,25 +32,41 @@ def download_with_progress(url, dest):
             f.write(chunk)
             bar.update(len(chunk))
 
-def main():
-    os.makedirs(CATALOGS_DIR, exist_ok=True)
+def _unpack(archive_path, dest):
+    """Unpack the catalogs archive into dest, stripping the leading catalogs/ so
+    the survey folders (vlssr/, tgss/, ...) land directly inside."""
+    with tarfile.open(archive_path, "r:gz") as tar:
+        members = [m for m in tar.getmembers() if m.name.startswith("catalogs/")]
+        for m in members:
+            m.name = m.name[len("catalogs/"):]
+        tar.extractall(path=dest, members=members, filter="data")
 
-    if os.path.exists(MARKER):
+def main():
+    parser = argparse.ArgumentParser(description="Download and unpack the Radio-Flux-Solver reference catalogs.")
+    parser.add_argument("--path", default=None, help="Directory to unpack the catalogs into (default: this folder's catalogs/). The survey folders land directly inside.")
+    args = parser.parse_args()
+
+    catalogs_dir = os.path.abspath(args.path) if args.path else os.path.join(SCRIPT_DIR, "catalogs")
+    marker      = os.path.join(catalogs_dir, ".downloaded")
+    archive_path = os.path.join(catalogs_dir, FILENAME)
+
+    os.makedirs(catalogs_dir, exist_ok=True)
+
+    if os.path.exists(marker):
         print("Catalogs already present, skipping download.")
         return
 
     print(f"Downloading {FILENAME}...")
-    download_with_progress(URL, ARCHIVE_PATH)
+    download_with_progress(URL, archive_path)
 
-    print("\nUnpacking into catalogs/...")
-    with tarfile.open(ARCHIVE_PATH, "r:gz") as tar:
-        tar.extractall(path=SCRIPT_DIR)
+    print(f"\nUnpacking into {catalogs_dir}...")
+    _unpack(archive_path, catalogs_dir)
 
-    os.remove(ARCHIVE_PATH)
+    os.remove(archive_path)
     print("Removed archive.")
 
-    open(MARKER, "w").close()
-    print("Catalogs ready in ./catalogs/")
+    open(marker, "w").close()
+    print(f"Catalogs ready in {catalogs_dir}")
 
 if __name__ == "__main__":
     main()

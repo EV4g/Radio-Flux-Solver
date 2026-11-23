@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "Radio-Flux-Solver"
 version = "1.1.1"
@@ -17,6 +21,13 @@ dependencies = [
     "termcolor>=3.3.0",
     "tqdm>=4.67.3",
 ]
+
+[project.scripts]
+rfs = "flux_calibrator_cli:main"
+rfs-install = "install:main"
+
+[tool.setuptools]
+py-modules = ["functions", "catalog_manager", "catalogs_transform", "flux_calibrator_cli", "install"]
 
 [tool.ty.rules]
 missing-attribute = "ignore"

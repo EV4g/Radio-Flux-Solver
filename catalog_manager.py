@@ -15,6 +15,20 @@ from time import perf_counter
 from termcolor import colored
 
 _PROJECT_ROOT = Path(__file__).resolve().parent
+_REFERENCE_CATALOG_DIR = _PROJECT_ROOT / "catalogs"  # --reference-catalog-dir target; default: the catalogs/ folder shipped with RFS
+
+def set_reference_catalog_dir(dirpath):
+    """Point the reference-catalog location at dirpath and re-resolve every
+    registered catalog against it. Relative paths are taken against the project root."""
+    global _REFERENCE_CATALOG_DIR
+    root = Path(dirpath)
+    if not root.is_absolute():
+        root = _PROJECT_ROOT / root
+    if not root.is_dir():
+        raise SystemExit(f"Reference catalog dir is not a directory: {dirpath}")
+    _REFERENCE_CATALOG_DIR = root
+    for cat in Catalog_set.registry.values():
+        cat._resolve_paths()
 
 def _extract_plane(path):
     """Return a 2-D celestial-plane FITS path; write a temp file only for N-D images."""
@@ -49,16 +63,14 @@ def resolve_catalog_path(path):
     if p.is_absolute() and p.parent.exists():
         return p.resolve()
     clean = str(p).lstrip("/") if p.is_absolute() else str(p)
-    return (_PROJECT_ROOT / clean).resolve()
+    return (_REFERENCE_CATALOG_DIR / clean).resolve()
 
 # wrapper class for incoming Table data
 class Catalog:
     def __init__(self, path=None, freq_hz=None, name=None, flux_lim=0, scale=1, table=True, reload_cache=True, minimum_position_error=0, unit_fallback=False):
-        self.path = resolve_catalog_path(path) if path is not None else None
-        if self.path is None: raise ValueError(f"Valid catalog path is required\nPath: {path} is not valid")
+        self.raw_path = path  # kept as given; relative paths resolve against the reference catalog dir
+        self._resolve_paths()
 
-        self.dir          = self.path.parent
-        self.path_stem    = self.path.stem
         self.freq         = freq_hz       # central frequency
         self.freq_unit    = 'Hz'          # frequency unit
         self.name         = name          # survey name
@@ -77,6 +89,14 @@ class Catalog:
         self._xyz  = None
         self._tree = None
         self._err_rad_median = None  # cached median(err_rad), reused per pair by match_catalogs_2D
+
+    def _resolve_paths(self):
+        """Resolve self.raw_path against the reference catalog dir"""
+        self.path = resolve_catalog_path(self.raw_path) if self.raw_path is not None else None
+        if self.path is None: raise ValueError(f"Valid catalog path is required\nPath: {self.raw_path} is not valid")
+
+        self.dir          = self.path.parent
+        self.path_stem    = self.path.stem
 
     def load(self):
         if self.table:

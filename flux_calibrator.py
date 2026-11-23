@@ -15,30 +15,30 @@ start = perf_counter()
 
 #### all currently implemented survey catalogs
 all_catalogs = Catalog_set([
-    Catalog("catalogs/vlssr/vlssr_clean.fits",                73.8e6,     "vlssr",      scale=1.1733),
-    Catalog("catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",   144.6e6,    "lofar_dr3",  scale=1.0564),
-    Catalog("catalogs/tgss/tgss_clean.fits",                  150e6,      "tgss",       scale=1.1125),
-    Catalog("catalogs/gleam_x_gp/gleam_x_gp_clean.fits",      200e6,      "gleam_xgp",  scale=1.1337),
-    Catalog("catalogs/gleam_300/gleam_300_clean.fits",        300e6,      "gleam_300",  scale=1.1337),
-    Catalog("catalogs/wenss/wenss_clean.fits",                325e6,      "wenss",      scale=1.0484),
-    Catalog("catalogs/vcss/vcss_clean.fits",                  340e6,      "vcss",       scale=0.9815),
-    Catalog("catalogs/txs/txs_clean.fits",                    365e6,      "txs",        scale=0.9524),
-    Catalog("catalogs/racs/racs_low_gal_clean.fits",          887.5e6,    "racs_gal",   scale=0.8879),  # the galactic portion of the racs-low survey
-    Catalog("catalogs/racs/racs_low_clean.fits",              887.5e6,    "racs_low",   scale=0.8879),  # the rest of the racs-low survey
-    Catalog("catalogs/apertif/apertif_clean.fits",            1355e6,     "apertif",    scale=0.9765),
-    Catalog("catalogs/meerkat/meerkat_clean.fits",            1359.7e6,   "meerkat",    scale=0.8525),
-    Catalog("catalogs/racs/racs_mid_clean.fits",              1367.5e6,   "racs_mid",   scale=0.9486),
-    Catalog("catalogs/nvss/nvss_clean.fits",                  1400e6,     "nvss",       scale=1),
-    Catalog("catalogs/first/first_clean.fits",                1400e6,     "first",      scale=1),
-    Catalog("catalogs/racs/racs_high_clean.fits",             1655.5e6,   "racs_high",  scale=0.9901),
-    Catalog("catalogs/vlass/vlass_clean.fits",                3000e6,     "vlass",      scale=0.9915),  # vlass
+    Catalog("vlssr/vlssr_clean.fits",                73.8e6,     "vlssr",      scale=1.1733),
+    Catalog("lofar/LoTSS_DR3_v1.0.srl_clean.fits",   144.6e6,    "lofar_dr3",  scale=1.0564),
+    Catalog("tgss/tgss_clean.fits",                  150e6,      "tgss",       scale=1.1125),
+    Catalog("gleam_x_gp/gleam_x_gp_clean.fits",      200e6,      "gleam_xgp",  scale=1.1337),
+    Catalog("gleam_300/gleam_300_clean.fits",        300e6,      "gleam_300",  scale=1.1337),
+    Catalog("wenss/wenss_clean.fits",                325e6,      "wenss",      scale=1.0484),
+    Catalog("vcss/vcss_clean.fits",                  340e6,      "vcss",       scale=0.9815),
+    Catalog("txs/txs_clean.fits",                    365e6,      "txs",        scale=0.9524),
+    Catalog("racs/racs_low_gal_clean.fits",          887.5e6,    "racs_gal",   scale=0.8879),  # the galactic portion of the racs-low survey
+    Catalog("racs/racs_low_clean.fits",              887.5e6,    "racs_low",   scale=0.8879),  # the rest of the racs-low survey
+    Catalog("apertif/apertif_clean.fits",            1355e6,     "apertif",    scale=0.9765),
+    Catalog("meerkat/meerkat_clean.fits",            1359.7e6,   "meerkat",    scale=0.8525),
+    Catalog("racs/racs_mid_clean.fits",              1367.5e6,   "racs_mid",   scale=0.9486),
+    Catalog("nvss/nvss_clean.fits",                  1400e6,     "nvss",       scale=1),
+    Catalog("first/first_clean.fits",                1400e6,     "first",      scale=1),
+    Catalog("racs/racs_high_clean.fits",             1655.5e6,   "racs_high",  scale=0.9901),
+    Catalog("vlass/vlass_clean.fits",                3000e6,     "vlass",      scale=0.9915),  # vlass
 ])
 
 #### catalogs based on pointings or cutouts
 pointing_catalogs = Catalog_set([
     Catalog("data/raw/catalogs/avgtest-MFS-image_pbcor_catalog.fits",  1284e6,     "meerkat_L_cat",  scale=1),       # meerkat L-band
-    Catalog("catalogs/lofar/lofar_sources_pipeline.fits",              144.6e6,    "lofar",          scale=1),       # LOFAR P282+00
-    Catalog("catalogs/other/cygnus_clean.fits",                        336e6,      "cygnus",         scale=1),       # vla cygnus region
+    Catalog("lofar/lofar_sources_pipeline.fits",              144.6e6,    "lofar",          scale=1),       # LOFAR P282+00
+    Catalog("other/cygnus_clean.fits",                        336e6,      "cygnus",         scale=1),       # vla cygnus region
     Catalog("data/raw/catalogs/lofar_cygnus_6arcsec_catalog.fits",     144.6e6,    "cygnus_6",       scale=1),       # lofar cygnus region 6"
     Catalog("data/raw/catalogs/lofar_cygnus_20arcsec_catalog.fits",    144.6e6,    "cygnus_20",      scale=1),       # lofar cygnus region 20"
     Catalog("data/raw/catalogs/lofar_cygnus_53arcsec_catalog.fits",    144.6e6,    "cygnus_53",      scale=1),       # lofar cygnus region 53"

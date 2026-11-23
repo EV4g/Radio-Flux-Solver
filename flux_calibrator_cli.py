@@ -8,7 +8,7 @@ from functions import plot_statistics, get_combinations, weighted_bin_stats, wei
 from functions import compute_flux_correction_factor, calculate_correction_factor_weight, biweight_location, report_ignored_cats
 from functions import load_config
 from time import perf_counter
-from catalog_manager import Catalog, Config, Catalog_set
+from catalog_manager import Catalog, Config, Catalog_set, set_reference_catalog_dir
 from joblib import Parallel, delayed
 from pathlib import Path
 from astropy.io import fits
@@ -18,24 +18,24 @@ warnings.filterwarnings("ignore", message=".*(non-interactive|tqdm).*")
 
 #### all currently implemented survey catalogs
 all_catalogs = Catalog_set([
-    Catalog("catalogs/lolss/lolss_clean.fits",                54e6,       "lolss_dr1",  scale=1),
-    Catalog("catalogs/vlssr/vlssr_clean.fits",                73.8e6,     "vlssr",      scale=1.1733),
-    Catalog("catalogs/lofar/LoTSS_DR3_v1.0.srl_clean.fits",   144.6e6,    "lofar_dr3",  scale=1.0564),
-    Catalog("catalogs/tgss/tgss_clean.fits",                  150e6,      "tgss",       scale=1.1125),
-    Catalog("catalogs/gleam_x_gp/gleam_x_gp_clean.fits",      200e6,      "gleam_xgp",  scale=1.1337),
-    Catalog("catalogs/gleam_300/gleam_300_clean.fits",        300e6,      "gleam_300",  scale=1.1337),
-    Catalog("catalogs/wenss/wenss_clean.fits",                325e6,      "wenss",      scale=1.0484),
-    Catalog("catalogs/vcss/vcss_clean.fits",                  340e6,      "vcss",       scale=0.9815),
-    Catalog("catalogs/txs/txs_clean.fits",                    365e6,      "txs",        scale=0.9524),
-    Catalog("catalogs/racs/racs_low_gal_clean.fits",          887.5e6,    "racs_gal",   scale=0.8879),  # the galactic portion of the racs-low survey
-    Catalog("catalogs/racs/racs_low_clean.fits",              887.5e6,    "racs_low",   scale=0.8879),  # the rest of the racs-low survey
-    Catalog("catalogs/apertif/apertif_clean.fits",            1355e6,     "apertif",    scale=0.9765),
-    Catalog("catalogs/meerkat/meerkat_clean.fits",            1359.7e6,   "meerkat",    scale=0.8525),
-    Catalog("catalogs/racs/racs_mid_clean.fits",              1367.5e6,   "racs_mid",   scale=0.9486),
-    Catalog("catalogs/nvss/nvss_clean.fits",                  1400e6,     "nvss",       scale=1),
-    Catalog("catalogs/first/first_clean.fits",                1400e6,     "first",      scale=1),
-    Catalog("catalogs/racs/racs_high_clean.fits",             1655.5e6,   "racs_high",  scale=0.9901),
-    Catalog("catalogs/vlass/vlass_clean.fits",                3000e6,     "vlass",      scale=0.9915),  # vlass
+    Catalog("lolss/lolss_clean.fits",                54e6,       "lolss_dr1",  scale=1),
+    Catalog("vlssr/vlssr_clean.fits",                73.8e6,     "vlssr",      scale=1.1733),
+    Catalog("lofar/LoTSS_DR3_v1.0.srl_clean.fits",   144.6e6,    "lofar_dr3",  scale=1.0564),
+    Catalog("tgss/tgss_clean.fits",                  150e6,      "tgss",       scale=1.1125),
+    Catalog("gleam_x_gp/gleam_x_gp_clean.fits",      200e6,      "gleam_xgp",  scale=1.1337),
+    Catalog("gleam_300/gleam_300_clean.fits",        300e6,      "gleam_300",  scale=1.1337),
+    Catalog("wenss/wenss_clean.fits",                325e6,      "wenss",      scale=1.0484),
+    Catalog("vcss/vcss_clean.fits",                  340e6,      "vcss",       scale=0.9815),
+    Catalog("txs/txs_clean.fits",                    365e6,      "txs",        scale=0.9524),
+    Catalog("racs/racs_low_gal_clean.fits",          887.5e6,    "racs_gal",   scale=0.8879),  # the galactic portion of the racs-low survey
+    Catalog("racs/racs_low_clean.fits",              887.5e6,    "racs_low",   scale=0.8879),  # the rest of the racs-low survey
+    Catalog("apertif/apertif_clean.fits",            1355e6,     "apertif",    scale=0.9765),
+    Catalog("meerkat/meerkat_clean.fits",            1359.7e6,   "meerkat",    scale=0.8525),
+    Catalog("racs/racs_mid_clean.fits",              1367.5e6,   "racs_mid",   scale=0.9486),
+    Catalog("nvss/nvss_clean.fits",                  1400e6,     "nvss",       scale=1),
+    Catalog("first/first_clean.fits",                1400e6,     "first",      scale=1),
+    Catalog("racs/racs_high_clean.fits",             1655.5e6,   "racs_high",  scale=0.9901),
+    Catalog("vlass/vlass_clean.fits",                3000e6,     "vlass",      scale=0.9915),  # vlass
 ])
 
 #### Presets
@@ -112,6 +112,7 @@ def _build_parser():
 
     # additional overrides
     p.add_argument("--scale",                     type=float, default=1,     help="Scale values in the anchor catalog by this amount")
+    p.add_argument("--reference-catalog-dir",     default="catalogs",        help="Directory containing the reference catalog folders (vlssr/, tgss/, ...). Default: the catalogs/ folder shipped with RFS.")
     p.add_argument("--minimum-position-error",    type=float, default=None,  help="Set a minimum position error. Sources with lower error at set to this value (Default: None).")
     p.add_argument("--unit-fallback",             action="store_true",       help="Assume deg/Jy for input columns with ambiguous units, instead of stopping (default: False)")
     p.add_argument("--reference-file",            default=None,              help="Provide reference cutout when giving a large catalog to speed up matching")
@@ -166,6 +167,11 @@ def main():
     if args.spectral_model.lower() not in SPECTRAL_MODELS:
         raise SystemExit(f"--spectral-model must be one of {SPECTRAL_MODELS} (got {args.spectral_model}).")
 
+    # reference catalogs should be at --reference-catalog-dir. Defaults to 'catalogs'.
+    if args.reference_catalog_dir != "catalogs":
+        print(f"Using reference catalog dir: {args.reference_catalog_dir}")
+    set_reference_catalog_dir(args.reference_catalog_dir)
+
     # check for fits file
     catalog_path = Path(args.catalog)
     if not catalog_path.exists():
@@ -195,7 +201,7 @@ def main():
         sys.stdout = open(outdir / f"{output_name}_run.log", "w")
 
     anchor_cat = Catalog(
-        path=str(catalog_path),
+        path=str(catalog_path.absolute()),
         freq_hz=freq_hz,
         name=anchor_name,
         scale=args.scale,
