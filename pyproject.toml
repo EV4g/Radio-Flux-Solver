@@ -19,8 +19,8 @@ dependencies = [
 ]
 
 [tool.ty.rules]
-unresolved-attribute = "ignore"
-unresolved-import = "ignore"
+missing-attribute = "ignore"
+import-not-found = "ignore"
 
 [tool.ruff.lint]
 ignore = ["E701","E702","E722","I001"]
